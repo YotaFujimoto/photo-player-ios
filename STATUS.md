@@ -31,6 +31,10 @@ SwiftUIの手動カウンター、UserDefaults保存、ビルド表示、XcodeGe
 
 コミット `c57c790792e512289de79bbfd56d667ebfea4283` の [run 42347602362](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42347602362) でiPhone 17 / iOS 27.1を指定したところ該当機種が未登録で停止。取得した一覧を根拠に、存在する安定版iPhone 17 / iOS 27.0へ固定した。Xcodeは27.1、ビルド番号は1のまま。
 
+## ビルド2のCI調査
+
+[run 42350093139](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350093139)、コミット `e0819f29473570fda61bde3cacdfb923154d7da5` はUIテストの背景状態確認で失敗。回収したXCTest診断ログでは、背景状態の1秒待機が終了した後、一時停止状態を待っている間に実際の状態が背景へ変わり、誤って失敗していた。正常な背景／一時停止のどちらかを単一の述語で同時に待つよう修正し、終了・再起動後の値保持の検証は維持した。失敗時にも画面画像を取得できるようにした。アプリ本体・Bundle ID・保存方式は変更していない。
+
 ## 次の作業
 
 1. 同じBundle ID・保存キー `manualCounter.v1`・標準UserDefaultsのままビルド2をCIへ送り、成功したコミットのIPAを `dist/PhotoPlayer.ipa` へ取得する。実機合格済みビルド1は保管したままにする。

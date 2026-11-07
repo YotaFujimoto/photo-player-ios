@@ -18,6 +18,20 @@ printf 'Simulator: %s / iOS %s / %s\n' "$SIMULATOR_MODEL" "$SIMULATOR_OS" "$simu
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 
+# Export screenshots on test failure too, without losing the original failure status.
+export_test_evidence() {
+  local result=$?
+  trap - EXIT
+  if [[ -d build/TestResults.xcresult ]]; then
+    xcrun xcresulttool export attachments \
+      --path build/TestResults.xcresult --output-path build/screenshots || {
+        if [[ "$result" -eq 0 ]]; then result=1; fi
+      }
+  fi
+  exit "$result"
+}
+trap export_test_evidence EXIT
+
 xcodebuild test \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
@@ -34,6 +48,3 @@ xcodebuild test \
   -resultBundlePath build/TestResults.xcresult \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee build/test.log
-
-xcrun xcresulttool export attachments \
-  --path build/TestResults.xcresult --output-path build/screenshots

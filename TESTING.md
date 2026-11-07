@@ -6,7 +6,7 @@
 
 1. Xcode 27.1 / build 27A9275、XcodeGen 2.46.0と配布ZIPのSHA-256を照合し、選択結果を記録する。
 2. IPA検査器の回帰試験: 実機arm64を受理し、同じarm64でもシミュレーターのバイナリ、署名付きバイナリ、異なるBundle ID・ビルド番号を拒否する。
-3. iPhone 17 / iOS 27.0シミュレーター1台のRelease構成で、カウンターを12増やし、バックグラウンド移行・終了・再起動後も値とビルド番号が変わらないことをUIテストする。OSによるバックグラウンド中の一時停止も正常な遷移として扱う。縦・横の画面画像を保存する。
+3. iPhone 17 / iOS 27.0シミュレーター1台のRelease構成で、カウンターを12増やし、バックグラウンド移行・終了・再起動後も値とビルド番号が変わらないことをUIテストする。背景／一時停止のいずれかになるまで単一の述語で待機する。縦・横の画面画像を保存し、失敗時も取得できる添付画像を残す。
 4. 別の出力先で実機用Releaseアーカイブを生成。署名なし、`iPhoneOS`/`iphoneos`、arm64 Mach-Oの `LC_BUILD_VERSION platform=IOS(2)`、固定識別子、版番号を検査する。
 5. 対象コミット、run ID/attempt、SHA-256を記録したIPAをアップロード。Windows取得時もCI・ハッシュ・plist・Mach-Oを再照合する。
 
@@ -20,6 +20,7 @@ CIログ・xcresult・スクリーンショットは `ci-evidence`、実機IPA�
 - 実機IPA: CIとWindowsで未署名arm64 / iPhoneOS / Mach-OのIOSプラットフォーム / 固定Bundle ID / ビルド1 / SHA-256を検査し、`dist/PhotoPlayer.ipa` へ取得済み。ソース来歴は `dist/build-info.json`。
 - 初回実機: **ビルド1、全項目合格、値12**（2026-11-07の本人報告）。署名・導入、終了・再起動後の保存、PCなし・機内モード（Wi-Fiオフ）での起動と12保持を確認。元IPA・来歴・報告は `dist/known-good/build-1/` に保管。
 - 上書き試験版: ビルド番号のみ1→2へ変更。同じBundle ID・標準UserDefaults・保存キー `manualCounter.v1` を維持。CI・取得は進行中。
+- ビルド2の初回CI: [run 42350093139](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350093139) は背景状態判定の待機競合で失敗。診断ログで正常な背景移行を確認し、2状態を順次待つ方式から同時に待つ方式へ修正。保存値と再起動の合格条件は変更していない。
 - 上書き更新実機: 未実施（ビルド2の作成後に確認）。
 
 ## 初回の実機確認票（完了済み）
