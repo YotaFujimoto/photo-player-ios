@@ -22,7 +22,9 @@ CIの初回実行、実機署名・導入、PCなし・機内モードでの起�
 
 ## 初回CIの調査
 
-コミット `689dfe7a8822ac323c706ca633611844e636ac5a` の [run 42346620649](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42346620649) は試験ステップの長時間待機を調査するため中断。回収したログでは、起動と12までの加算後、ホーム遷移で `.runningBackground` だけを期待したテストが失敗していた。正常な `.runningBackgroundSuspended` も認め、再起動後の保存検証は維持する。また、最新ランタイム自動選択でiOS 27.2を使用していたため、iPhone 17 / iOS 27.1に固定した。ビルド番号は1のまま。
+コミット `689dfe7a8822ac323c706ca633611844e636ac5a` の [run 42346620649](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42346620649) は試験ステップの長時間待機を調査するため中断。回収したログでは、起動と12までの加算後、iPhone Duoのホーム遷移で `.runningBackground` に到達せずテストが失敗していた。正常な `.runningBackgroundSuspended` も扱うよう変更し、再起動後の保存検証は維持する。
+
+コミット `c57c790792e512289de79bbfd56d667ebfea4283` の [run 42347602362](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42347602362) でiPhone 17 / iOS 27.1を指定したところ該当機種が未登録で停止。取得した一覧を根拠に、存在する安定版iPhone 17 / iOS 27.0へ固定した。Xcodeは27.1、ビルド番号は1のまま。
 
 ## 次の作業
 

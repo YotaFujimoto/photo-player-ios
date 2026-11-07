@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Match the stable Xcode SDK instead of selecting an installed beta/RC runtime.
+# Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
 simulator_id="$(python3 -c '
 import json, os, sys
