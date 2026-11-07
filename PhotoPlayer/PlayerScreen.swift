@@ -25,20 +25,26 @@ private struct PlayerSurface: UIViewRepresentable {
 struct PlayerScreen: View {
     let video: LibraryVideo
     let selectionDiagnostics: Bool
+    let selectionTrace: SelectionTrace?
     @StateObject private var model: PlaybackModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
-    init(video: LibraryVideo, selectionDiagnostics: Bool = false) {
+    init(video: LibraryVideo, selectionDiagnostics: Bool = false, selectionTrace: SelectionTrace? = nil) {
         self.video = video
         self.selectionDiagnostics = selectionDiagnostics
+        self.selectionTrace = selectionTrace
         _model = StateObject(wrappedValue: PlaybackModel(asset: video.asset))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("閉じる", systemImage: "xmark") { model.close(); dismiss() }
+                Button("閉じる", systemImage: "xmark") {
+                    selectionTrace?.record("閉じる受付")
+                    selectionTrace?.observesLibrary = true
+                    model.close(); dismiss()
+                }
                     .accessibilityIdentifier("closePlayer")
                 Spacer()
                 VStack(spacing: 2) {
@@ -52,6 +58,7 @@ struct PlayerScreen: View {
                 }
                 Spacer()
             }.padding()
+            if selectionDiagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace) }
             GeometryReader { geometry in
                 if geometry.size.width > geometry.size.height {
                     HStack(spacing: 0) {
@@ -66,7 +73,11 @@ struct PlayerScreen: View {
                 }
             }
         }
-        .onAppear { model.load() }
+        .onAppear {
+            selectionTrace?.appear()
+            model.onLoadEvent = { [weak selectionTrace] event in selectionTrace?.loadEvent(event) }
+            model.load()
+        }
         .onDisappear { model.close() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { model.suspend() } }
     }
@@ -78,6 +89,12 @@ struct PlayerScreen: View {
                 VStack(spacing: 12) {
                     ProgressView(value: model.hasDownloadProgress ? model.progress : nil)
                     Text(model.hasDownloadProgress ? "動画を取得中 \(Int(model.progress * 100))%" : "動画を準備中")
+                        .accessibilityIdentifier("videoLoading")
+                    if ProcessInfo.processInfo.arguments.contains("--hold-player-result") {
+                        Button("試験用取得結果を渡す") { model.releaseTestResult() }
+                            .disabled(!model.isTestResultHeld)
+                            .accessibilityIdentifier("releasePlayerResult")
+                    }
                     Button("取得をキャンセル") { model.cancelLoading() }
                         .accessibilityIdentifier("cancelDownload")
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()

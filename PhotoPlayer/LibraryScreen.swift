@@ -3,6 +3,7 @@ import Photos
 
 struct LibraryScreen: View {
     @StateObject private var library = VideoLibrary()
+    @StateObject private var trace = SelectionTrace()
     @State private var selection: LibraryVideo?
     @State private var selectionDiagnostics = ProcessInfo.processInfo.arguments.contains("--selection-diagnostics")
     @Environment(\.scenePhase) private var scenePhase
@@ -27,7 +28,7 @@ struct LibraryScreen: View {
                             ScrollView {
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 12)], spacing: 16) {
                                     ForEach(library.videos) { video in
-                                        Button { selection = video } label: {
+                                        Button { trace.accept(video.diagnosticNumber); selection = video } label: {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
                                                     .allowsHitTesting(false)
@@ -39,6 +40,7 @@ struct LibraryScreen: View {
                                             // controls drawing, not the scaled image's hit-test extent.
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .contentShape(.interaction, Rectangle())
+                                            .background { ContactProbe(number: video.diagnosticNumber, trace: trace) }
                                             .overlay {
                                                 if selectionDiagnostics {
                                                     Rectangle().stroke(.orange, lineWidth: 1).allowsHitTesting(false)
@@ -54,6 +56,10 @@ struct LibraryScreen: View {
                         }
                         Text("iCloudの動画は選択時に取得します。動画の変更・削除は行いません。")
                             .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                        if selectionDiagnostics { SelectionTracePanel(trace: trace) }
+                        if selection != nil && !trace.isPlayerVisible {
+                            ProgressView("動画を開いています…").accessibilityIdentifier("openingVideo")
+                        }
                     }
                 } else if library.authorization == .notDetermined {
                     VStack(spacing: 20) {
@@ -86,10 +92,12 @@ struct LibraryScreen: View {
         .onChange(of: library.revision) { _, _ in
             if let selection, !library.videos.contains(where: { $0.id == selection.id }) {
                 self.selection = nil
+                trace.record("選択素材が一覧から消失")
             }
         }
-        .fullScreenCover(item: $selection) { video in
-            PlayerScreen(video: video, selectionDiagnostics: selectionDiagnostics)
+        .onChange(of: selection?.id) { _, value in trace.record(value == nil ? "選択解除" : "選択状態更新") }
+        .fullScreenCover(item: $selection, onDismiss: { trace.dismissed() }) { video in
+            PlayerScreen(video: video, selectionDiagnostics: selectionDiagnostics, selectionTrace: trace)
         }
     }
 }

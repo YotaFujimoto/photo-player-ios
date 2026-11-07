@@ -9,8 +9,13 @@ private struct PlayerItemResult: @unchecked Sendable {
     let errorCode: String?
 }
 
+enum VideoLoadEvent { case requested, received, ready, failed }
+
 @MainActor
 final class PlaybackModel: ObservableObject {
+    var onLoadEvent: ((VideoLoadEvent) -> Void)?
+    private var heldResult: (UUID, PlayerItemResult)?
+    @Published private(set) var isTestResultHeld = false
     let player = AVPlayer()
     let asset: PHAsset
     @Published private(set) var isLoading = false
@@ -69,6 +74,7 @@ final class PlaybackModel: ObservableObject {
         isLoading = true
         wantsPlayback = true
         let token = requestGate.begin()
+        onLoadEvent?(.requested)
         let options = PHVideoRequestOptions()
         options.version = .current
         options.deliveryMode = .highQualityFormat
@@ -88,26 +94,50 @@ final class PlaybackModel: ObservableObject {
                 cancelled: info?[PHImageCancelledKey] as? Bool == true,
                 errorCode: (info?[PHImageErrorKey] as? Error).map { PlaybackPolicy.errorCode($0) })
             Task { @MainActor in
-                guard let self, self.requestGate.finish(token) else { return }
-                self.requestID = nil
-                self.isLoading = false
-                if result.cancelled {
-                    self.wantsPlayback = false
-                    self.errorMessage = "取得をキャンセルしました。"
-                } else if let item = result.item {
-                    self.progress = 1
-                    self.install(item)
-                } else {
-                    self.wantsPlayback = false
-                    self.errorMessage = "動画を取得できません（\(result.errorCode ?? "利用不可")）。接続・写真のアクセス権を確認して再試行してください。"
+                guard let self, self.requestGate.accepts(token) else { return }
+                if ProcessInfo.processInfo.arguments.contains("--hold-player-result") {
+                    self.heldResult = (token, result)
+                    self.isTestResultHeld = true
+                    return
                 }
+                self.receive(result, token: token)
             }
         }
+    }
+
+    private func receive(_ result: PlayerItemResult, token: UUID) {
+        guard requestGate.finish(token) else { return }
+        requestID = nil
+        isLoading = false
+        if result.cancelled {
+            wantsPlayback = false
+            errorMessage = "取得をキャンセルしました。"
+            onLoadEvent?(.failed)
+        } else if let item = result.item {
+            progress = 1
+            onLoadEvent?(.received)
+            install(item)
+        } else {
+            wantsPlayback = false
+            errorMessage = "動画を取得できません（\(result.errorCode ?? "利用不可")）。接続・写真のアクセス権を確認して再試行してください。"
+            onLoadEvent?(.failed)
+        }
+    }
+
+    // Deterministic CI gate, not a production delay or an opening workaround.
+    func releaseTestResult() {
+        guard let (token, result) = heldResult else { return }
+        heldResult = nil
+        isTestResultHeld = false
+        receive(result, token: token)
     }
 
     func cancelLoading() { failDownload("取得をキャンセルしました。") }
 
     private func failDownload(_ message: String) {
+        heldResult = nil
+        isTestResultHeld = false
+        onLoadEvent?(.failed)
         requestGate.cancel()
         if let requestID { manager.cancelImageRequest(requestID) }
         requestID = nil
@@ -178,6 +208,7 @@ final class PlaybackModel: ObservableObject {
     private func refresh(ifSession currentSession: UUID) {
         guard session == currentSession, let item = player.currentItem else { return }
         if item.status == .failed {
+            if errorMessage == nil { onLoadEvent?(.failed) }
             pause()
             isReady = false
             errorMessage = "再生を準備できません（\(PlaybackPolicy.errorCode(item.error))）。"
@@ -185,6 +216,7 @@ final class PlaybackModel: ObservableObject {
             return
         }
         let firstReady = !isReady && item.status == .readyToPlay
+        if firstReady { onLoadEvent?(.ready) }
         assign(\.isReady, item.status == .readyToPlay)
         assign(\.canPlaySlow, isReady && item.canPlaySlowForward)
         let seconds = item.duration.seconds
@@ -339,6 +371,8 @@ final class PlaybackModel: ObservableObject {
     }
 
     func close() {
+        heldResult = nil
+        isTestResultHeld = false
         session = UUID()
         requestGate.cancel()
         if let requestID { manager.cancelImageRequest(requestID) }
