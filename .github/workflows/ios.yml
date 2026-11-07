@@ -1,10 +1,11 @@
-name: iOS initial installation
+name: iOS Release verification
 
 on:
   push:
     paths:
       - 'PhotoPlayer/**'
       - 'PhotoPlayerUITests/**'
+      - 'PhotoPlayerTests/**'
       - 'Config/**'
       - 'project.yml'
       - 'scripts/**'
@@ -48,9 +49,11 @@ jobs:
         run: bash scripts/prepare-ci.sh
 
       - name: Test IPA validator
-        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+          python3 scripts/check_media_policy.py
 
-      - name: Test persistence on one iPhone simulator
+      - name: Test persistence and PhotoKit playback on one iPhone simulator
         timeout-minutes: 15
         run: bash scripts/test-ios.sh
 

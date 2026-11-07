@@ -32,6 +32,20 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        ENABLE_TESTABILITY: YES
+  PhotoPlayerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PhotoPlayerTests
+    dependencies:
+      - target: PhotoPlayer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/PhotoPlayer.app/PhotoPlayer
+        BUNDLE_LOADER: $(TEST_HOST)
   PhotoPlayerUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -55,6 +69,7 @@ schemes:
       config: Release
       gatherCoverageData: false
       targets:
+        - PhotoPlayerTests
         - PhotoPlayerUITests
     archive:
       config: Release

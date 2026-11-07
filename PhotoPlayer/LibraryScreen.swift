@@ -1,0 +1,74 @@
+import SwiftUI
+import Photos
+
+struct LibraryScreen: View {
+    @StateObject private var library = VideoLibrary()
+    @State private var selection: LibraryVideo?
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if library.canRead {
+                    VStack(spacing: 8) {
+                        if library.authorization == .limited {
+                            HStack {
+                                Text("選択した動画のみ").font(.caption)
+                                Spacer()
+                                Button("選択を変更") { library.changeLimitedSelection() }
+                            }.padding(.horizontal)
+                        }
+                        if library.videos.isEmpty {
+                            ContentUnavailableView("動画がありません", systemImage: "video",
+                                description: Text("写真ライブラリに動画を追加するか、アクセスできる動画の選択を確認してください。"))
+                        } else {
+                            ScrollView {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 12)], spacing: 16) {
+                                    ForEach(library.videos) { video in
+                                        Button { selection = video } label: {
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
+                                                Text(video.asset.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "動画")
+                                                    .font(.caption).foregroundStyle(.primary)
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityIdentifier("videoCard")
+                                    }
+                                }.padding()
+                            }
+                        }
+                        Text("iCloudの動画は選択時に取得します。動画の変更・削除は行いません。")
+                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                    }
+                } else if library.authorization == .notDetermined {
+                    VStack(spacing: 20) {
+                        ContentUnavailableView("写真の動画を再生", systemImage: "photo.on.rectangle",
+                            description: Text("動画を一覧表示するために、写真ライブラリへのアクセスを許可してください。"))
+                        Button("動画へのアクセスを許可") { Task { await library.requestAccess() } }
+                            .buttonStyle(.borderedProminent).accessibilityIdentifier("authorizePhotos")
+                    }.padding()
+                } else {
+                    VStack {
+                        ContentUnavailableView("写真へのアクセスがありません", systemImage: "lock",
+                            description: Text("設定で写真へのアクセスを許可してください。端末の利用制限がある場合は管理設定も確認してください。"))
+                        Button("設定を開く") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                        }.buttonStyle(.bordered)
+                    }.padding()
+                }
+            }
+            .navigationTitle("動画")
+            .toolbar { Button("更新", systemImage: "arrow.clockwise") { library.refresh() } }
+        }
+        .task { library.refresh() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { library.refresh() } }
+        .onChange(of: library.revision) { _, _ in
+            if let selection, !library.videos.contains(where: { $0.id == selection.id }) {
+                self.selection = nil
+            }
+        }
+        .fullScreenCover(item: $selection) { video in PlayerScreen(video: video) }
+    }
+}

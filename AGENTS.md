@@ -2,8 +2,8 @@
 
 ## 現在の範囲
 
-段階0（環境・CI）と段階1（導入検証）のみ。開始時に `SPEC.md`、`STATUS.md`、`TESTING.md` を読む。
-初回IPAの実機結果を受け取るまで上書き試験版を作らない。上書き後のデータ維持まで実機で合格し、次段階の指示を受けるまで動画プレイヤーを実装しない。
+現在は段階2（再生の核心）。開始時に `SPEC.md`、`STATUS.md`、`TESTING.md` を読む。
+ビルド2の実機上書き・オフライン起動・値12の保持は2026-11-07に合格報告を受け、段階2の実装が許可された。PhotoKit一覧・サムネイル、直接再生、シーク、0.25倍を含む速度変更、iCloud取得を実装する。音声付き0.25倍と長時間動画の実機確認前に段階3以降へ広げない。
 
 ## 自律作業と保護事項
 
@@ -17,7 +17,7 @@
 ## 実装・検証・引き渡し
 
 1. 必要な最小変更を行い、差分と公開対象を確認する。生成したXcodeプロジェクト、ログ、IPAはコミットしない。
-2. `Config/Version.xcconfig` が版番号の正本。初回の修正中はビルド1を維持し、次の実機候補作成時に増やす。
+2. `Config/Version.xcconfig` が版番号の正本。現在の段階2候補はビルド3。同じ候補のCI修正中は番号を維持し、次の実機候補作成時に増やす。
 3. push後、`gh run list --commit <SHA>` で対象CIを特定する。CIの `head_sha` と対象コミットを照合する。文書だけの変更はビルド対象外。
 4. 失敗時は `gh run view <ID> --log-failed` を読み、根拠のある修正をして再実行する。同一原因で3回失敗したら原因分析を見直す。テスト削除・合格条件緩和で成功扱いにしない。
 5. 成功後、`scripts/Get-Ipa.ps1 -RunId <ID> -Commit <完全SHA>` で `dist/PhotoPlayer.ipa` を取得する。成功状態、対象コミット、run attempt、SHA-256、Bundle ID、ビルド番号、iPhoneOS plist、Mach-OのiOS実機プラットフォームを照合してから配置する。
@@ -33,3 +33,5 @@
 - CIは署名無効。`xcodebuild -exportArchive` による署名フローを使わず、実機アーカイブ内のアプリを `Payload/PhotoPlayer.app` に格納する。
 - WindowsにはSwift/Xcode/Pythonの導入を要求しない。`gh` がPATHにない場合は `Program Files/GitHub CLI/gh.exe` を使う。通信制限と認証失敗を混同しない。
 - Actions成果物の保持は3日。実機合格したIPAはローカルの `dist/known-good/` に保管し、新候補で置き換えない。
+- PhotoKitの `.current` 動画を `requestPlayerItem` で再生し、動画本体の永続的な書き出し・コピーをしない。写真ライブラリ変更API・外部アップロードを実装しない。OS管理のiCloud取得キャッシュは別扱い。
+- CIの動画・音声・静止画はスクリプトで生成する合成素材だけを使用する。実動画・ファイル名・ローカル識別子を診断出力へ含めない。

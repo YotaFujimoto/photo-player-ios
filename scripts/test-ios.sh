@@ -32,7 +32,24 @@ export_test_evidence() {
 }
 trap export_test_evidence EXIT
 
-xcodebuild test \
+xcrun swift scripts/GenerateFixtures.swift build/fixtures 2>&1 | tee build/fixtures.log
+xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/synthetic-video.mov
+
+xcodebuild build-for-testing \
+  -project PhotoPlayer.xcodeproj \
+  -scheme PhotoPlayer \
+  -configuration Release \
+  -sdk iphonesimulator \
+  -destination "platform=iOS Simulator,id=$simulator_id" \
+  -derivedDataPath build/simulator \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  2>&1 | tee build/test-build.log
+
+# Grant read access on the synthetic simulator library before exercising the real PhotoKit path.
+xcrun simctl install "$simulator_id" build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayer.app
+xcrun simctl privacy "$simulator_id" grant photos io.github.photoplayer.p6a936d329b934a8ba532081564a51c07
+
+xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
   -configuration Release \
@@ -42,8 +59,8 @@ xcodebuild test \
   -maximum-concurrent-test-simulator-destinations 1 \
   -destination-timeout 60 \
   -test-timeouts-enabled YES \
-  -default-test-execution-time-allowance 90 \
-  -maximum-test-execution-time-allowance 120 \
+  -default-test-execution-time-allowance 120 \
+  -maximum-test-execution-time-allowance 180 \
   -derivedDataPath build/simulator \
   -resultBundlePath build/TestResults.xcresult \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \

@@ -6,6 +6,7 @@ final class CounterPersistenceTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
+        app.tabBars.buttons["導入確認"].tap()
 
         let counter = app.staticTexts["counterValue"]
         XCTAssertTrue(counter.waitForExistence(timeout: 10))
@@ -39,6 +40,7 @@ final class CounterPersistenceTests: XCTestCase {
         )
         app.terminate()
         app.launch()
+        app.tabBars.buttons["導入確認"].tap()
         XCTAssertTrue(counter.waitForExistence(timeout: 10))
         XCTAssertEqual(counter.label, expectedValue)
         XCTAssertEqual(build.label, originalBuild)

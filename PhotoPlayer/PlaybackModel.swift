@@ -1,0 +1,337 @@
+@preconcurrency import AVFoundation
+@preconcurrency import Photos
+import SwiftUI
+
+// The PhotoKit callback transfers the item to MainActor; it is never used on that queue again.
+private struct PlayerItemResult: @unchecked Sendable {
+    let item: AVPlayerItem?
+    let cancelled: Bool
+    let errorCode: String?
+}
+
+@MainActor
+final class PlaybackModel: ObservableObject {
+    let player = AVPlayer()
+    let asset: PHAsset
+    @Published private(set) var isLoading = false
+    @Published private(set) var isReady = false
+    @Published private(set) var cloudDownload = false
+    @Published private(set) var progress = 0.0
+    @Published private(set) var errorMessage: String?
+    @Published private(set) var position = 0.0
+    @Published private(set) var duration = 0.0
+    @Published private(set) var selectedRate: Float = 1
+    @Published private(set) var actualRate: Float = 0
+    @Published private(set) var wantsPlayback = false
+    @Published private(set) var canPlaySlow = false
+    @Published private(set) var isSeeking = false
+    @Published private(set) var stateText = "準備中"
+    @Published private(set) var pictureSize = CGSize.zero
+    @Published private(set) var bufferedUntil = 0.0
+    @Published private(set) var voicePitch = false
+
+    private let manager = PHImageManager()
+    private var requestID: PHImageRequestID?
+    private var requestGate = RequestGate()
+    private var session = UUID()
+    private var observations: [NSKeyValueObservation] = []
+    private var notifications: [NSObjectProtocol] = []
+    private var timeObserver: Any?
+    private var seekQueue = SeekQueue()
+    private var scrubbing = false
+    private var scrubTask: Task<Void, Never>?
+    private var audioActive = false
+
+    init(asset: PHAsset) { self.asset = asset }
+
+    func load() {
+        close()
+        errorMessage = nil
+        duration = asset.duration
+        position = 0
+        progress = 0
+        cloudDownload = false
+        selectedRate = 1
+        stateText = "準備中"
+        isLoading = true
+        wantsPlayback = true
+        let token = requestGate.begin()
+        let options = PHVideoRequestOptions()
+        options.version = .current
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        options.progressHandler = { @Sendable [weak self] fraction, error, _, _ in
+            let errorCode = error.map { PlaybackPolicy.errorCode($0) }
+            Task { @MainActor in
+                guard let self, self.requestGate.accepts(token) else { return }
+                self.cloudDownload = true
+                if fraction.isFinite { self.progress = max(self.progress, min(max(fraction, 0), 1)) }
+                if let errorCode { self.failDownload("iCloud取得に失敗しました（\(errorCode)）。接続を確認して再試行してください。") }
+            }
+        }
+        requestID = manager.requestPlayerItem(forVideo: asset, options: options) { @Sendable [weak self] item, info in
+            let result = PlayerItemResult(item: item,
+                cancelled: info?[PHImageCancelledKey] as? Bool == true,
+                errorCode: (info?[PHImageErrorKey] as? Error).map { PlaybackPolicy.errorCode($0) })
+            Task { @MainActor in
+                guard let self, self.requestGate.finish(token) else { return }
+                self.requestID = nil
+                self.isLoading = false
+                if result.cancelled {
+                    self.wantsPlayback = false
+                    self.errorMessage = "取得をキャンセルしました。"
+                } else if let item = result.item {
+                    self.progress = 1
+                    self.install(item)
+                } else {
+                    self.wantsPlayback = false
+                    self.errorMessage = "動画を取得できません（\(result.errorCode ?? "利用不可")）。接続・写真のアクセス権を確認して再試行してください。"
+                }
+            }
+        }
+    }
+
+    func cancelLoading() { failDownload("取得をキャンセルしました。") }
+
+    private func failDownload(_ message: String) {
+        requestGate.cancel()
+        if let requestID { manager.cancelImageRequest(requestID) }
+        requestID = nil
+        isLoading = false
+        wantsPlayback = false
+        errorMessage = message
+        stateText = "取得停止"
+    }
+
+    private func install(_ item: AVPlayerItem) {
+        let currentSession = session
+        item.audioTimePitchAlgorithm = voicePitch ? .timeDomain : .spectral
+        player.replaceCurrentItem(with: item)
+        observations = [
+            item.observe(\.status, options: [.initial, .new]) { @Sendable [weak self] _, _ in
+                Task { @MainActor in self?.refresh(ifSession: currentSession) }
+            },
+            player.observe(\.timeControlStatus, options: [.new]) { @Sendable [weak self] _, _ in
+                Task { @MainActor in self?.refresh(ifSession: currentSession) }
+            },
+            player.observe(\.rate, options: [.new]) { @Sendable [weak self] _, _ in
+                Task { @MainActor in self?.refresh(ifSession: currentSession) }
+            }
+        ]
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) {
+            @Sendable [weak self] _ in Task { @MainActor in self?.refresh(ifSession: currentSession) }
+        }
+        notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) {
+            [weak self] _ in Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.pause()
+                self.position = self.duration
+                self.stateText = "終了"
+            }
+        })
+        notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) {
+            [weak self] note in
+            let code = PlaybackPolicy.errorCode(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)
+            Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.pause()
+                self.errorMessage = "再生に失敗しました（\(code)）。"
+            }
+        })
+        notifications.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) {
+            [weak self] _ in Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.pause()
+            }
+        })
+        notifications.append(NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) {
+            [weak self] note in
+            let disconnected = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue
+            if disconnected { Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.pause()
+            } }
+        })
+    }
+
+    private func refresh(ifSession currentSession: UUID) {
+        guard session == currentSession, let item = player.currentItem else { return }
+        if item.status == .failed {
+            pause()
+            isReady = false
+            errorMessage = "再生を準備できません（\(PlaybackPolicy.errorCode(item.error))）。"
+            stateText = "エラー"
+            return
+        }
+        let firstReady = !isReady && item.status == .readyToPlay
+        isReady = item.status == .readyToPlay
+        canPlaySlow = isReady && item.canPlaySlowForward
+        let seconds = item.duration.seconds
+        if seconds.isFinite && seconds > 0 { duration = seconds }
+        pictureSize = item.presentationSize
+        if !scrubbing && !seekQueue.isBusy { position = PlaybackPolicy.position(player.currentTime().seconds, duration: duration) }
+        bufferedUntil = item.loadedTimeRanges.map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
+            .filter(\.isFinite).max() ?? 0
+        actualRate = player.rate
+        if !isReady { stateText = "準備中" }
+        else if isSeeking { stateText = "移動中" }
+        else {
+            switch player.timeControlStatus {
+            case .playing: stateText = "再生中"
+            case .waitingToPlayAtSpecifiedRate: stateText = "読み込み待ち"
+            case .paused: stateText = position >= duration && duration > 0 ? "終了" : "一時停止"
+            @unknown default: stateText = "待機中"
+            }
+        }
+        if firstReady && wantsPlayback { resumeIfNeeded() }
+    }
+
+    func togglePlayback() {
+        if wantsPlayback { pause() }
+        else {
+            wantsPlayback = true
+            if duration > 0 && position >= duration - 0.1 { enqueueSeek(0, exact: true) }
+            else { resumeIfNeeded() }
+        }
+    }
+
+    func pause() {
+        wantsPlayback = false
+        player.pause()
+        actualRate = 0
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func resumeIfNeeded() {
+        guard wantsPlayback, isReady, !scrubbing, !seekQueue.isBusy else { return }
+        guard selectedRate >= 1 || canPlaySlow else {
+            pause()
+            errorMessage = "この動画は低速再生に対応していません。"
+            return
+        }
+        do {
+            if !audioActive {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+                try AVAudioSession.sharedInstance().setActive(true)
+                audioActive = true
+            }
+            player.rate = selectedRate
+            UIApplication.shared.isIdleTimerDisabled = true
+        } catch {
+            pause()
+            errorMessage = "音声を準備できません（\(PlaybackPolicy.errorCode(error))）。"
+        }
+    }
+
+    func setRate(_ rate: Float) {
+        guard PlaybackPolicy.rates.contains(rate), rate >= 1 || canPlaySlow else { return }
+        selectedRate = rate
+        resumeIfNeeded()
+    }
+
+    func setVoicePitch(_ value: Bool) {
+        voicePitch = value
+        player.currentItem?.audioTimePitchAlgorithm = value ? .timeDomain : .spectral
+    }
+
+    func beginScrubbing() {
+        scrubbing = true
+        player.pause()
+    }
+
+    func scrub(to seconds: Double) {
+        position = PlaybackPolicy.position(seconds, duration: duration)
+        guard scrubbing else { return }
+        if scrubTask == nil {
+            scrubTask = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(120)) } catch { return }
+                guard let self, !Task.isCancelled else { return }
+                self.scrubTask = nil
+                self.enqueueSeek(self.position, exact: false)
+            }
+        }
+    }
+
+    func endScrubbing() {
+        scrubTask?.cancel()
+        scrubTask = nil
+        scrubbing = false
+        enqueueSeek(position, exact: true)
+    }
+
+    private func enqueueSeek(_ seconds: Double, exact: Bool) {
+        guard isReady, duration > 0 else { return }
+        let request = SeekRequest(seconds: PlaybackPolicy.position(seconds, duration: duration), exact: exact)
+        player.pause()
+        isSeeking = true
+        if let next = seekQueue.enqueue(request) { performSeek(next) }
+    }
+
+    private func performSeek(_ request: SeekRequest) {
+        let currentSession = session
+        let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
+        player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) {
+            @Sendable [weak self] finished in Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                if let next = self.seekQueue.finish() { self.performSeek(next) }
+                else {
+                    self.isSeeking = false
+                    if !self.scrubbing { self.position = PlaybackPolicy.position(self.player.currentTime().seconds, duration: self.duration) }
+                    if finished { self.resumeIfNeeded() }
+                    else {
+                        self.pause()
+                        self.errorMessage = "指定位置へ移動できませんでした。再試行してください。"
+                    }
+                }
+            }
+        }
+    }
+
+    func suspend() {
+        pause()
+        if isLoading { cancelLoading() }
+        deactivateAudio()
+    }
+
+    private func deactivateAudio() {
+        if audioActive { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+        audioActive = false
+    }
+
+    func close() {
+        session = UUID()
+        requestGate.cancel()
+        if let requestID { manager.cancelImageRequest(requestID) }
+        requestID = nil
+        scrubTask?.cancel()
+        scrubTask = nil
+        scrubbing = false
+        seekQueue.cancel()
+        player.currentItem?.cancelPendingSeeks()
+        pause()
+        if let timeObserver { player.removeTimeObserver(timeObserver) }
+        timeObserver = nil
+        observations.forEach { $0.invalidate() }
+        observations = []
+        notifications.forEach { NotificationCenter.default.removeObserver($0) }
+        notifications = []
+        player.replaceCurrentItem(with: nil)
+        isReady = false
+        isLoading = false
+        isSeeking = false
+        deactivateAudio()
+    }
+
+    var diagnosticText: String {
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return """
+        PhotoPlayer build \(build)
+        長さ: \(PlaybackPolicy.clock(duration)) / 位置: \(PlaybackPolicy.clock(position))
+        解像度: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(asset.mediaSubtypes.contains(.videoHDR))
+        速度: 選択 \(selectedRate) / 実際 \(actualRate) / 低速対応: \(canPlaySlow)
+        状態: \(stateText) / iCloud取得: \(cloudDownload) / 進捗: \(Int(progress * 100))%
+        音程補正: \(voicePitch ? "音声向け" : "標準")
+        エラー: \(errorMessage ?? "なし")
+        """
+    }
+}
