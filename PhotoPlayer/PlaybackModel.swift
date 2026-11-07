@@ -42,8 +42,19 @@ final class PlaybackModel: ObservableObject {
     private var scrubbing = false
     private var scrubTask: Task<Void, Never>?
     private var audioActive = false
+    private var audioActivating = false
+    private var audioRequest = UUID()
 
     init(asset: PHAsset) { self.asset = asset }
+
+    private func assign<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<PlaybackModel, Value>, _ value: Value) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+    }
+
+    private func trace(_ event: String) {
+        guard ProcessInfo.processInfo.arguments.contains("--playback-diagnostics") else { return }
+        print("Playback: \(event), time=\(position), selected=\(selectedRate), actual=\(player.rate), state=\(stateText)")
+    }
 
     func load() {
         close()
@@ -174,25 +185,27 @@ final class PlaybackModel: ObservableObject {
             return
         }
         let firstReady = !isReady && item.status == .readyToPlay
-        isReady = item.status == .readyToPlay
-        canPlaySlow = isReady && item.canPlaySlowForward
+        assign(\.isReady, item.status == .readyToPlay)
+        assign(\.canPlaySlow, isReady && item.canPlaySlowForward)
         let seconds = item.duration.seconds
-        if seconds.isFinite && seconds > 0 { duration = seconds }
-        pictureSize = item.presentationSize
-        if !scrubbing && !seekQueue.isBusy { position = PlaybackPolicy.position(player.currentTime().seconds, duration: duration) }
-        bufferedUntil = item.loadedTimeRanges.map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
-            .filter(\.isFinite).max() ?? 0
-        actualRate = player.rate
-        if !isReady { stateText = "準備中" }
-        else if isSeeking { stateText = "移動中" }
+        if seconds.isFinite && seconds > 0 { assign(\.duration, seconds) }
+        assign(\.pictureSize, item.presentationSize)
+        if !scrubbing && !seekQueue.isBusy { assign(\.position, PlaybackPolicy.position(player.currentTime().seconds, duration: duration)) }
+        assign(\.bufferedUntil, item.loadedTimeRanges.map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
+            .filter(\.isFinite).max() ?? 0)
+        assign(\.actualRate, player.rate)
+        let newState: String
+        if !isReady { newState = "準備中" }
+        else if isSeeking { newState = "移動中" }
         else {
             switch player.timeControlStatus {
-            case .playing: stateText = "再生中"
-            case .waitingToPlayAtSpecifiedRate: stateText = "読み込み待ち"
-            case .paused: stateText = position >= duration && duration > 0 ? "終了" : "一時停止"
-            @unknown default: stateText = "待機中"
+            case .playing: newState = "再生中"
+            case .waitingToPlayAtSpecifiedRate: newState = "読み込み待ち"
+            case .paused: newState = position >= duration && duration > 0 ? "終了" : "一時停止"
+            @unknown default: newState = "待機中"
             }
         }
+        assign(\.stateText, newState)
         if firstReady && wantsPlayback { resumeIfNeeded() }
     }
 
@@ -206,9 +219,9 @@ final class PlaybackModel: ObservableObject {
     }
 
     func pause() {
-        wantsPlayback = false
-        player.pause()
-        actualRate = 0
+        assign(\.wantsPlayback, false)
+        if player.timeControlStatus != .paused || player.rate != 0 { player.pause() }
+        assign(\.actualRate, 0)
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -219,18 +232,29 @@ final class PlaybackModel: ObservableObject {
             errorMessage = "この動画は低速再生に対応していません。"
             return
         }
-        do {
-            if !audioActive {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-                try AVAudioSession.sharedInstance().setActive(true)
-                audioActive = true
+        if !audioActive {
+            guard !audioActivating else { return }
+            audioActivating = true
+            let token = UUID()
+            audioRequest = token
+            PlaybackAudioSession.setActive(true) { [weak self] errorCode in
+                Task { @MainActor in
+                    guard let self, self.audioRequest == token else { return }
+                    self.audioActivating = false
+                    if let errorCode {
+                        self.pause()
+                        self.errorMessage = "音声を準備できません（\(errorCode)）。"
+                    } else {
+                        self.audioActive = true
+                        self.resumeIfNeeded()
+                    }
+                }
             }
-            player.rate = selectedRate
-            UIApplication.shared.isIdleTimerDisabled = true
-        } catch {
-            pause()
-            errorMessage = "音声を準備できません（\(PlaybackPolicy.errorCode(error))）。"
+            return
         }
+        if player.rate != selectedRate { player.rate = selectedRate }
+        UIApplication.shared.isIdleTimerDisabled = true
+        trace("resume")
     }
 
     func setRate(_ rate: Float) {
@@ -279,6 +303,7 @@ final class PlaybackModel: ObservableObject {
 
     private func performSeek(_ request: SeekRequest) {
         let currentSession = session
+        trace("seek start \(request.seconds), exact=\(request.exact)")
         let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) {
             @Sendable [weak self] finished in Task { @MainActor in
@@ -294,6 +319,7 @@ final class PlaybackModel: ObservableObject {
                     }
                     // A paused player may not emit another periodic callback after the seek.
                     self.refresh(ifSession: currentSession)
+                    self.trace("seek completed=\(finished)")
                 }
             }
         }
@@ -306,8 +332,10 @@ final class PlaybackModel: ObservableObject {
     }
 
     private func deactivateAudio() {
-        if audioActive { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+        audioRequest = UUID()
+        if audioActive || audioActivating { PlaybackAudioSession.setActive(false) }
         audioActive = false
+        audioActivating = false
     }
 
     func close() {

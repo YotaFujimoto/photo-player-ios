@@ -16,7 +16,9 @@ private struct PlayerSurface: UIViewRepresentable {
         view.playerLayer.player = player
         return view
     }
-    func updateUIView(_ uiView: PlayerLayerView, context: Context) { uiView.playerLayer.player = player }
+    func updateUIView(_ uiView: PlayerLayerView, context: Context) {
+        if uiView.playerLayer.player !== player { uiView.playerLayer.player = player }
+    }
     static func dismantleUIView(_ uiView: PlayerLayerView, coordinator: ()) { uiView.playerLayer.player = nil }
 }
 

@@ -5,6 +5,7 @@ final class VideoPlaybackTests: XCTestCase {
     func testPhotoKitVideoPlaybackRateAndSeek() {
         continueAfterFailure = false
         let app = XCUIApplication()
+        app.launchArguments = ["--playback-diagnostics"]
         app.launch()
         let card = app.buttons.matching(identifier: "videoCard").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20))
