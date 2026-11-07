@@ -28,8 +28,11 @@ CIログ・xcresult・スクリーンショットは `ci-evidence`、実機IPA�
 - 上書き試験版: アプリの変更はビルド番号1→2のみ。同じBundle ID・標準UserDefaults・保存キー `manualCounter.v1` を維持。CI・取得は完了。
 - ビルド2の初回CI: [run 42350093139](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350093139) は背景状態判定の待機競合で失敗。診断ログで正常な背景移行を確認し、2状態を順次待つ方式から同時に待つ方式へ修正。保存値と再起動の合格条件は変更していない。
 - ビルド2の修正後CI: **成功**。[run 42350896546](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350896546)、コミット `003a6d73620230685e6f7509fa3a894d189d8355`。検査器4テスト、保存・背景移行・終了・再起動のUIテスト1件（失敗0）。縦横画像のビルド2・値12を目視確認済み。
-- ビルド2の実機IPA: `dist/PhotoPlayer.ipa` に取得済み。来歴・SHA-256・固定Bundle ID・ビルド番号2・実機arm64/iPhoneOS/IOSプラットフォーム・署名なしを検査済み。SHA-256は `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0`。来歴は `dist/build-info.json`。
+- ビルド2の実機IPA: 現在は `dist/known-good/build-2/PhotoPlayer.ipa` に保管。来歴・SHA-256・固定Bundle ID・ビルド番号2・実機arm64/iPhoneOS/IOSプラットフォーム・署名なしを検査済み。SHA-256は `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0`。来歴も同じ保管先の `build-info.json`。
 - 上書き更新実機: **ビルド2、全項目合格、値12**（2026-11-07の本人報告）。削除せず上書き後の値12保持と、PCなし・機内モード再起動に合格。段階1合格。IPA・来歴・確認結果を `dist/known-good/build-2/` に保管済み。
+- ビルド3の段階2CI: **成功**。[run 42360541851 / attempt 2](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42360541851)、コミット `6125b2db204f7d45cd7b582c3f590a10be993c61`。検査器4件・単体6件・UI2件の計12件で失敗0。Photos一覧の動画限定・サムネイル・再生／停止・0.25倍の実速度と時刻進行・停止中／再生中のシークと速度維持・横画面操作・閉じる・カウンター再起動後の12保持が成功。合成動画と禁止APIの検査も成功。
+- 成功attemptの一覧・低速再生・横画面シーク・カウンター縦横の計5画像を目視確認。ログ・xcresult・画像は `build/evidence-42360541851-attempt2/` に取得済み。attempt 1は再生開始前のXCTest内部I/O待ちで時間切れになったため、同じソース・同じ条件で再実行した。調査履歴は `STATUS.md` に記載。
+- ビルド3の実機IPA: `dist/PhotoPlayer.ipa`、0.2.0 / 3、202,364 bytes。成功CI・コミット・attempt 2・固定Bundle ID・ビルド番号・iPhoneOS plist・実機arm64のMach-O IOS(2)・未署名をCIとWindowsで照合済み。SHA-256: `f1814b986319892ea6a940b99b58cb3e9a836ab031a5a244a541f7b4f8da5975`。来歴は `dist/build-info.json`。**ビルド3の実機結果は未確認**。
 
 ## 初回の実機確認票（完了済み）
 
