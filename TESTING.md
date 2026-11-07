@@ -17,11 +17,13 @@ CIログ・xcresult・スクリーンショットは `ci-evidence`、実機IPA�
 - 初回CI: 起動と加算は成功。iPhone Duoでホーム遷移後のバックグラウンド状態判定が失敗。長時間待機を中断してログを取得し、一時停止状態も扱う判定と安定版シミュレーター選択へ修正。
 - 2回目CI: iOS 27.1にはiPhone Duoしか登録されておらず、指定したiPhone 17を発見できず停止。取得した一覧で確認したiPhone 17 / iOS 27.0へ固定。Xcodeは27.1のまま。
 - 3回目CI: **成功**。[run 42347702781](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42347702781)、コミット `797b8d0b62591d1ec281f4ad34dc69013a44ba53`。検査器4テスト、UIテスト1件（失敗0）。画面のビルド1・値12、再起動後の12保持、縦横画像を確認済み。
-- 実機IPA: CIとWindowsで未署名arm64 / iPhoneOS / Mach-OのIOSプラットフォーム / 固定Bundle ID / ビルド1 / SHA-256を検査し、`dist/PhotoPlayer.ipa` へ取得済み。ソース来歴は `dist/build-info.json`。
+- 初回IPA: CIとWindowsで未署名arm64 / iPhoneOS / Mach-OのIOSプラットフォーム / 固定Bundle ID / ビルド1 / SHA-256を検査済み。現在は来歴とともに `dist/known-good/build-1/` に保管。
 - 初回実機: **ビルド1、全項目合格、値12**（2026-11-07の本人報告）。署名・導入、終了・再起動後の保存、PCなし・機内モード（Wi-Fiオフ）での起動と12保持を確認。元IPA・来歴・報告は `dist/known-good/build-1/` に保管。
-- 上書き試験版: ビルド番号のみ1→2へ変更。同じBundle ID・標準UserDefaults・保存キー `manualCounter.v1` を維持。CI・取得は進行中。
+- 上書き試験版: アプリの変更はビルド番号1→2のみ。同じBundle ID・標準UserDefaults・保存キー `manualCounter.v1` を維持。CI・取得は完了。
 - ビルド2の初回CI: [run 42350093139](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350093139) は背景状態判定の待機競合で失敗。診断ログで正常な背景移行を確認し、2状態を順次待つ方式から同時に待つ方式へ修正。保存値と再起動の合格条件は変更していない。
-- 上書き更新実機: 未実施（ビルド2の作成後に確認）。
+- ビルド2の修正後CI: **成功**。[run 42350896546](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350896546)、コミット `003a6d73620230685e6f7509fa3a894d189d8355`。検査器4テスト、保存・背景移行・終了・再起動のUIテスト1件（失敗0）。縦横画像のビルド2・値12を目視確認済み。
+- ビルド2の実機IPA: `dist/PhotoPlayer.ipa` に取得済み。来歴・SHA-256・固定Bundle ID・ビルド番号2・実機arm64/iPhoneOS/IOSプラットフォーム・署名なしを検査済み。SHA-256は `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0`。来歴は `dist/build-info.json`。
+- 上書き更新実機: **未確認、本人のビルド2結果待ち**。初回の実機合格やシミュレーターの再起動試験から上書きの成功を推定しない。
 
 ## 初回の実機確認票（完了済み）
 
