@@ -53,6 +53,10 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_*.py' -v
           python3 scripts/check_media_policy.py
 
+      - name: Generate and verify synthetic video and audio
+        timeout-minutes: 5
+        run: bash scripts/generate-fixtures.sh
+
       - name: Test persistence and PhotoKit playback on one iPhone simulator
         timeout-minutes: 15
         run: bash scripts/test-ios.sh
@@ -79,6 +83,7 @@ jobs:
             build/*.log
             build/toolchain.txt
             build/simulators.json
+            build/fixture-info.json
             build/TestResults.xcresult
             build/screenshots/
           if-no-files-found: warn

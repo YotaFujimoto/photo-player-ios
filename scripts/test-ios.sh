@@ -32,7 +32,6 @@ export_test_evidence() {
 }
 trap export_test_evidence EXIT
 
-xcrun swift scripts/GenerateFixtures.swift build/fixtures 2>&1 | tee build/fixtures.log
 xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/synthetic-video.mov
 
 xcodebuild build-for-testing \
