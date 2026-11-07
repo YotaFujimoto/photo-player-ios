@@ -54,6 +54,9 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 
 ## 根拠
 
+- [Apple: クリッピングは描画を境界へ制限](https://developer.apple.com/documentation/swiftui/view/clipped(antialiased:))
+- [Apple: contentShapeによるヒットテスト範囲](https://developer.apple.com/documentation/swiftui/view/contentshape(_:eofill:))
+
 - [Apple: HDR動画のトラック判定](https://developer.apple.com/av-foundation/Incorporating-HDR-video-with-Dolby-Vision-into-your-apps.pdf)
 - [Apple: 限定写真アクセスとPhotosUI](https://developer.apple.com/videos/play/wwdc2020/10641/)
 - [GitHub標準Xcode 27イメージ](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available/)

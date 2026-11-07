@@ -77,6 +77,33 @@ final class VideoSelectionTests: XCTestCase {
     }
 
     @MainActor
+    func testSelectionBoundsWithDiagnosticsOff() {
+        let app = launch()
+        app.buttons["selectionDiagnostics"].tap()
+        for number in 2...4 {
+            let card = reveal(number, in: app)
+            let dimensions = card.value as! String
+            XCTAssertTrue(card.images["videoThumbnail"].waitForExistence(timeout: 15))
+            verifyThumbnail(card, dimensions: dimensions)
+            for bottom in [false, true] {
+                let rect = reveal(number, in: app).frame
+                app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                    dx: rect.midX, dy: bottom ? rect.maxY - 3 : rect.minY + 3)).tap()
+                let selected = app.staticTexts["selectedVideo"]
+                XCTAssertTrue(selected.waitForExistence(timeout: 10))
+                XCTAssertEqual(selected.label, "再生")
+                XCTAssertEqual(selected.value as? String, dimensions)
+                XCTAssertTrue(app.buttons["playPause"].waitForExistence(timeout: 15))
+                let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"),
+                                                     object: app.buttons["playPause"])
+                XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
+                app.buttons["closePlayer"].tap()
+            }
+        }
+        attach("selection-diagnostics-off")
+    }
+
+    @MainActor
     private func reveal(_ number: Int, in app: XCUIApplication) -> XCUIElement {
         let card = app.buttons["videoCard.\(number)"]
         let scroll = app.scrollViews.firstMatch
@@ -84,10 +111,10 @@ final class VideoSelectionTests: XCTestCase {
             let viewport = scroll.frame.insetBy(dx: 0, dy: 5)
             if card.exists {
                 let rect = card.frame
-                if viewport.contains(rect), card.isHittable { return card }
-                if rect.minY < viewport.minY { scroll.swipeDown(); continue }
+                if rect.height > 0, viewport.contains(rect), card.isHittable { return card }
+                if rect.height > 0 && rect.minY < viewport.minY { scroll.swipeDown(); continue }
             }
-            scroll.swipeUp()
+            if number == 1 { scroll.swipeDown() } else { scroll.swipeUp() }
         }
         XCTFail("Cell \(number) was not fully visible after scrolling")
         return card
@@ -115,14 +142,15 @@ final class VideoSelectionTests: XCTestCase {
             "184x360": [1, 0.647, 0], "206x206": [0.502, 0, 0.502], "380x180": [0, 0.502, 0.502],
             "186x380": [1, 0.753, 0.796], "208x208": [0.502, 0.502, 0.502]
         ]
-        guard let expected = colors[dimensions] else {
+        guard colors[dimensions] != nil else {
             XCTAssertEqual(dimensions, "320x180") // Original moving test pattern.
             return
         }
-        let source = card.images["videoThumbnail"].screenshot().image.cgImage!
-        // Sample the middle, away from the duration badge and rounded corners.
-        let crop = source.cropping(to: CGRect(x: CGFloat(source.width) / 3, y: CGFloat(source.height) / 3,
-                                              width: CGFloat(source.width) / 3, height: CGFloat(source.height) / 3))!
+        // Sample the visible cell, not the scaled image's accessibility bounds.
+        let source = card.screenshot().image.cgImage!
+        let scale = CGFloat(source.height) / card.frame.height
+        let crop = source.cropping(to: CGRect(x: CGFloat(source.width) / 3, y: 35 * scale,
+                                              width: CGFloat(source.width) / 3, height: 30 * scale))!
         var rgba = [UInt8](repeating: 0, count: 4)
         rgba.withUnsafeMutableBytes { bytes in
             let context = CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8,
@@ -130,10 +158,17 @@ final class VideoSelectionTests: XCTestCase {
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)!
             context.draw(crop, in: CGRect(x: 0, y: 0, width: 1, height: 1))
         }
-        for channel in 0..<3 {
-            XCTAssertEqual(Double(rgba[channel]) / 255, expected[channel], accuracy: 0.15,
-                           "Visible thumbnail must belong to the labeled asset \(dimensions)")
-        }
+        // H.264 YUV decoding/display conversion changes RGB channel values (the
+        // green fixture renders as 63,251,0). Classify against ALL fixture colors
+        // instead of requiring raw source RGB; wrong assets still fail identity.
+        let sampled = rgba.prefix(3).map { Double($0) / 255 }
+        let ranked = colors.map { entry in
+            (dimensions: entry.key, distance: zip(sampled, entry.value)
+                .reduce(0.0) { $0 + pow($1.0 - $1.1, 2) }.squareRoot())
+        }.sorted { $0.distance < $1.distance }
+        XCTAssertLessThan(ranked[0].distance, 0.35, "Thumbnail must contain a fixture color")
+        XCTAssertEqual(ranked[0].dimensions, dimensions,
+                       "Visible thumbnail must belong to the labeled asset \(dimensions)")
     }
 
     @MainActor

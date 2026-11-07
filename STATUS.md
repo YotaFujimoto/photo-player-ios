@@ -18,7 +18,7 @@ PhotoKitの動画一覧・サムネイル・限定アクセス、AVPlayerへの�
 - 実機用IPA: `dist/PhotoPlayer.ipa`、202,364 bytes、**ビルド3 / 0.2.0**。iOS 17.0以上。実機arm64、SDK `iphoneos27.1`、Release、未署名。CIとWindowsでplist・Mach-Oを検査済み（`LC_BUILD_VERSION platform=IOS(2)`、署名なし）。
 - SHA-256: `f1814b986319892ea6a940b99b58cb3e9a836ab031a5a244a541f7b4f8da5975`。
 - 来歴: `dist/build-info.json`。成功CIログ・テスト結果・画面画像はローカル `build/evidence-42360541851-attempt2/` と `build/success-42360541851-attempt2.log` に取得済み。GitHub成果物の保持は3日。
-- 最新の実機合格版: **ビルド2**（コミット `003a6d73620230685e6f7509fa3a894d189d8355`、[run 42350896546](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350896546)）。上書き・終了／再起動・PCなし機内モードでの値12保持に合格。IPA・来歴・本人報告を `dist/known-good/build-2/` に保管し、元のSHA-256 `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0` と一致することを再確認済み。ビルド1も `dist/known-good/build-1/` に保管継続。ビルド3は実機合格前の候補であり、正常版を置き換えない。
+- 最新の実機合格版: **ビルド2**（コミット `003a6d73620230685e6f7509fa3a894d189d8355`、[run 42350896546](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42350896546)）。上書き・終了／再起動・PCなし機内モードでの値12保持に合格。IPA・来歴・本人報告を `dist/known-good/build-2/` に保管し、元のSHA-256 `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0` と一致することを再確認済み。ビルド1も `dist/known-good/build-1/` に保管継続。ビルド3は選択操作が不合格のため、正常版を置き換えない。
 
 ## 未確認事項
 
@@ -34,7 +34,11 @@ PhotoKitの動画一覧・サムネイル・限定アクセス、AVPlayerへの�
 
 読み取り時点では、ForEachの識別子はPHAsset.localIdentifierで、ボタンはそのセルのLibraryVideoを値として保持し、同じPHAssetでPlaybackModelを初期化している。配列の添字から選び直す処理はない。サムネイル結果には要求トークンによる古い通知の排除がある。セル配置はLazyVGridで負の余白やオフセットはない。一方、scaledToFillした画像のクリッピングとセルのヒットテスト形状は別で、操作範囲を明示していない。原因候補として検証する。
 
-まず合成動画12本（縦長・横長・正方形、各々異なる寸法と色）で、6行の各セルの上端・中央・画像下端・セル下端を実座標で押す試験を追加する。画像の色・セルの匿名番号・選択されたPHAssetの寸法・AVPlayerItemの実際の再生寸法を照合する。別試験で高速スクロール、一覧更新、PhotoKit画像通知の遅延も確認する。再現確認までは既存のヒットテスト実装を維持する。
+合成動画12本（縦長・横長・正方形、各々異なる寸法と色）で、6行の各セルの上端・中央・画像下端・セル下端を実座標で押す試験を追加。画像の色・セルの匿名番号・選択されたPHAssetの寸法・AVPlayerItemの実際の再生寸法を照合する。別試験で高速スクロール、一覧更新、PhotoKit画像通知の遅延も確認する。
+
+修正前のコミット `9a73f943b9adf622486228ceaccfd5104fae2705` の [run 42366552734](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42366552734) で、動画1の上端・中央・画像下端は動画1を開くが、セル下端から3pt内側（画面座標105.5, 311.8）では次行の動画3を開くことを再現。画像ではセルの表示に重なりがなく、操作範囲との不一致を確認した。セル5の上端の無反応、セル9/10のアクセシビリティ領域の交差も検出。セルラベル全体に `.contentShape(.interaction, Rectangle())` を指定し、装飾画像はヒットテストから外す最小修正で検証する。選択するPHAssetと再生エンジンの対応処理は維持する。
+
+再現CIでは緑サムネイルが画面上でRGB 63,251,0となり、元のRGBと各成分を直接比較した試験にも失敗した。可視セルの画像内を採色し、全11色のうち最も近い色の素材IDが一致するかを検査する方式へ修正する。これは色変換を扱う試験側の修正で、動画の選択一致条件は変えない。また既存再生試験で停止中シークの完了待ちが失敗したため、同じ再生コードと合格条件を維持して修正後CIでも回帰確認する。
 
 ## 初回CIの調査
 

@@ -30,10 +30,15 @@ struct LibraryScreen: View {
                                         Button { selection = video } label: {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
+                                                    .allowsHitTesting(false)
                                                 Text(selectionDiagnostics ? "動画 \(video.diagnosticNumber)" :
                                                     (video.asset.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "動画"))
                                                     .font(.caption).foregroundStyle(.primary)
                                             }
+                                            // The cell owns one rectangular tap area. Image clipping
+                                            // controls drawing, not the scaled image's hit-test extent.
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .contentShape(.interaction, Rectangle())
                                             .overlay {
                                                 if selectionDiagnostics {
                                                     Rectangle().stroke(.orange, lineWidth: 1).allowsHitTesting(false)
