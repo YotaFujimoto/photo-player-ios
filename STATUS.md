@@ -41,6 +41,12 @@ SwiftUIの手動カウンター、UserDefaults保存、ビルド表示、XcodeGe
 2. CIを通し、実機用未署名Releaseのビルド3を取得する。最大5項目の確認票を渡して段階2の実機結果を待つ。
 3. 音声付き0.25倍と長時間動画の実機確認が終わるまで段階3以降へ広げない。
 
+## ビルド3のCI調査
+
+- [run 42354951618](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42354951618)、コミット `a696c87c6768b2ce0e7c29af72c6062a44c3b4a6` はアプリ試験前の合成素材生成で失敗。AVAssetWriterの入力待機が60秒で打ち切られ、ログには仮想環境の映像ドライバー照合失敗も出ていた。CI素材生成をFFmpegのソフトウェアH.264/AACへ変更し、生成後の形式・30秒の長さを検査する。再実行で素材生成と検査の成功を確認済み。
+- シーク完了時、停止中のプレイヤーから次の定期通知が来なくても表示を更新するよう補強。UI試験には停止中のシークに加え、再生中のシーク後の0.25倍維持も追加。
+- [run 42355693541](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42355693541) は合成素材検査に成功したが、コンパイルでHDR属性のAPI指定とPhotosUIのimport不足が判明。HDRはAVFoundationの `.containsHDRVideo` トラック読み込みへ修正し、限定アクセス選択にPhotosUIを読み込む。試験対象1台と同じarm64だけをシミュレーターでビルドする。
+
 ## 段階1の実機合格
 
 ビルド2は「全項目合格、値12」の報告を受領。削除せず上書きした後のデータ維持とPCなし・機内モード再起動に合格した。IPA・来歴・実機結果を `dist/known-good/build-2/` に保管し、SHA-256 `1b3ba0aba813b83b262d9ffae0e0325191e88ff6ed36baf623a264cbc2550ae0` を照合済み。ビルド1も保管継続。

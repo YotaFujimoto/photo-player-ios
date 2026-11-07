@@ -53,6 +53,8 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 
 ## 根拠
 
+- [Apple: HDR動画のトラック判定](https://developer.apple.com/av-foundation/Incorporating-HDR-video-with-Dolby-Vision-into-your-apps.pdf)
+- [Apple: 限定写真アクセスとPhotosUI](https://developer.apple.com/videos/play/wwdc2020/10641/)
 - [GitHub標準Xcode 27イメージ](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available/)
 - [ランナーのXcode一覧](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
 - [XcodeGen 2.46.0](https://github.com/yonaskolb/XcodeGen/releases/tag/2.46.0)

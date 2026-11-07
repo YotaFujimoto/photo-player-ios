@@ -116,7 +116,7 @@ struct PlayerScreen: View {
 
             DisclosureGroup("再生情報") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("\(video.asset.pixelWidth) × \(video.asset.pixelHeight) / HDR: \(video.asset.mediaSubtypes.contains(.videoHDR) ? "あり" : "なし")")
+                    Text("\(video.asset.pixelWidth) × \(video.asset.pixelHeight) / HDR: \(model.hdrDescription)")
                     Text(String(format: "実再生速度 %.2f×", model.actualRate)).accessibilityIdentifier("actualRate")
                     Text("取得: \(model.cloudDownload ? "iCloud" : "Photos") / バッファ終端: \(PlaybackPolicy.clock(model.bufferedUntil))")
                     Toggle("音声向けの音程補正", isOn: Binding(get: { model.voicePitch }, set: { model.setVoicePitch($0) }))

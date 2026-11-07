@@ -1,4 +1,5 @@
 @preconcurrency import Photos
+@preconcurrency import PhotosUI
 import SwiftUI
 
 struct LibraryVideo: Identifiable {

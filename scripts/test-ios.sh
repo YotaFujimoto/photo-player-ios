@@ -41,7 +41,7 @@ xcodebuild build-for-testing \
   -sdk iphonesimulator \
   -destination "platform=iOS Simulator,id=$simulator_id" \
   -derivedDataPath build/simulator \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee build/test-build.log
 
 # Grant read access on the synthetic simulator library before exercising the real PhotoKit path.
@@ -62,5 +62,5 @@ xcodebuild test-without-building \
   -maximum-test-execution-time-allowance 180 \
   -derivedDataPath build/simulator \
   -resultBundlePath build/TestResults.xcresult \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee build/test.log

@@ -27,6 +27,7 @@ final class PlaybackModel: ObservableObject {
     @Published private(set) var isSeeking = false
     @Published private(set) var stateText = "準備中"
     @Published private(set) var pictureSize = CGSize.zero
+    @Published private(set) var hdrDescription = "確認中"
     @Published private(set) var bufferedUntil = 0.0
     @Published private(set) var voicePitch = false
 
@@ -51,6 +52,7 @@ final class PlaybackModel: ObservableObject {
         position = 0
         progress = 0
         cloudDownload = false
+        hdrDescription = "確認中"
         selectedRate = 1
         stateText = "準備中"
         isLoading = true
@@ -105,6 +107,13 @@ final class PlaybackModel: ObservableObject {
 
     private func install(_ item: AVPlayerItem) {
         let currentSession = session
+        item.asset.loadTracks(withMediaCharacteristic: .containsHDRVideo) { @Sendable [weak self] tracks, _ in
+            let description = tracks.map { $0.isEmpty ? "なし" : "あり" } ?? "不明"
+            Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.hdrDescription = description
+            }
+        }
         item.audioTimePitchAlgorithm = voicePitch ? .timeDomain : .spectral
         player.replaceCurrentItem(with: item)
         observations = [
@@ -329,7 +338,7 @@ final class PlaybackModel: ObservableObject {
         return """
         PhotoPlayer build \(build)
         長さ: \(PlaybackPolicy.clock(duration)) / 位置: \(PlaybackPolicy.clock(position))
-        解像度: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(asset.mediaSubtypes.contains(.videoHDR))
+        解像度: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(hdrDescription)
         速度: 選択 \(selectedRate) / 実際 \(actualRate) / 低速対応: \(canPlaySlow)
         状態: \(stateText) / iCloud取得: \(cloudDownload) / 進捗: \(Int(progress * 100))%
         音程補正: \(voicePitch ? "音声向け" : "標準")
