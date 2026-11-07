@@ -7,10 +7,11 @@ final class VideoPlaybackTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--playback-diagnostics"]
         app.launch()
-        let card = app.buttons.matching(identifier: "videoCard").firstMatch
+        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.'"))
+        let card = cards.matching(NSPredicate(format: "value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20))
-        XCTAssertEqual(app.buttons.matching(identifier: "videoCard").count, 1, "Only the synthetic video, not still images, should be listed")
-        XCTAssertTrue(app.images["videoThumbnail"].waitForExistence(timeout: 15))
+        XCTAssertEqual(cards.count, 12, "Only the twelve synthetic videos, not still images, should be listed")
+        XCTAssertTrue(card.images["videoThumbnail"].waitForExistence(timeout: 15))
         screenshot("video-library")
         card.tap()
 

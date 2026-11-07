@@ -58,7 +58,7 @@ jobs:
         run: bash scripts/generate-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        timeout-minutes: 15
+        timeout-minutes: 23
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA

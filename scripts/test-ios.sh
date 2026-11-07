@@ -32,7 +32,7 @@ export_test_evidence() {
 }
 trap export_test_evidence EXIT
 
-xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/synthetic-video.mov
+xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
 
 xcodebuild build-for-testing \
   -project PhotoPlayer.xcodeproj \

@@ -4,8 +4,10 @@ import SwiftUI
 
 struct LibraryVideo: Identifiable {
     let asset: PHAsset
+    let diagnosticNumber: Int
     var id: String { asset.localIdentifier }
     var duration: String { PlaybackPolicy.clock(asset.duration) }
+    var dimensions: String { "\(asset.pixelWidth)x\(asset.pixelHeight)" }
 }
 
 @MainActor
@@ -14,6 +16,8 @@ final class VideoLibrary: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     @Published private(set) var videos: [LibraryVideo] = []
     @Published private(set) var revision = 0
     let thumbnails = PHCachingImageManager()
+    // Session-local numbers only. Never expose or persist Photos local identifiers.
+    private var diagnosticNumbers: [String: Int] = [:]
 
     override init() {
         super.init()
@@ -38,7 +42,12 @@ final class VideoLibrary: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         let result = PHAsset.fetchAssets(with: .video, options: options)
         var current: [LibraryVideo] = []
         current.reserveCapacity(result.count)
-        for index in 0..<result.count { current.append(LibraryVideo(asset: result.object(at: index))) }
+        for index in 0..<result.count {
+            let asset = result.object(at: index)
+            let number = diagnosticNumbers[asset.localIdentifier] ?? (diagnosticNumbers.count + 1)
+            diagnosticNumbers[asset.localIdentifier] = number
+            current.append(LibraryVideo(asset: asset, diagnosticNumber: number))
+        }
         videos = current
         revision += 1
     }
@@ -92,6 +101,10 @@ final class ThumbnailModel: ObservableObject {
             @Sendable [weak self] image, info in
             let result = ThumbnailResult(image: image, inCloud: info?[PHImageResultIsInCloudKey] as? Bool == true)
             Task { @MainActor in
+                // CI can keep real PhotoKit results pending while scrolling/reloading.
+                if ProcessInfo.processInfo.arguments.contains("--delay-thumbnails") {
+                    try? await Task.sleep(for: .seconds(5))
+                }
                 guard let self, self.gate.accepts(token) else { return }
                 if let image = result.image { self.image = image }
                 self.inCloud = result.inCloud
@@ -127,6 +140,7 @@ struct VideoThumbnail: View {
                     .accessibilityIdentifier("videoThumbnail")
             } else {
                 Image(systemName: model.inCloud ? "icloud" : "video")
+                    .accessibilityIdentifier("thumbnailPlaceholder")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .foregroundStyle(.secondary)
             }

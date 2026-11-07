@@ -24,12 +24,14 @@ private struct PlayerSurface: UIViewRepresentable {
 
 struct PlayerScreen: View {
     let video: LibraryVideo
+    let selectionDiagnostics: Bool
     @StateObject private var model: PlaybackModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
-    init(video: LibraryVideo) {
+    init(video: LibraryVideo, selectionDiagnostics: Bool = false) {
         self.video = video
+        self.selectionDiagnostics = selectionDiagnostics
         _model = StateObject(wrappedValue: PlaybackModel(asset: video.asset))
     }
 
@@ -39,7 +41,15 @@ struct PlayerScreen: View {
                 Button("閉じる", systemImage: "xmark") { model.close(); dismiss() }
                     .accessibilityIdentifier("closePlayer")
                 Spacer()
-                Text("再生").font(.headline)
+                VStack(spacing: 2) {
+                    Text(selectionDiagnostics ? "動画 \(video.diagnosticNumber)" : "再生").font(.headline)
+                        .accessibilityIdentifier("selectedVideo")
+                        .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
+                    if selectionDiagnostics {
+                        Text("\(Int(model.pictureSize.width))x\(Int(model.pictureSize.height))")
+                            .font(.caption.monospacedDigit()).accessibilityIdentifier("loadedVideoSize")
+                    }
+                }
                 Spacer()
             }.padding()
             GeometryReader { geometry in

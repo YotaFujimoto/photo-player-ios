@@ -4,6 +4,7 @@ import Photos
 struct LibraryScreen: View {
     @StateObject private var library = VideoLibrary()
     @State private var selection: LibraryVideo?
+    @State private var selectionDiagnostics = ProcessInfo.processInfo.arguments.contains("--selection-diagnostics")
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -29,12 +30,19 @@ struct LibraryScreen: View {
                                         Button { selection = video } label: {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
-                                                Text(video.asset.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "動画")
+                                                Text(selectionDiagnostics ? "動画 \(video.diagnosticNumber)" :
+                                                    (video.asset.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "動画"))
                                                     .font(.caption).foregroundStyle(.primary)
+                                            }
+                                            .overlay {
+                                                if selectionDiagnostics {
+                                                    Rectangle().stroke(.orange, lineWidth: 1).allowsHitTesting(false)
+                                                }
                                             }
                                         }
                                         .buttonStyle(.plain)
-                                        .accessibilityIdentifier("videoCard")
+                                        .accessibilityIdentifier("videoCard.\(video.diagnosticNumber)")
+                                        .accessibilityValue(video.dimensions)
                                     }
                                 }.padding()
                             }
@@ -60,7 +68,13 @@ struct LibraryScreen: View {
                 }
             }
             .navigationTitle("動画")
-            .toolbar { Button("更新", systemImage: "arrow.clockwise") { library.refresh() } }
+            .toolbar {
+                Button(selectionDiagnostics ? "選択確認を終了" : "選択確認", systemImage: "square.dashed") {
+                    selectionDiagnostics.toggle()
+                }.accessibilityIdentifier("selectionDiagnostics")
+                Button("更新", systemImage: "arrow.clockwise") { library.refresh() }
+                    .accessibilityIdentifier("refreshLibrary")
+            }
         }
         .task { library.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { library.refresh() } }
@@ -69,6 +83,8 @@ struct LibraryScreen: View {
                 self.selection = nil
             }
         }
-        .fullScreenCover(item: $selection) { video in PlayerScreen(video: video) }
+        .fullScreenCover(item: $selection) { video in
+            PlayerScreen(video: video, selectionDiagnostics: selectionDiagnostics)
+        }
     }
 }

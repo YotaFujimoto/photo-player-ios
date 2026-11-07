@@ -17,7 +17,7 @@
 ## 実装・検証・引き渡し
 
 1. 必要な最小変更を行い、差分と公開対象を確認する。生成したXcodeプロジェクト、ログ、IPAはコミットしない。
-2. `Config/Version.xcconfig` が版番号の正本。現在の段階2候補はビルド3。同じ候補のCI修正中は番号を維持し、次の実機候補作成時に増やす。
+2. `Config/Version.xcconfig` が版番号の正本。現在はビルド3で判明した一覧選択不具合を修正するビルド4。同じ候補のCI修正中は番号を維持し、次の実機候補作成時に増やす。段階3へは進まない。
 3. push後、`gh run list --commit <SHA>` で対象CIを特定する。CIの `head_sha` と対象コミットを照合する。文書だけの変更はビルド対象外。
 4. 失敗時は `gh run view <ID> --log-failed` を読み、根拠のある修正をして再実行する。ログが空なら `ci-evidence` とジョブログAPIを利用する。CLIがANSI装飾を拒否した場合は `--allow-escape-sequences` でローカル保存して装飾を除去し、端末へそのまま流さない。同一原因で3回失敗したら原因分析を見直す。テスト削除・合格条件緩和で成功扱いにしない。
 5. 成功後、`scripts/Get-Ipa.ps1 -RunId <ID> -Commit <完全SHA>` で `dist/PhotoPlayer.ipa` を取得する。成功状態、対象コミット、run attempt、SHA-256、Bundle ID、ビルド番号、iPhoneOS plist、Mach-OのiOS実機プラットフォームを照合してから配置する。
