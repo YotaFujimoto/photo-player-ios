@@ -10,7 +10,7 @@ xcodebuild archive \
   -archivePath build/PhotoPlayer.xcarchive \
   -derivedDataPath build/device \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
-  | tee build/archive.log
+  2>&1 | tee build/archive.log
 
 app='build/PhotoPlayer.xcarchive/Products/Applications/PhotoPlayer.app'
 test -d "$app"

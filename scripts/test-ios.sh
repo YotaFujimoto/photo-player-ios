@@ -1,23 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-# Select exactly one available iPhone, from the newest installed iOS runtime.
-simulator_id="$(xcrun simctl list devices available --json | python3 -c '
-import json, sys
-devices = json.load(sys.stdin)["devices"]
-for runtime in sorted(devices, reverse=True):
-    if ".iOS-" not in runtime:
-        continue
-    phones = [d for d in devices[runtime] if d["isAvailable"] and d["name"].startswith("iPhone")]
-    if phones:
-        print(phones[0]["udid"])
-        break
-else:
-    sys.exit("No available iPhone simulator")
+# Match the stable Xcode SDK instead of selecting an installed beta/RC runtime.
+xcrun simctl list devices available --json > build/simulators.json
+simulator_id="$(python3 -c '
+import json, os, sys
+with open("build/simulators.json") as source:
+    devices = json.load(source)["devices"]
+runtime = "com.apple.CoreSimulator.SimRuntime.iOS-" + os.environ["SIMULATOR_OS"].replace(".", "-")
+phones = [d for d in devices.get(runtime, [])
+          if d["isAvailable"] and d["name"] == os.environ["SIMULATOR_MODEL"]]
+if not phones:
+    sys.exit("Pinned stable iPhone simulator is not available")
+print(phones[0]["udid"])
 ')"
-printf 'Simulator: %s\n' "$simulator_id" | tee build/simulator.log
-xcrun simctl boot "$simulator_id"
-xcrun simctl bootstatus "$simulator_id" -b
+printf 'Simulator: %s / iOS %s / %s\n' "$SIMULATOR_MODEL" "$SIMULATOR_OS" "$simulator_id" | tee build/simulator.log
+xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 
 xcodebuild test \
   -project PhotoPlayer.xcodeproj \
@@ -27,10 +26,14 @@ xcodebuild test \
   -destination "platform=iOS Simulator,id=$simulator_id" \
   -parallel-testing-enabled NO \
   -maximum-concurrent-test-simulator-destinations 1 \
+  -destination-timeout 60 \
+  -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 90 \
+  -maximum-test-execution-time-allowance 120 \
   -derivedDataPath build/simulator \
   -resultBundlePath build/TestResults.xcresult \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  | tee build/test.log
+  2>&1 | tee build/test.log
 
 xcrun xcresulttool export attachments \
   --path build/TestResults.xcresult --output-path build/screenshots

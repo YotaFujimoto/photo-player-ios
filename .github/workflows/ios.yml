@@ -28,6 +28,8 @@ jobs:
       EXPECTED_XCODE_BUILD: '27A9275'
       XCODEGEN_VERSION: '2.46.0'
       XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+      SIMULATOR_MODEL: iPhone 17
+      SIMULATOR_OS: '27.1'
     defaults:
       run:
         shell: bash
@@ -49,6 +51,7 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Test persistence on one iPhone simulator
+        timeout-minutes: 15
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
@@ -72,6 +75,7 @@ jobs:
           path: |
             build/*.log
             build/toolchain.txt
+            build/simulators.json
             build/TestResults.xcresult
             build/screenshots/
           if-no-files-found: warn

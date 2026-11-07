@@ -25,7 +25,10 @@ final class CounterPersistenceTests: XCTestCase {
 
         // Use a normal background transition before terminating the process.
         XCUIDevice.shared.press(.home)
-        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5))
+        // iOS may suspend a background app before XCTest observes its state.
+        let backgrounded = app.wait(for: .runningBackground, timeout: 1)
+            || app.wait(for: .runningBackgroundSuspended, timeout: 5)
+        XCTAssertTrue(backgrounded, "App must leave the foreground before relaunch")
         app.terminate()
         app.launch()
         XCTAssertTrue(counter.waitForExistence(timeout: 10))
