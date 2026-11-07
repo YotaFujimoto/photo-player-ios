@@ -1,0 +1,26 @@
+# Private development input (never publish).
+/DEVELOPMENT_PLAN.md
+
+# Generated files, artifacts, local tools and logs.
+/dist/
+/build/
+__pycache__/
+/.tools/
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+
+# Credentials, signing material and personal media.
+.env
+.env.*
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.ipa
+*.mp4
+*.mov
+*.m4v

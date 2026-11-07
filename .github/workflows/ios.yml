@@ -1,0 +1,78 @@
+name: iOS initial installation
+
+on:
+  push:
+    paths:
+      - 'PhotoPlayer/**'
+      - 'PhotoPlayerUITests/**'
+      - 'Config/**'
+      - 'project.yml'
+      - 'scripts/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      EXPECTED_XCODE_VERSION: '27.1'
+      EXPECTED_XCODE_BUILD: '27A9275'
+      XCODEGEN_VERSION: '2.46.0'
+      XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Require public repository for free standard runner use
+        env:
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: test "$REPOSITORY_VISIBILITY" = public
+
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Select and verify pinned tools
+        run: bash scripts/prepare-ci.sh
+
+      - name: Test IPA validator
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+      - name: Test persistence on one iPhone simulator
+        run: bash scripts/test-ios.sh
+
+      - name: Archive and verify unsigned device Release IPA
+        run: bash scripts/archive-ios.sh
+
+      - name: Upload verified device IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PhotoPlayer-device-ipa
+          path: |
+            dist/PhotoPlayer.ipa
+            dist/build-info.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload logs and simulator test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-evidence
+          path: |
+            build/*.log
+            build/toolchain.txt
+            build/TestResults.xcresult
+            build/screenshots/
+          if-no-files-found: warn
+          retention-days: 3

@@ -1,0 +1,60 @@
+name: PhotoPlayer
+options:
+  minimumXcodeGenVersion: 2.46.0
+  xcodeVersion: '27.1'
+  deploymentTarget:
+    iOS: '17.0'
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Config/Version.xcconfig
+  Release: Config/Version.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+    DEVELOPMENT_TEAM: ''
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  PhotoPlayer:
+    type: application
+    platform: iOS
+    sources:
+      - path: PhotoPlayer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.photoplayer.p6a936d329b934a8ba532081564a51c07
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: PhotoPlayer/Info.plist
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+  PhotoPlayerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: PhotoPlayerUITests
+    dependencies:
+      - target: PhotoPlayer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PhotoPlayer
+schemes:
+  PhotoPlayer:
+    build:
+      targets:
+        PhotoPlayer: all
+    run:
+      config: Debug
+    test:
+      config: Release
+      gatherCoverageData: false
+      targets:
+        - PhotoPlayerUITests
+    archive:
+      config: Release
