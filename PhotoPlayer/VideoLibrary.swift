@@ -118,10 +118,12 @@ struct VideoThumbnail: View {
     @StateObject private var model = ThumbnailModel()
 
     var body: some View {
+        GeometryReader { geometry in
         ZStack(alignment: .bottomTrailing) {
             Rectangle().fill(.quaternary)
             if let image = model.image {
                 Image(uiImage: image).resizable().scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                     .accessibilityIdentifier("videoThumbnail")
             } else {
                 Image(systemName: model.inCloud ? "icloud" : "video")
@@ -131,6 +133,7 @@ struct VideoThumbnail: View {
             Text(video.duration).font(.caption.monospacedDigit())
                 .padding(4).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 4))
                 .foregroundStyle(.white).padding(6)
+        }
         }
         .frame(height: 110).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
         .onAppear { model.start(asset: video.asset, manager: manager) }

@@ -46,6 +46,7 @@ SwiftUIの手動カウンター、UserDefaults保存、ビルド表示、XcodeGe
 - [run 42354951618](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42354951618)、コミット `a696c87c6768b2ce0e7c29af72c6062a44c3b4a6` はアプリ試験前の合成素材生成で失敗。AVAssetWriterの入力待機が60秒で打ち切られ、ログには仮想環境の映像ドライバー照合失敗も出ていた。CI素材生成をFFmpegのソフトウェアH.264/AACへ変更し、生成後の形式・30秒の長さを検査する。再実行で素材生成と検査の成功を確認済み。
 - シーク完了時、停止中のプレイヤーから次の定期通知が来なくても表示を更新するよう補強。UI試験には停止中のシークに加え、再生中のシーク後の0.25倍維持も追加。
 - [run 42355693541](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42355693541) は合成素材検査に成功したが、コンパイルでHDR属性のAPI指定とPhotosUIのimport不足が判明。HDRはAVFoundationの `.containsHDRVideo` トラック読み込みへ修正し、限定アクセス選択にPhotosUIを読み込む。試験対象1台と同じarm64だけをシミュレーターでビルドする。
+- [run 42356382683](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42356382683) はReleaseビルド・単体6件・カウンター保存試験に成功。動画一覧・サムネイル・再生・0.25倍選択と時刻進行まで成功した後、実速度のUI要素検出で失敗。取得した画面階層で、DisclosureGroupの識別子が子の実速度表示へ伝播して上書きされていることを確認。親の識別子を除き、開閉は表示ラベルで操作する。0.25倍の実速度検証は維持する。画像と階層から判明したサムネイルのセル幅超過と、端末内素材の取得進捗をiCloudと誤分類する表示も修正。
 
 ## 段階1の実機合格
 

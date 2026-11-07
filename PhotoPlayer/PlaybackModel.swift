@@ -15,7 +15,7 @@ final class PlaybackModel: ObservableObject {
     let asset: PHAsset
     @Published private(set) var isLoading = false
     @Published private(set) var isReady = false
-    @Published private(set) var cloudDownload = false
+    @Published private(set) var hasDownloadProgress = false
     @Published private(set) var progress = 0.0
     @Published private(set) var errorMessage: String?
     @Published private(set) var position = 0.0
@@ -51,7 +51,7 @@ final class PlaybackModel: ObservableObject {
         duration = asset.duration
         position = 0
         progress = 0
-        cloudDownload = false
+        hasDownloadProgress = false
         hdrDescription = "確認中"
         selectedRate = 1
         stateText = "準備中"
@@ -66,9 +66,10 @@ final class PlaybackModel: ObservableObject {
             let errorCode = error.map { PlaybackPolicy.errorCode($0) }
             Task { @MainActor in
                 guard let self, self.requestGate.accepts(token) else { return }
-                self.cloudDownload = true
+                // PhotoKit can report progress for local assets as well as iCloud downloads.
+                self.hasDownloadProgress = true
                 if fraction.isFinite { self.progress = max(self.progress, min(max(fraction, 0), 1)) }
-                if let errorCode { self.failDownload("iCloud取得に失敗しました（\(errorCode)）。接続を確認して再試行してください。") }
+                if let errorCode { self.failDownload("動画の取得に失敗しました（\(errorCode)）。接続を確認して再試行してください。") }
             }
         }
         requestID = manager.requestPlayerItem(forVideo: asset, options: options) { @Sendable [weak self] item, info in
@@ -340,7 +341,7 @@ final class PlaybackModel: ObservableObject {
         長さ: \(PlaybackPolicy.clock(duration)) / 位置: \(PlaybackPolicy.clock(position))
         解像度: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(hdrDescription)
         速度: 選択 \(selectedRate) / 実際 \(actualRate) / 低速対応: \(canPlaySlow)
-        状態: \(stateText) / iCloud取得: \(cloudDownload) / 進捗: \(Int(progress * 100))%
+        状態: \(stateText) / Photos取得進捗: \(Int(progress * 100))%
         音程補正: \(voicePitch ? "音声向け" : "標準")
         エラー: \(errorMessage ?? "なし")
         """

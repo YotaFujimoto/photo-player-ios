@@ -27,7 +27,7 @@ final class VideoPlaybackTests: XCTestCase {
         let initialPosition = app.staticTexts["playbackPosition"].label
         let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", initialPosition), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 12), .completed)
-        app.buttons["playbackDetails"].tap()
+        app.buttons["再生情報"].tap()
         let actualRate = app.staticTexts["actualRate"]
         XCTAssertTrue(actualRate.waitForExistence(timeout: 5))
         let slowRate = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)

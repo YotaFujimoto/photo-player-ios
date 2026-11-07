@@ -64,8 +64,8 @@ struct PlayerScreen: View {
             PlayerSurface(player: model.player).accessibilityIdentifier("videoSurface")
             if model.isLoading {
                 VStack(spacing: 12) {
-                    ProgressView(value: model.cloudDownload ? model.progress : nil)
-                    Text(model.cloudDownload ? "iCloudから取得中 \(Int(model.progress * 100))%" : "動画を準備中")
+                    ProgressView(value: model.hasDownloadProgress ? model.progress : nil)
+                    Text(model.hasDownloadProgress ? "動画を取得中 \(Int(model.progress * 100))%" : "動画を準備中")
                     Button("取得をキャンセル") { model.cancelLoading() }
                         .accessibilityIdentifier("cancelDownload")
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
@@ -118,13 +118,13 @@ struct PlayerScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("\(video.asset.pixelWidth) × \(video.asset.pixelHeight) / HDR: \(model.hdrDescription)")
                     Text(String(format: "実再生速度 %.2f×", model.actualRate)).accessibilityIdentifier("actualRate")
-                    Text("取得: \(model.cloudDownload ? "iCloud" : "Photos") / バッファ終端: \(PlaybackPolicy.clock(model.bufferedUntil))")
+                    Text("Photos取得: \(Int(model.progress * 100))% / バッファ終端: \(PlaybackPolicy.clock(model.bufferedUntil))")
                     Toggle("音声向けの音程補正", isOn: Binding(get: { model.voicePitch }, set: { model.setVoicePitch($0) }))
                     Text("オフは標準。低速時の音質を比較できます。動画名や識別子は診断に含めません。")
                         .foregroundStyle(.secondary)
                     Button("再生情報をコピー") { UIPasteboard.general.string = model.diagnosticText }
                 }.font(.caption).padding(.top, 8)
-            }.accessibilityIdentifier("playbackDetails")
+            }
         }
     }
 }
