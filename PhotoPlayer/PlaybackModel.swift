@@ -282,6 +282,8 @@ final class PlaybackModel: ObservableObject {
                         self.pause()
                         self.errorMessage = "指定位置へ移動できませんでした。再試行してください。"
                     }
+                    // A paused player may not emit another periodic callback after the seek.
+                    self.refresh(ifSession: currentSession)
                 }
             }
         }
