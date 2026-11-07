@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       EXPECTED_XCODE_VERSION: '27.1'
@@ -58,7 +58,9 @@ jobs:
         run: bash scripts/generate-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        timeout-minutes: 23
+        # Includes a cold Release build (~9 min) and the expanded UI suite.
+        # Individual test deadlines and every assertion remain unchanged.
+        timeout-minutes: 30
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA

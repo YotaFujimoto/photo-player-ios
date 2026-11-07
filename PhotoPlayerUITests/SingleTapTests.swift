@@ -33,9 +33,29 @@ final class SingleTapTests: XCTestCase {
             app.buttons["closePlayer"].tap()
         }
         if !diagnostics { app.buttons["selectionDiagnostics"].tap() }
-        verifyCounts(app, accepted: 4, shown: 4, requested: 4, received: 4, ready: 4)
+        verifyCounts(app, accepted: 4, shown: 4, requested: 4, received: 4, ready: 4, inPlayer: false)
         XCTAssertTrue(trace(app).contains("contacts=4;"), "Each opening requires exactly ONE contact: \(trace(app))")
         attach("single-tap-return-\(diagnostics ? "on" : "off")")
+    }
+
+    @MainActor
+    func testSingleContactsWithSmallFingerMovement() {
+        let app = launch()
+        for number in [3, 4, 1, 2] {
+            let card = app.buttons["videoCard.\(number)"]
+            let frame = card.frame
+            let dimensions = card.value as! String
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
+            let end = start.withOffset(CGVector(dx: number.isMultiple(of: 2) ? 3 : -3, dy: 3))
+            // A single finger contact with 4.2pt of movement, not a second tap.
+            start.press(forDuration: 0.03, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
+            verifyOpened(app, number: number, dimensions: dimensions, diagnostics: true)
+            app.buttons["closePlayer"].tap()
+        }
+        verifyCounts(app, accepted: 4, shown: 4, requested: 4, received: 4, ready: 4, inPlayer: false)
+        XCTAssertTrue(trace(app).contains("contacts=4;"), trace(app))
+        attach("single-tap-small-movement")
     }
 
     @MainActor
@@ -50,6 +70,7 @@ final class SingleTapTests: XCTestCase {
         let frame = last.frame
         let dimensions = last.value as! String
         let before = trace(app)
+        XCTAssertTrue(before.contains("accepted=0;"), "Scrolling must not select a video: \(before)")
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55)).press(forDuration: 0.03)
         verifyOpened(app, number: 12, dimensions: dimensions, diagnostics: true)
@@ -108,15 +129,17 @@ final class SingleTapTests: XCTestCase {
 
     @MainActor
     private func trace(_ app: XCUIApplication) -> String {
-        let trace = app.staticTexts["selectionTrace"]
+        let player = app.staticTexts["selectionTrace.player"]
+        let trace = player.exists ? player : app.staticTexts["selectionTrace.library"]
         return trace.exists ? (trace.value as? String ?? trace.label) : "diagnostics hidden"
     }
 
     @MainActor
-    private func verifyCounts(_ app: XCUIApplication, accepted: Int, shown: Int, requested: Int, received: Int, ready: Int) {
+    private func verifyCounts(_ app: XCUIApplication, accepted: Int, shown: Int, requested: Int, received: Int, ready: Int, inPlayer: Bool = true) {
         let expected = "accepted=\(accepted);shown=\(shown);requested=\(requested);received=\(received);ready=\(ready)"
         let predicate = NSPredicate(format: "value CONTAINS %@", expected)
-        let counts = XCTNSPredicateExpectation(predicate: predicate, object: app.staticTexts["selectionTrace"])
+        let counts = XCTNSPredicateExpectation(predicate: predicate,
+            object: app.staticTexts[inPlayer ? "selectionTrace.player" : "selectionTrace.library"])
         XCTAssertEqual(XCTWaiter.wait(for: [counts], timeout: 10), .completed, trace(app))
     }
 

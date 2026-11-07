@@ -172,12 +172,13 @@ struct ContactProbe: UIViewRepresentable {
 
 struct SelectionTracePanel: View {
     @ObservedObject var trace: SelectionTrace
+    let location: String
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(trace.summary).accessibilityIdentifier("selectionTrace").accessibilityValue(trace.testValue)
+            Text(trace.summary).accessibilityIdentifier("selectionTrace.\(location)").accessibilityValue(trace.testValue)
             Text(trace.contactDescription)
-            Text(trace.events.joined(separator: " → "))
-        }.font(.caption2).frame(maxWidth: .infinity, alignment: .leading)
+            Text(trace.events.joined(separator: " → ")).truncationMode(.head)
+        }.font(.caption2).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal).allowsHitTesting(false)
     }
 }

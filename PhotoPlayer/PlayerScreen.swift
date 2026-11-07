@@ -58,7 +58,7 @@ struct PlayerScreen: View {
                 }
                 Spacer()
             }.padding()
-            if selectionDiagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace) }
+            if selectionDiagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace, location: "player") }
             GeometryReader { geometry in
                 if geometry.size.width > geometry.size.height {
                     HStack(spacing: 0) {

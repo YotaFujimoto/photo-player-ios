@@ -3,7 +3,9 @@ import Photos
 
 struct LibraryScreen: View {
     @StateObject private var library = VideoLibrary()
-    @StateObject private var trace = SelectionTrace()
+    // Only the diagnostic panels observe these counters; recording a contact
+    // must not rebuild every button in the library.
+    @State private var trace = SelectionTrace()
     @State private var selection: LibraryVideo?
     @State private var selectionDiagnostics = ProcessInfo.processInfo.arguments.contains("--selection-diagnostics")
     @Environment(\.scenePhase) private var scenePhase
@@ -56,8 +58,8 @@ struct LibraryScreen: View {
                         }
                         Text("iCloudの動画は選択時に取得します。動画の変更・削除は行いません。")
                             .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                        if selectionDiagnostics { SelectionTracePanel(trace: trace) }
-                        if selection != nil && !trace.isPlayerVisible {
+                        if selectionDiagnostics { SelectionTracePanel(trace: trace, location: "library") }
+                        if selection != nil {
                             ProgressView("動画を開いています…").accessibilityIdentifier("openingVideo")
                         }
                     }
