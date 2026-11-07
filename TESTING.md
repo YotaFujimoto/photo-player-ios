@@ -15,7 +15,9 @@ CIログ・xcresult・スクリーンショットは `ci-evidence`、実機IPA�
 ### 結果
 
 - 初回CI: 起動と加算は成功。iPhone Duoでホーム遷移後のバックグラウンド状態判定が失敗。長時間待機を中断してログを取得し、一時停止状態も扱う判定と安定版シミュレーター選択へ修正。
-- 2回目CI: iOS 27.1にはiPhone Duoしか登録されておらず、指定したiPhone 17を発見できず停止。取得した一覧で確認したiPhone 17 / iOS 27.0へ固定。Xcodeは27.1のまま。再試験待ち。
+- 2回目CI: iOS 27.1にはiPhone Duoしか登録されておらず、指定したiPhone 17を発見できず停止。取得した一覧で確認したiPhone 17 / iOS 27.0へ固定。Xcodeは27.1のまま。
+- 3回目CI: **成功**。[run 42347702781](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42347702781)、コミット `797b8d0b62591d1ec281f4ad34dc69013a44ba53`。検査器4テスト、UIテスト1件（失敗0）。画面のビルド1・値12、再起動後の12保持、縦横画像を確認済み。
+- 実機IPA: CIとWindowsで未署名arm64 / iPhoneOS / Mach-OのIOSプラットフォーム / 固定Bundle ID / ビルド1 / SHA-256を検査し、`dist/PhotoPlayer.ipa` へ取得済み。ソース来歴は `dist/build-info.json`。
 - 初回実機: 未確認。
 - 上書き更新実機: 未実施（初回結果待ち）。
 

@@ -29,7 +29,7 @@
 - SwiftUI、iOS 17.0以上、iPhone優先、アプリ外部依存なし。
 - Xcode 27.1 (`27A9275`)、`/Applications/Xcode_27.1.app/Contents/Developer` を固定。暗黙の既定XcodeやRC/betaへ切り替えない。
 - XcodeGen 2.46.0、公式ZIPのSHA-256をCIに固定する。
-- シミュレーターはRelease構成で1台だけテスト。実機アーカイブは `-sdk iphoneos -destination 'generic/platform=iOS'`。
+- シミュレーターはiPhone 17 / iOS 27.0のRelease構成で1台だけテスト。ランナー上のiOS 27.1にはiPhone Duoしか登録されていないことを初回CIで確認した。実機アーカイブは `-sdk iphoneos -destination 'generic/platform=iOS'`。
 - CIは署名無効。`xcodebuild -exportArchive` による署名フローを使わず、実機アーカイブ内のアプリを `Payload/PhotoPlayer.app` に格納する。
 - WindowsにはSwift/Xcode/Pythonの導入を要求しない。`gh` がPATHにない場合は `Program Files/GitHub CLI/gh.exe` を使う。通信制限と認証失敗を混同しない。
 - Actions成果物の保持は3日。実機合格したIPAはローカルの `dist/known-good/` に保管し、新候補で置き換えない。
