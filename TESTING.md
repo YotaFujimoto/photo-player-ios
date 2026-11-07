@@ -16,6 +16,8 @@
 
 CIログ・xcresult・スクリーンショットは `ci-evidence`、実機IPAと来歴は `PhotoPlayer-device-ipa` に3日間保存する。シミュレーターのアプリは配布しない。
 
+再生中のシーク試験では、位置の期待範囲も検証済みの速度0.25倍で経過時間に応じて進める。固定の過去時刻を待ち続けない。[XCTestのスライダー操作は近似](https://developer.apple.com/documentation/xcuiautomation/xcuielement/adjust(tonormalizedsliderposition:))であるため、停止時と同じ幅の位置範囲を使い、再生状態・実速度を別途確認する。
+
 ### 結果
 
 - 初回CI: 起動と加算は成功。iPhone Duoでホーム遷移後のバックグラウンド状態判定が失敗。長時間待機を中断してログを取得し、一時停止状態も扱う判定と安定版シミュレーター選択へ修正。

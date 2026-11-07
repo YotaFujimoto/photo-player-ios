@@ -44,11 +44,22 @@ final class VideoPlaybackTests: XCTestCase {
         waitForLabel(state, "一時停止")
         app.buttons["playPause"].tap()
         waitForLabel(state, "再生中")
+        let seekStarted = ProcessInfo.processInfo.systemUptime
         slider.adjust(toNormalizedSliderPosition: 0.75)
         waitForLabel(state, "再生中")
         let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
-        let later = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", ["0:22", "0:23", "0:24"]), object: app.staticTexts["playbackPosition"])
+        // XCTest's slider gesture is approximate, and playback keeps advancing while
+        // the state/rate assertions query the UI. Advance the same 22...24-second
+        // acceptance window at the verified 0.25 rate instead of waiting for the past.
+        let movingPosition = NSPredicate { candidate, _ in
+            let elapsed = ProcessInfo.processInfo.systemUptime - seekStarted
+            let expectedLabels = (22...24).map {
+                String(format: "0:%02d", min(30, Int(Double($0) + elapsed * 0.25)))
+            }
+            return NSPredicate(format: "label IN %@", expectedLabels).evaluate(with: candidate)
+        }
+        let later = XCTNSPredicateExpectation(predicate: movingPosition, object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [later], timeout: 15), .completed)
         app.buttons["playPause"].tap()
         waitForLabel(state, "一時停止")
