@@ -97,9 +97,14 @@ input_off='PhotoPlayerUITests/InputLifecycleTests/testSameSingleTapsWithMonitorD
 input_background='PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn'
 gesture_skip='PhotoPlayerUITests/PlaybackGestureTests/testDoubleTapBoundsSingleTapAndControlsInBothOrientations'
 gesture_hold='PhotoPlayerUITests/PlaybackGestureTests/testHeldDoubleSpeedRestoresRateAndNeverStartsPausedPlayback'
+playback_seek='PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRateAndSeek'
 mkdir -p build/copy-results
+# Validate the input under investigation first. On failure retain its evidence
+# immediately; a successful candidate still runs every test exactly once.
+run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
 test_status=0
 run_tests build/TestResults.xcresult \
+  "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \

@@ -79,18 +79,14 @@ final class VideoPlaybackTests: XCTestCase {
     @MainActor
     private func dragSlider(_ app: XCUIApplication, to fraction: CGFloat) {
         let slider = app.sliders["seekSlider"]
-        @MainActor func seconds(_ identifier: String) -> Double {
-            app.staticTexts[identifier].label.split(separator: ":").reduce(0) { $0 * 60 + (Double($1) ?? 0) }
-        }
-        let duration = seconds("playbackDuration")
-        XCTAssertGreaterThan(duration, 0)
-        // Grab within the thumb using the displayed second's midpoint, then
-        // drag to a fixed track coordinate. XCTest's approximate adjustment
-        // previously ended at 17.24s despite requesting 50% of a 30s video.
-        let current = CGFloat(min(1, max(0, (seconds("playbackPosition") + 0.5) / duration)))
+        // Read the indicator itself, not the rounded playback clock. Use one
+        // continuous slow drag; the prior default-speed input committed 17.22s
+        // despite its endpoint being at 50% of the accessibility frame.
+        let current = slider.normalizedSliderPosition
+        XCTAssertTrue((0...1).contains(current))
         let start = slider.coordinate(withNormalizedOffset: CGVector(dx: current, dy: 0.5))
         let end = slider.coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
     }
 
     @MainActor
