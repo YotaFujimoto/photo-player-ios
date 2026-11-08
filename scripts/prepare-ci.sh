@@ -16,8 +16,16 @@ swift --version | tee -a build/toolchain.txt
 curl --fail --location --retry 3 --retry-all-errors \
   --connect-timeout 30 --max-time 120 --retry-max-time 240 \
   --header 'Accept: application/octet-stream' \
+  --header "Authorization: Bearer ${GH_TOKEN}" \
+  --dump-header build/xcodegen-response-headers.txt \
   "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/${XCODEGEN_ASSET_ID}" \
-  --output build/xcodegen.zip
+  --output build/xcodegen.zip || {
+    download_status=$?
+    # Do not publish authorization headers or signed redirect URLs.
+    awk 'tolower($0) ~ /^(http\/|x-ratelimit-(limit|remaining|reset):|retry-after:)/ { print }' \
+      build/xcodegen-response-headers.txt
+    exit "$download_status"
+  }
 printf '%s  %s\n' "$XCODEGEN_SHA256" build/xcodegen.zip | shasum -a 256 -c -
 unzip -q build/xcodegen.zip -d build/xcodegen
 xcodegen_bin="$(find build/xcodegen -type f -name xcodegen | head -n 1)"
