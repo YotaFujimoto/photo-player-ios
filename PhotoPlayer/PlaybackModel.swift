@@ -28,6 +28,7 @@ final class PlaybackModel: ObservableObject {
     @Published private var speed = PlaybackSpeed()
     var selectedRate: Float { speed.selected }
     var isTemporaryDoubleRate: Bool { speed.isBoosting }
+    var showsPauseControl: Bool { wantsPlayback && !isAtSkippedEnd }
     @Published private(set) var actualRate: Float = 0
     @Published private(set) var wantsPlayback = false
     @Published private(set) var canPlaySlow = false
@@ -46,6 +47,8 @@ final class PlaybackModel: ObservableObject {
     private var notifications: [NSObjectProtocol] = []
     private var timeObserver: Any?
     private var seekQueue = SeekQueue()
+    private var keepsPlaybackAtSkippedEnd = false
+    private var isAtSkippedEnd: Bool { keepsPlaybackAtSkippedEnd && duration > 0 && position >= duration }
     private var scrubbing = false
     private var scrubTask: Task<Void, Never>?
     private var audioActive = false
@@ -177,6 +180,10 @@ final class PlaybackModel: ObservableObject {
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) {
             [weak self] _ in Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
+                // A queued seek can make an earlier end notification obsolete.
+                guard !self.seekQueue.isBusy,
+                      self.player.currentTime().seconds >= self.duration - 0.05 else { return }
+                if self.keepsPlaybackAtSkippedEnd && self.wantsPlayback { return }
                 self.pause()
                 self.position = self.duration
                 self.stateText = "Ended"
@@ -244,7 +251,11 @@ final class PlaybackModel: ObservableObject {
     }
 
     func togglePlayback() {
-        if wantsPlayback { pause() }
+        if isAtSkippedEnd {
+            keepsPlaybackAtSkippedEnd = false
+            wantsPlayback = true
+            enqueueSeek(0, exact: true)
+        } else if wantsPlayback { pause() }
         else {
             wantsPlayback = true
             if duration > 0 && position >= duration - 0.1 { enqueueSeek(0, exact: true) }
@@ -253,6 +264,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func pause() {
+        keepsPlaybackAtSkippedEnd = false
         speed.endHold()
         assign(\.wantsPlayback, false)
         if player.timeControlStatus != .paused || player.rate != 0 { player.pause() }
@@ -262,6 +274,13 @@ final class PlaybackModel: ObservableObject {
 
     private func resumeIfNeeded() {
         guard wantsPlayback, isReady, !scrubbing, !seekQueue.isBusy else { return }
+        // At the boundary no frames remain. Retain the pre-skip play intent so
+        // a subsequent backward skip resumes, without running beyond duration.
+        if isAtSkippedEnd {
+            player.pause()
+            UIApplication.shared.isIdleTimerDisabled = false
+            return
+        }
         guard selectedRate >= 1 || canPlaySlow else {
             pause()
             errorMessage = "Slow playback unavailable."
@@ -316,7 +335,9 @@ final class PlaybackModel: ObservableObject {
         // While a seek is in flight, accumulate from its latest requested target.
         // Reading AVPlayer's old currentTime here would discard rapid double taps.
         let origin = seekQueue.isBusy ? position : player.currentTime().seconds
-        position = PlaybackPolicy.skip(from: origin, forward: forward, duration: duration)
+        let target = PlaybackPolicy.skip(from: origin, forward: forward, duration: duration)
+        keepsPlaybackAtSkippedEnd = wantsPlayback && target >= duration
+        position = target
         enqueueSeek(position, exact: true)
     }
 
@@ -327,6 +348,7 @@ final class PlaybackModel: ObservableObject {
 
     func beginScrubbing() {
         trace("scrub begin")
+        keepsPlaybackAtSkippedEnd = false
         speed.endHold()
         scrubbing = true
         player.pause()

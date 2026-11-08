@@ -59,6 +59,15 @@ final class PlaybackLifecycleTests: XCTestCase {
         XCTAssertEqual(model.player.rate, 0.25)
         XCTAssertTrue(model.wantsPlayback)
         XCTAssertEqual(model.position, 10, accuracy: 0.5)
+        for _ in 0..<3 { model.skip(forward: true) }
+        try await wait { !model.isSeeking && model.player.timeControlStatus == .paused }
+        XCTAssertEqual(model.position, model.duration, accuracy: 0.1)
+        XCTAssertTrue(model.wantsPlayback, "A skip to the end must retain the pre-skip playback intent")
+        XCTAssertFalse(model.showsPauseControl)
+        model.skip(forward: false)
+        try await wait { !model.isSeeking && model.player.timeControlStatus == .playing }
+        XCTAssertEqual(model.player.rate, 0.25)
+        XCTAssertEqual(model.position, 20, accuracy: 0.5)
         model.pause()
         for _ in 0..<4 { model.skip(forward: true) }
         try await wait { !model.isSeeking }

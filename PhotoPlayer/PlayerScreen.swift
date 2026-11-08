@@ -138,7 +138,7 @@ struct PlayerScreen: View {
 
             HStack {
                 Button { model.togglePlayback() } label: {
-                    Label(model.wantsPlayback ? "Pause" : "Play", systemImage: model.wantsPlayback ? "pause.fill" : "play.fill")
+                    Label(model.showsPauseControl ? "Pause" : "Play", systemImage: model.showsPauseControl ? "pause.fill" : "play.fill")
                         .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                 }.buttonStyle(.borderedProminent).disabled(!model.isReady)
                     .accessibilityIdentifier("playPause").accessibilityValue(model.stateText)

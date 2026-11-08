@@ -71,6 +71,7 @@ final class PlaybackGestureTests: XCTestCase {
     @MainActor
     func testHeldDoubleSpeedRestoresRateAndNeverStartsPausedPlayback() {
         let app = open()
+        defer { XCUIDevice.shared.orientation = .portrait }
         app.buttons["playPause"].tap()
         state(app, "Paused")
         app.sliders["seekSlider"].adjust(toNormalizedSliderPosition: 0)
@@ -84,12 +85,7 @@ final class PlaybackGestureTests: XCTestCase {
         state(app, "Playing")
         // At 0.25× the ordinary wall time cannot account for this advance.
         // This checks the real PhotoKit AVPlayer during a physical held gesture.
-        let start = readPosition(app)
-        let started = ProcessInfo.processInfo.systemUptime
-        surface.press(forDuration: 3)
-        let advanced = readPosition(app) - start
-        let elapsed = ProcessInfo.processInfo.systemUptime - started
-        XCTAssertGreaterThan(Double(advanced) - elapsed * 0.25, 2.5)
+        verifyHeldAdvance(app, surface: surface)
         XCTAssertFalse(app.staticTexts["temporaryRate"].exists)
         XCTAssertEqual(app.buttons["rateMenu"].value as? String, "0.25×")
         state(app, "Playing")
@@ -98,6 +94,11 @@ final class PlaybackGestureTests: XCTestCase {
         expect(app.staticTexts["actualRate"], "label CONTAINS '0.25'")
         attach("gesture-hold-restored")
         app.buttons["playerDiagnostics"].tap()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        verifyHeldAdvance(app, surface: surface)
+        XCTAssertFalse(app.staticTexts["temporaryRate"].exists)
+        XCTAssertEqual(app.buttons["rateMenu"].value as? String, "0.25×")
+        attach("gesture-hold-landscape")
         // Leave the video region during a hold; no seek or control action occurs.
         let source = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let outside = app.buttons["closePlayer"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -118,6 +119,16 @@ final class PlaybackGestureTests: XCTestCase {
 
     @MainActor private func setRate(_ app: XCUIApplication, _ rate: String) {
         app.buttons["rateMenu"].tap(); app.buttons[rate].tap()
+    }
+    @MainActor private func verifyHeldAdvance(_ app: XCUIApplication, surface: XCUIElement) {
+        let start = readPosition(app)
+        let started = ProcessInfo.processInfo.systemUptime
+        surface.press(forDuration: 3)
+        let advanced = readPosition(app) - start
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        let extra = Double(advanced) - elapsed * 0.25
+        XCTAssertGreaterThan(extra, 2.5, "A held press must temporarily accelerate the real player")
+        XCTAssertLessThan(extra, 6.5, "Releasing a hold must not also trigger a 10-second skip")
     }
     @MainActor private func state(_ app: XCUIApplication, _ state: String) {
         expect(app.buttons["playPause"], "value == '\(state)'")
