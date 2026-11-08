@@ -48,6 +48,15 @@ xcodebuild build-for-testing \
 xcrun simctl install "$simulator_id" build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayer.app
 xcrun simctl privacy "$simulator_id" grant photos io.github.photoplayer.p6a936d329b934a8ba532081564a51c07
 
+# Register the UI test host explicitly. Xcode's implicit installation previously
+# reached launch with FrontBoard reporting that this bundle was unknown.
+ui_runner='build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayerUITests-Runner.app'
+test -d "$ui_runner"
+xcrun simctl install "$simulator_id" "$ui_runner" 2>&1 | tee -a build/simulator.log
+xcrun simctl get_app_container "$simulator_id" \
+  io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests.xctrunner app \
+  2>&1 | tee -a build/simulator.log
+
 xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
