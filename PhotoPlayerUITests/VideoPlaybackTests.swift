@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class VideoPlaybackTests: XCTestCase {
     @MainActor
@@ -39,15 +40,14 @@ final class VideoPlaybackTests: XCTestCase {
         app.buttons["playPause"].tap()
         waitForLabel(state, "Paused")
 
-        let slider = app.sliders["seekSlider"]
-        slider.adjust(toNormalizedSliderPosition: 0.5)
+        dragSlider(app, to: 0.5)
         let middle = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", ["0:14", "0:15", "0:16"]), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [middle], timeout: 15), .completed)
         waitForLabel(state, "Paused")
         app.buttons["playPause"].tap()
         waitForLabel(state, "Playing")
         let seekStarted = ProcessInfo.processInfo.systemUptime
-        slider.adjust(toNormalizedSliderPosition: 0.75)
+        dragSlider(app, to: 0.75)
         waitForLabel(state, "Playing")
         let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
@@ -72,6 +72,23 @@ final class VideoPlaybackTests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["playPause"].exists)
+    }
+
+    @MainActor
+    private func dragSlider(_ app: XCUIApplication, to fraction: CGFloat) {
+        let slider = app.sliders["seekSlider"]
+        @MainActor func seconds(_ identifier: String) -> Double {
+            app.staticTexts[identifier].label.split(separator: ":").reduce(0) { $0 * 60 + (Double($1) ?? 0) }
+        }
+        let duration = seconds("playbackDuration")
+        XCTAssertGreaterThan(duration, 0)
+        // Grab within the thumb using the displayed second's midpoint, then
+        // drag to a fixed track coordinate. XCTest's approximate adjustment
+        // previously ended at 17.24s despite requesting 50% of a 30s video.
+        let current = CGFloat(min(1, max(0, (seconds("playbackPosition") + 0.5) / duration)))
+        let start = slider.coordinate(withNormalizedOffset: CGVector(dx: current, dy: 0.5))
+        let end = slider.coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
     }
 
     @MainActor

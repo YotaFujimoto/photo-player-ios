@@ -75,6 +75,33 @@ final class PlaybackLifecycleTests: XCTestCase {
         assertStopped(model)
     }
 
+    @MainActor
+    func testScrubReleaseCommitsLatestPositionAndPreservesPlaybackIntent() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        for playing in [false, true] {
+            if playing { model.togglePlayback() } else { model.pause() }
+            if playing { try await wait { model.player.timeControlStatus == .playing } }
+            model.beginScrubbing()
+            model.scrub(to: 8)
+            // Observe the preview starting (or already reaching its destination),
+            // rather than sleeping for a presumed AVFoundation completion time.
+            try await wait { model.isSeeking || abs(model.player.currentTime().seconds - 8) < 0.25 }
+            model.scrub(to: 15)
+            model.endScrubbing()
+            try await wait { !model.isSeeking }
+            if playing { try await wait { model.player.timeControlStatus == .playing } }
+            XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.25)
+            XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
+            XCTAssertEqual(model.wantsPlayback, playing)
+            XCTAssertEqual(model.selectedRate, 0.25)
+            XCTAssertNil(model.errorMessage)
+        }
+    }
+
     @MainActor private func makeModel() throws -> PlaybackModel {
         let assets = PHAsset.fetchAssets(with: .video, options: nil)
         let asset = assets.objects(at: IndexSet(integersIn: 0..<assets.count))

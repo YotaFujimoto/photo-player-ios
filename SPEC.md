@@ -42,6 +42,7 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 - 選択した動画の編集済み最新版 (`.current`) を `requestPlayerItem` からAVPlayerへ渡す。動画全体のData読み込み、アプリ領域への動画コピー・書き出しを行わない。iCloud動画は選択時にPhotosが取得し、進捗・取消・失敗・再試行を表示する。
 - 取得取消や画面離脱後の遅いコールバックは無視する。閉じる／背景移行時は再生を停止し、閉じる時は取得・観測・プレイヤーを解放する。
 - シークバーはドラッグ中の要求を間引き、同時に1件だけ処理する。待機中の要求は最新位置に集約し、指を離した位置を正確にシークする。
+- 指を離した時に途中表示用の近似シークが進行中なら、最終位置をキューに入れてからその途中シークを取り消す。取消通知から最終位置へ進め、途中の完了待ちで最終要求を止め続けない。再生／停止の意図と選択速度は維持する。
 - 速度は0.25/0.5/1/1.25/1.5/2倍。低速に非対応の素材は明示する。音程補正はspectralを既定とし、診断欄からtimeDomainと比較できるようにする。実際の音質は実機で決定する。
 - 最低限の診断表示はビルド番号、長さ、解像度、HDR属性、要求／実速度、再生状態、取得進捗、低速対応、匿名化したエラーコード。動画名・識別子・URLは含めない。
 - 権限のAPIはPhotosの `.readWrite` を使用する（読み取り専用の権限区分がないため）。アプリには写真の追加・編集・削除の処理を設けない。
@@ -91,6 +92,7 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 
 ## 根拠
 
+- [Apple: 保留シークの取消と完了通知](https://developer.apple.com/documentation/avfoundation/avplayeritem/cancelpendingseeks())
 - [Apple: ジェスチャー認識の排他関係](https://developer.apple.com/documentation/uikit/uigesturerecognizer/require(tofail:))
 - [Apple: 長押しの標準成立時間](https://developer.apple.com/documentation/uikit/uilongpressgesturerecognizer/minimumpressduration)
 

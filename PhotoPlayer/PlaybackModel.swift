@@ -372,7 +372,15 @@ final class PlaybackModel: ObservableObject {
         scrubTask?.cancel()
         scrubTask = nil
         scrubbing = false
+        let pendingPreview = seekQueue.active?.exact == false
         enqueueSeek(position, exact: true)
+        // The released position supersedes a preview, so it must not wait for
+        // that preview to finish decoding. Cancellation delivers finished=false;
+        // the existing completion path then advances to the queued exact seek.
+        if pendingPreview {
+            trace("scrub commit cancels preview")
+            player.currentItem?.cancelPendingSeeks()
+        }
     }
 
     private func enqueueSeek(_ seconds: Double, exact: Bool) {
