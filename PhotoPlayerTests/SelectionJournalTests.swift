@@ -119,8 +119,8 @@ final class SelectionJournalTests: XCTestCase {
         XCTAssertEqual(journal.accepted, 0)
         let report = journal.report(build: "6")
         XCTAssertTrue(report.contains("V7 input.other.begin input=I1 reason=library-observation-gate"))
-        XCTAssertTrue(report.contains("observation=begin-only"))
-        XCTAssertFalse(report.contains("input.other.end"), "An excluded input must not claim an observed ending")
+        XCTAssertFalse(report.contains("observation=begin-only"), "The application monitor can observe the ending too")
+        XCTAssertFalse(report.contains("input.end"), "Recording a begin alone must not invent an ending")
     }
 
     func testSelectionClearingReasonsRemainEvenIfSwiftUIObservationCoalesces() {

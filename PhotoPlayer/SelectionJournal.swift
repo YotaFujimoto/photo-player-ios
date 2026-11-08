@@ -88,7 +88,7 @@ struct SelectionJournal {
         contactCandidate = nil
         if input == nil { inputNumber += 1 }
         let input = input ?? inputNumber
-        append("input.other.begin input=I\(input) reason=\(reason) observation=begin-only \(state) \(evidence)", video: geometryVideo)
+        append("input.other.begin input=I\(input) reason=\(reason) \(state) \(evidence)", video: geometryVideo)
         return input
     }
 

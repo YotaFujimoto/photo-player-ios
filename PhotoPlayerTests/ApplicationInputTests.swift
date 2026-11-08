@@ -17,6 +17,10 @@ final class ApplicationInputTests: XCTestCase {
         }
         XCTAssertEqual(forwards, 1)
         XCTAssertEqual(trace.journal.contactCount, 0)
+        input.dispatch([InputSample(key: sample.key, phase: .ended, point: .zero, window: nil, receiver: nil)]) { forwards += 1 }
+        XCTAssertEqual(forwards, 2)
+        XCTAssertTrue(trace.report.contains("input.end input=I1 cancelled=false"))
+        XCTAssertFalse(trace.report.contains("observation=begin-only"))
     }
 
     @MainActor
