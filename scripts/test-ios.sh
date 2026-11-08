@@ -21,13 +21,17 @@ xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 # Export screenshots on test failure too, without losing the original failure status.
 export_test_evidence() {
   local result=$?
+  local bundle name
   trap - EXIT
-  if [[ -d build/TestResults.xcresult ]]; then
-    xcrun xcresulttool export attachments \
-      --path build/TestResults.xcresult --output-path build/screenshots || {
+  for bundle in build/TestResults.xcresult build/copy-results/*.xcresult; do
+    if [[ -d "$bundle" ]]; then
+      name="$(basename "$bundle" .xcresult)"
+      xcrun xcresulttool export attachments \
+        --path "$bundle" --output-path "build/screenshots/$name" || {
         if [[ "$result" -eq 0 ]]; then result=1; fi
       }
-  fi
+    fi
+  done
   exit "$result"
 }
 trap export_test_evidence EXIT
@@ -57,7 +61,10 @@ xcrun simctl get_app_container "$simulator_id" \
   io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests.xctrunner app \
   2>&1 | tee -a build/simulator.log
 
-xcodebuild test-without-building \
+run_tests() {
+  local result_bundle=$1
+  shift
+  xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
   -configuration Release \
@@ -70,6 +77,25 @@ xcodebuild test-without-building \
   -default-test-execution-time-allowance 120 \
   -maximum-test-execution-time-allowance 180 \
   -derivedDataPath build/simulator \
-  -resultBundlePath build/TestResults.xcresult \
+  -resultBundlePath "$result_bundle" \
+  "$@" \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  2>&1 | tee build/test.log
+  2>&1 | tee -a build/test.log
+}
+
+# Keep the two new clipboard/large accessibility-report cases in fresh test-host
+# sessions. The combined session previously stalled while terminating the app
+# between tests; Xcode's host restart allowed the remaining cases to pass.
+# Every test still runs once, sequentially on this same simulator, with unchanged
+# assertions and individual deadlines. Preserve all result bundles on failure.
+copy_contact='PhotoPlayerUITests/SingleTapTests/testCopyDistinguishesNewUnacceptedContactFromPreviousPlayback'
+copy_reopen='PhotoPlayerUITests/SingleTapTests/testCopyKeepsDistinctOperationsWhenReopeningSameVideo'
+mkdir -p build/copy-results
+test_status=0
+run_tests build/TestResults.xcresult \
+  "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" || test_status=$?
+run_tests build/copy-results/CopyContact.xcresult \
+  "-only-testing:$copy_contact" || test_status=$?
+run_tests build/copy-results/CopyReopen.xcresult \
+  "-only-testing:$copy_reopen" || test_status=$?
+exit "$test_status"

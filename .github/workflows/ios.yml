@@ -87,6 +87,7 @@ jobs:
             build/simulators.json
             build/fixture-info.json
             build/TestResults.xcresult
+            build/copy-results/
             build/screenshots/
           if-no-files-found: warn
           retention-days: 3
