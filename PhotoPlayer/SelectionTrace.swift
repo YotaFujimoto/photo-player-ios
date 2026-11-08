@@ -84,7 +84,6 @@ final class SelectionTrace: ObservableObject {
     }
 
     fileprivate func target(at point: CGPoint) -> (number: Int, scroll: UIScrollView)? {
-        guard observesLibrary else { return nil }
         for probe in probes.compactMap(\.view) where probe.window === window && probe.isVisibleInHierarchy {
             guard probe.convert(probe.bounds, to: window).contains(point),
                   let scroll = probe.scrollView,
@@ -97,11 +96,18 @@ final class SelectionTrace: ObservableObject {
     fileprivate func contactBegan(number: Int, scroll: UIScrollView, receiver: UIView?) -> Int {
         let id = journal.beginContact(video: number, scroll: scrollSnapshot(scroll),
             receiverInScroll: receiver?.isDescendant(of: scroll) == true)
-        changed()
+        // Do not publish diagnostic-only UI changes while the finger is down.
         return id
     }
 
-    fileprivate func otherInputBegan() { journal.otherInputBegan() }
+    fileprivate func otherInputBegan(reason: String, geometryVideo: Int?) -> Int {
+        journal.otherInputBegan(reason: reason, geometryVideo: geometryVideo)
+    }
+
+    fileprivate func otherInputEnded(_ id: Int, distance: CGFloat, cancelled: Bool) {
+        journal.otherInputEnded(id, movement: Double(distance), cancelled: cancelled)
+        changed()
+    }
 
     fileprivate func contactEnded(_ id: Int, distance: CGFloat, cancelled: Bool, endVideo: Int?, scroll: UIScrollView?) {
         journal.endContact(id, movement: Double(distance), cancelled: cancelled, endVideo: endVideo, scroll: scrollSnapshot(scroll))
@@ -120,6 +126,7 @@ private struct WeakProbe { weak var view: ContactProbeView? }
 private final class ContactObserver: UIGestureRecognizer {
     private weak var trace: SelectionTrace?
     private var contact: (id: Int, point: CGPoint)?
+    private var otherInput: (id: Int, point: CGPoint)?
     private weak var scroll: UIScrollView?
     private var distance: CGFloat = 0
 
@@ -136,11 +143,18 @@ private final class ContactObserver: UIGestureRecognizer {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         guard touches.count == 1, let touch = touches.first else {
-            trace?.otherInputBegan(); state = .failed; return
+            if let id = trace?.otherInputBegan(reason: "multiple-touches", geometryVideo: nil) {
+                trace?.otherInputEnded(id, distance: 0, cancelled: true)
+            }
+            state = .failed; return
         }
         let point = touch.location(in: view)
-        guard let trace, let target = trace.target(at: point) else {
-            trace?.otherInputBegan(); state = .failed; return
+        guard let trace else { state = .failed; return }
+        let target = trace.target(at: point)
+        guard trace.observesLibrary, let target else {
+            let id = trace.otherInputBegan(reason: trace.observesLibrary ? "outside-cell" : "library-observation-gate", geometryVideo: target?.number)
+            otherInput = (id, point)
+            return
         }
         let id = trace.contactBegan(number: target.number, scroll: target.scroll, receiver: touch.view)
         contact = (id, point)
@@ -148,9 +162,9 @@ private final class ContactObserver: UIGestureRecognizer {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard let contact, let touch = touches.first else { return }
+        guard let origin = contact?.point ?? otherInput?.point, let touch = touches.first else { return }
         let point = touch.location(in: view)
-        distance = max(distance, hypot(point.x - contact.point.x, point.y - contact.point.y))
+        distance = max(distance, hypot(point.x - origin.x, point.y - origin.y))
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(touches, cancelled: false) }
@@ -162,11 +176,15 @@ private final class ContactObserver: UIGestureRecognizer {
             distance = max(distance, hypot(point.x - contact.point.x, point.y - contact.point.y))
             trace?.contactEnded(contact.id, distance: distance, cancelled: cancelled,
                 endVideo: trace?.target(at: point)?.number, scroll: scroll)
+        } else if let otherInput {
+            let point = touches.first?.location(in: view) ?? otherInput.point
+            distance = max(distance, hypot(point.x - otherInput.point.x, point.y - otherInput.point.y))
+            trace?.otherInputEnded(otherInput.id, distance: distance, cancelled: cancelled)
         }
         state = .failed
     }
 
-    override func reset() { contact = nil; scroll = nil; distance = 0 }
+    override func reset() { contact = nil; otherInput = nil; scroll = nil; distance = 0 }
 }
 
 final class ContactProbeView: UIView {

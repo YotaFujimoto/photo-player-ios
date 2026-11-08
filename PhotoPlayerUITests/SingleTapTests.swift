@@ -38,7 +38,9 @@ final class SingleTapTests: XCTestCase {
         XCTAssertTrue(report.contains("selectionCandidate=-"))
         let copy = app.buttons["copySelectionTrace.library"]
         copy.tap()
-        XCTAssertEqual(copy.value as? String, report, "Read back the app's actual clipboard contents")
+        let copied = copy.value as! String
+        XCTAssertTrue(copied.hasPrefix(report), "Copy retains the report; its own window input may append events")
+        XCTAssertTrue(copied.contains("input.other.begin"))
         attach("journal-new-contact-after-close-copied")
     }
 
