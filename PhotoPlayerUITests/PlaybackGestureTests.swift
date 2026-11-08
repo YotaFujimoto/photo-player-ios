@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class PlaybackGestureTests: XCTestCase {
     @MainActor
@@ -27,7 +28,7 @@ final class PlaybackGestureTests: XCTestCase {
         app.buttons["playPause"].tap()
         state(app, "Paused")
         setRate(app, "0.25×")
-        for orientation in [XCUIDeviceOrientation.portrait, .landscapeLeft] {
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
             let surface = app.otherElements["videoSurface"]
             XCTAssertTrue(surface.isHittable)
