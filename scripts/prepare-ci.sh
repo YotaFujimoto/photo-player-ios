@@ -10,7 +10,11 @@ printf 'DEVELOPER_DIR=%s\nImageOS=%s\nImageVersion=%s\n' \
 xcrun --sdk iphoneos --show-sdk-version | tee -a build/toolchain.txt
 swift --version | tee -a build/toolchain.txt
 
-curl --fail --location --retry 3 \
+# The release download intermittently returns 504 as curl error 56, which the
+# default transient-error retry list did not retry. Only this idempotent GET is
+# retried; each attempt replaces the output and the pinned digest is mandatory.
+curl --fail --location --retry 3 --retry-all-errors \
+  --connect-timeout 30 --max-time 120 --retry-max-time 240 \
   "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" \
   --output build/xcodegen.zip
 printf '%s  %s\n' "$XCODEGEN_SHA256" build/xcodegen.zip | shasum -a 256 -c -
