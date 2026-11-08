@@ -47,7 +47,9 @@ final class VideoPlaybackTests: XCTestCase {
         app.buttons["playPause"].tap()
         waitForLabel(state, "Playing")
         let seekStarted = ProcessInfo.processInfo.systemUptime
-        dragSlider(app, to: 0.75)
+        // While playing the thumb keeps moving; let XCTest resolve its current
+        // value instead of estimating a grab point from a rounded clock label.
+        app.sliders["seekSlider"].adjust(toNormalizedSliderPosition: 0.75)
         waitForLabel(state, "Playing")
         let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
