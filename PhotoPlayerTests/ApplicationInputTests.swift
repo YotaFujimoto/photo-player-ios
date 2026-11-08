@@ -29,6 +29,8 @@ final class ApplicationInputTests: XCTestCase {
         let input = ApplicationInput(trace: trace)
         let first = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 600))
         let second = UIWindow(frame: first.frame)
+        let firstRecognizers = recognizers(in: first)
+        let secondRecognizers = recognizers(in: second)
         let a = NSObject(), b = NSObject()
         input.dispatch([
             InputSample(key: ObjectIdentifier(a), phase: .began, point: .zero, window: first, receiver: first),
@@ -36,8 +38,8 @@ final class ApplicationInputTests: XCTestCase {
         ]) {}
         XCTAssertTrue(trace.report.contains("input.entry input=I1 source=UIApplication.sendEvent windowID=W1{"))
         XCTAssertTrue(trace.report.contains("input.entry input=I2 source=UIApplication.sendEvent windowID=W2{"))
-        XCTAssertTrue((first.gestureRecognizers ?? []).isEmpty)
-        XCTAssertTrue((second.gestureRecognizers ?? []).isEmpty)
+        XCTAssertEqual(recognizers(in: first), firstRecognizers, "Observation must preserve UIKit's existing recognizers")
+        XCTAssertEqual(recognizers(in: second), secondRecognizers, "Observation must not move recognizers between windows")
     }
 
     @MainActor
@@ -49,9 +51,13 @@ final class ApplicationInputTests: XCTestCase {
         defer { window.isHidden = true }
         let scroll = UIScrollView(frame: window.bounds)
         window.addSubview(scroll)
+        // UIWindow can already own UIKit recognizers. Compare their identities,
+        // so both adding a competitor and removing a system recognizer fail.
+        let beforeRegistration = recognizers(in: window)
         let probe = ContactProbeView(frame: CGRect(x: 16, y: 467, width: 166, height: 130))
         probe.number = 5; probe.trace = trace
         scroll.addSubview(probe)
+        XCTAssertEqual(recognizers(in: window), beforeRegistration, "Registering a probe must preserve existing recognizers")
         let closingFinger = NSObject(), nextFinger = NSObject()
         trace.observesLibrary = false
         input.dispatch([InputSample(key: ObjectIdentifier(closingFinger), phase: .began,
@@ -63,7 +69,7 @@ final class ApplicationInputTests: XCTestCase {
         XCTAssertTrue(trace.report.contains("V5 contact.begin input=I2"))
         XCTAssertTrue(trace.report.contains("diagnostics=false"))
         XCTAssertEqual(trace.journal.contactCount, 1)
-        XCTAssertTrue((window.gestureRecognizers ?? []).isEmpty, "Registering a probe must not install an input competitor")
+        XCTAssertEqual(recognizers(in: window), beforeRegistration, "Recording a contact must not add or remove recognizers")
         input.dispatch([InputSample(key: sample.key, phase: .ended, point: sample.point, window: window, receiver: scroll)]) {}
         XCTAssertEqual(trace.journal.contacts.first?.ended, true)
     }
@@ -129,5 +135,9 @@ final class ApplicationInputTests: XCTestCase {
         XCTAssertEqual(forwards, 3)
         XCTAssertTrue(trace.report.contains("input.replaced-missing-end previous=I1"))
         XCTAssertTrue(trace.report.contains("input.entry input=I2"))
+    }
+
+    @MainActor private func recognizers(in window: UIWindow) -> Set<ObjectIdentifier> {
+        Set((window.gestureRecognizers ?? []).map { ObjectIdentifier($0) })
     }
 }
