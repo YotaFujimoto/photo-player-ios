@@ -26,14 +26,16 @@ struct PlayerScreen: View {
     let video: LibraryVideo
     let selectionDiagnostics: Bool
     let selectionTrace: SelectionTrace?
+    let selectionOperation: Int?
     @StateObject private var model: PlaybackModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
-    init(video: LibraryVideo, selectionDiagnostics: Bool = false, selectionTrace: SelectionTrace? = nil) {
+    init(video: LibraryVideo, selectionDiagnostics: Bool = false, selectionTrace: SelectionTrace? = nil, selectionOperation: Int? = nil) {
         self.video = video
         self.selectionDiagnostics = selectionDiagnostics
         self.selectionTrace = selectionTrace
+        self.selectionOperation = selectionOperation
         _model = StateObject(wrappedValue: PlaybackModel(asset: video.asset))
     }
 
@@ -41,8 +43,7 @@ struct PlayerScreen: View {
         VStack(spacing: 0) {
             HStack {
                 Button("閉じる", systemImage: "xmark") {
-                    selectionTrace?.record("閉じる受付")
-                    selectionTrace?.observesLibrary = true
+                    if let selectionOperation { selectionTrace?.closeRequested(selectionOperation) }
                     model.close(); dismiss()
                 }
                     .accessibilityIdentifier("closePlayer")
@@ -74,11 +75,16 @@ struct PlayerScreen: View {
             }
         }
         .onAppear {
-            selectionTrace?.appear()
-            model.onLoadEvent = { [weak selectionTrace] event in selectionTrace?.loadEvent(event) }
+            if let selectionOperation { selectionTrace?.appear(selectionOperation) }
+            model.onLoadEvent = { [weak selectionTrace, selectionOperation] event in
+                if let selectionOperation { selectionTrace?.loadEvent(event, operation: selectionOperation) }
+            }
             model.load()
         }
-        .onDisappear { model.close() }
+        .onDisappear {
+            model.close()
+            if let selectionOperation { selectionTrace?.disappear(selectionOperation) }
+        }
         .onChange(of: scenePhase) { _, phase in if phase != .active { model.suspend() } }
     }
 

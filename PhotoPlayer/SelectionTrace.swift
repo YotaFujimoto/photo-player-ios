@@ -4,54 +4,72 @@ import UIKit
 /// In-memory, anonymous evidence. Observing a contact never selects a video.
 @MainActor
 final class SelectionTrace: ObservableObject {
-    @Published private(set) var contacts = 0
-    @Published private(set) var accepted = 0
-    @Published private(set) var shown = 0
-    @Published private(set) var requested = 0
-    @Published private(set) var received = 0
-    @Published private(set) var ready = 0
-    @Published private(set) var contactDescription = "接触なし"
-    @Published private(set) var events: [String] = []
-    @Published private(set) var isPlayerVisible = false
+    @Published private(set) var revision = 0
+    private(set) var journal = SelectionJournal()
+    private var publicationPending = false
     var observesLibrary = true
     private var probes: [WeakProbe] = []
     private weak var window: UIWindow?
     private var observer: ContactObserver?
 
-    var summary: String { "接触 \(contacts) / 受付 \(accepted) / 表示 \(shown) / 取得 \(requested)→\(received)" }
+    var summary: String { "接触 \(journal.contactCount) / 受付 \(journal.accepted) / 表示 \(journal.shown) / 取得 \(journal.requested)→\(journal.received)" }
     var testValue: String {
-        "contacts=\(contacts);accepted=\(accepted);shown=\(shown);requested=\(requested);received=\(received);ready=\(ready)"
+        "contacts=\(journal.contactCount);accepted=\(journal.accepted);shown=\(journal.shown);requested=\(journal.requested);received=\(journal.received);ready=\(journal.ready)"
+    }
+    var report: String { journal.report(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") }
+
+    // Record synchronously in delivery order. Defer only the UI publication;
+    // unlike build 5, an async Task never changes the order of recorded events.
+    private func changed() {
+        guard !publicationPending else { return }
+        publicationPending = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.publicationPending = false
+            self.revision &+= 1
+        }
     }
 
-    func accept(_ number: Int) {
-        accepted += 1
-        events = ["動画\(number) 受付"]
+    func accept(_ number: Int) -> Int {
+        let operation = journal.actionEntered(video: number)
+        journal.decision(operation, accept: true, reason: "no-app-guard")
+        changed()
+        return operation
     }
 
-    func record(_ event: String) {
-        events = Array((events + [event]).suffix(6))
-    }
+    func selectionWritten(_ operation: Int?, reason: String) { journal.selectionWritten(operation, reason: reason); changed() }
+    func bindingWrite(_ operation: Int?) { journal.bindingWrite(operation); changed() }
+    func selectionObserved(old: Int?, new: Int?) { journal.selectionObserved(old: old, new: new); changed() }
 
-    func appear() {
+    func appear(_ operation: Int) {
         observesLibrary = false
-        isPlayerVisible = true
-        shown += 1
-        record("画面表示")
+        journal.appear(operation)
+        changed()
     }
+
+    func closeRequested(_ operation: Int) {
+        observesLibrary = true
+        journal.closeRequested(operation)
+        changed()
+    }
+
+    func disappear(_ operation: Int) { journal.disappear(operation); changed() }
 
     func dismissed() {
-        isPlayerVisible = false
-        observesLibrary = true
-        record("一覧復帰")
+        journal.dismissed()
+        observesLibrary = journal.visible == nil
+        changed()
     }
 
-    func loadEvent(_ event: VideoLoadEvent) {
-        switch event {
-        case .requested: requested += 1; record("取得開始")
-        case .received: received += 1; record("取得完了")
-        case .ready: ready += 1; record("再生準備完了")
-        case .failed: record("取得／準備エラー")
+    func loadEvent(_ event: VideoLoadEvent, operation: Int) {
+        let name: String = switch event {
+        case .requested: "requested"
+        case .received: "received"
+        case .ready: "ready"
+        case .failed: "failed"
         }
+        journal.load(operation, event: name)
+        changed()
     }
 
     fileprivate func register(_ probe: ContactProbeView) {
@@ -65,20 +83,34 @@ final class SelectionTrace: ObservableObject {
         observer = recognizer
     }
 
-    fileprivate func target(at point: CGPoint) -> (Int, Bool)? {
+    fileprivate func target(at point: CGPoint) -> (number: Int, scroll: UIScrollView)? {
         guard observesLibrary else { return nil }
         for probe in probes.compactMap(\.view) where probe.window === window && probe.isVisibleInHierarchy {
             guard probe.convert(probe.bounds, to: window).contains(point),
                   let scroll = probe.scrollView,
                   scroll.convert(scroll.bounds, to: window).contains(point) else { continue }
-            return (probe.number, scroll.isDecelerating || scroll.isDragging)
+            return (probe.number, scroll)
         }
         return nil
     }
 
-    fileprivate func contact(number: Int, distance: CGFloat, scrolling: Bool, cancelled: Bool) {
-        contacts += 1
-        contactDescription = "動画\(number)・移動\(Int(distance))pt・\(scrolling ? "スクロール中" : "停止中")\(cancelled ? "・取消" : "")"
+    fileprivate func contactBegan(number: Int, scroll: UIScrollView, receiver: UIView?) -> Int {
+        let id = journal.beginContact(video: number, scroll: scrollSnapshot(scroll),
+            receiverInScroll: receiver?.isDescendant(of: scroll) == true)
+        changed()
+        return id
+    }
+
+    fileprivate func otherInputBegan() { journal.otherInputBegan() }
+
+    fileprivate func contactEnded(_ id: Int, distance: CGFloat, cancelled: Bool, endVideo: Int?, scroll: UIScrollView?) {
+        journal.endContact(id, movement: Double(distance), cancelled: cancelled, endVideo: endVideo, scroll: scrollSnapshot(scroll))
+        changed()
+    }
+
+    private func scrollSnapshot(_ scroll: UIScrollView?) -> String {
+        guard let scroll else { return "detached" }
+        return "drag:\(scroll.isDragging),decel:\(scroll.isDecelerating),pan:\(scroll.panGestureRecognizer.state.rawValue)"
     }
 }
 
@@ -87,7 +119,8 @@ private struct WeakProbe { weak var view: ContactProbeView? }
 /// No recognition, prevention, delay, or cancellation: only observes UIKit delivery.
 private final class ContactObserver: UIGestureRecognizer {
     private weak var trace: SelectionTrace?
-    private var contact: (number: Int, point: CGPoint, scrolling: Bool)?
+    private var contact: (id: Int, point: CGPoint)?
+    private weak var scroll: UIScrollView?
     private var distance: CGFloat = 0
 
     init(trace: SelectionTrace) {
@@ -102,10 +135,16 @@ private final class ContactObserver: UIGestureRecognizer {
     override func canBePrevented(by other: UIGestureRecognizer) -> Bool { false }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard touches.count == 1, let touch = touches.first else { state = .failed; return }
+        guard touches.count == 1, let touch = touches.first else {
+            trace?.otherInputBegan(); state = .failed; return
+        }
         let point = touch.location(in: view)
-        guard let target = trace?.target(at: point) else { state = .failed; return }
-        contact = (target.0, point, target.1)
+        guard let trace, let target = trace.target(at: point) else {
+            trace?.otherInputBegan(); state = .failed; return
+        }
+        let id = trace.contactBegan(number: target.number, scroll: target.scroll, receiver: touch.view)
+        contact = (id, point)
+        scroll = target.scroll
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
@@ -114,22 +153,20 @@ private final class ContactObserver: UIGestureRecognizer {
         distance = max(distance, hypot(point.x - contact.point.x, point.y - contact.point.y))
     }
 
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(cancelled: false) }
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(cancelled: true) }
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(touches, cancelled: false) }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(touches, cancelled: true) }
 
-    private func finish(cancelled: Bool) {
+    private func finish(_ touches: Set<UITouch>, cancelled: Bool) {
         if let contact {
-            let distance = distance
-            // Publish after delivery finishes; never rebuild a button mid-contact.
-            Task { @MainActor [weak trace] in
-                trace?.contact(number: contact.number, distance: distance,
-                               scrolling: contact.scrolling, cancelled: cancelled)
-            }
+            let point = touches.first?.location(in: view) ?? contact.point
+            distance = max(distance, hypot(point.x - contact.point.x, point.y - contact.point.y))
+            trace?.contactEnded(contact.id, distance: distance, cancelled: cancelled,
+                endVideo: trace?.target(at: point)?.number, scroll: scroll)
         }
         state = .failed
     }
 
-    override func reset() { contact = nil; distance = 0 }
+    override func reset() { contact = nil; scroll = nil; distance = 0 }
 }
 
 final class ContactProbeView: UIView {
@@ -173,12 +210,23 @@ struct ContactProbe: UIViewRepresentable {
 struct SelectionTracePanel: View {
     @ObservedObject var trace: SelectionTrace
     let location: String
+    @State private var copiedReport: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(trace.summary).accessibilityIdentifier("selectionTrace.\(location)").accessibilityValue(trace.testValue)
-            Text(trace.contactDescription)
-            Text(trace.events.joined(separator: " → ")).truncationMode(.head)
+            Group {
+                Text(trace.summary).accessibilityIdentifier("selectionTrace.\(location)").accessibilityValue(trace.testValue)
+                Text(trace.journal.latestContact)
+                    .accessibilityIdentifier("selectionJournal.\(location)")
+                    .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--verify-diagnostic-copy") ? trace.report : trace.journal.latestContact)
+                Text(trace.journal.events.last ?? "履歴なし").truncationMode(.head)
+            }.allowsHitTesting(false)
+            Button(copiedReport == nil ? "診断をまとめてコピー" : "診断をコピー済み") {
+                UIPasteboard.general.string = trace.report
+                copiedReport = UIPasteboard.general.string
+            }
+            .accessibilityIdentifier("copySelectionTrace.\(location)")
+            .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--verify-diagnostic-copy") ? (copiedReport ?? "未コピー") : "")
         }.font(.caption2).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal).allowsHitTesting(false)
+            .padding(.horizontal)
     }
 }

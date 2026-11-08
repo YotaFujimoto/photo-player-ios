@@ -1,12 +1,20 @@
 import SwiftUI
 import Photos
 
+private struct VideoSelection: Identifiable {
+    let video: LibraryVideo
+    let operation: Int
+    // Preserve build 4/5's PhotoKit identity; the operation number is evidence,
+    // not a change to fullScreenCover's presentation identity.
+    var id: String { video.id }
+}
+
 struct LibraryScreen: View {
     @StateObject private var library = VideoLibrary()
     // Only the diagnostic panels observe these counters; recording a contact
     // must not rebuild every button in the library.
     @State private var trace = SelectionTrace()
-    @State private var selection: LibraryVideo?
+    @State private var selection: VideoSelection?
     @State private var selectionDiagnostics = ProcessInfo.processInfo.arguments.contains("--selection-diagnostics")
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -30,7 +38,11 @@ struct LibraryScreen: View {
                             ScrollView {
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 12)], spacing: 16) {
                                     ForEach(library.videos) { video in
-                                        Button { trace.accept(video.diagnosticNumber); selection = video } label: {
+                                        Button {
+                                            let operation = trace.accept(video.diagnosticNumber)
+                                            selection = VideoSelection(video: video, operation: operation)
+                                            trace.selectionWritten(selection?.operation, reason: "Button.action")
+                                        } label: {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
                                                     .allowsHitTesting(false)
@@ -94,12 +106,21 @@ struct LibraryScreen: View {
         .onChange(of: library.revision) { _, _ in
             if let selection, !library.videos.contains(where: { $0.id == selection.id }) {
                 self.selection = nil
-                trace.record("選択素材が一覧から消失")
+                trace.selectionWritten(nil, reason: "asset-missing-after-library-refresh")
             }
         }
-        .onChange(of: selection?.id) { _, value in trace.record(value == nil ? "選択解除" : "選択状態更新") }
-        .fullScreenCover(item: $selection, onDismiss: { trace.dismissed() }) { video in
-            PlayerScreen(video: video, selectionDiagnostics: selectionDiagnostics, selectionTrace: trace)
+        .onChange(of: selection?.operation) { old, new in trace.selectionObserved(old: old, new: new) }
+        .fullScreenCover(item: presentationSelection, onDismiss: { trace.dismissed() }) { selection in
+            PlayerScreen(video: selection.video, selectionDiagnostics: selectionDiagnostics,
+                         selectionTrace: trace, selectionOperation: selection.operation)
         }
+    }
+
+    private var presentationSelection: Binding<VideoSelection?> {
+        Binding(get: { selection }, set: { proposed in
+            trace.bindingWrite(proposed?.operation)
+            selection = proposed
+            trace.selectionWritten(selection?.operation, reason: "fullScreenCover.binding")
+        })
     }
 }

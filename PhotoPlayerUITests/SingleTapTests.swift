@@ -16,6 +16,57 @@ final class SingleTapTests: XCTestCase {
     }
 
     @MainActor
+    func testCopyDistinguishesNewUnacceptedContactFromPreviousPlayback() {
+        let app = launch(["--verify-diagnostic-copy"])
+        let frame = app.buttons["videoCard.3"].frame
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
+        start.press(forDuration: 0.03)
+        verifyOpened(app, number: 3, dimensions: "202x202", diagnostics: true)
+        app.buttons["closePlayer"].tap()
+        // A deliberate scroll is a real contact with no selection action.
+        // It must get its own record after the previous player's close history.
+        start.press(forDuration: 0.03, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -140)),
+                    withVelocity: .slow, thenHoldForDuration: 0.2)
+        let journal = app.staticTexts["selectionJournal.library"]
+        let latest = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "C2 動画3 選択処理の記録なし"), object: journal)
+        XCTAssertEqual(XCTWaiter.wait(for: [latest], timeout: 10), .completed)
+        verifyCounts(app, accepted: 1, shown: 1, requested: 1, received: 1, ready: 1, inPlayer: false)
+        let report = journal.value as! String
+        XCTAssertTrue(report.contains("cover.dismiss"))
+        XCTAssertTrue(report.contains("C2 V3 end=true"))
+        XCTAssertTrue(report.contains("selectionCandidate=-"))
+        let copy = app.buttons["copySelectionTrace.library"]
+        copy.tap()
+        XCTAssertEqual(copy.value as? String, report, "Read back the app's actual clipboard contents")
+        attach("journal-new-contact-after-close-copied")
+    }
+
+    @MainActor
+    func testCopyKeepsDistinctOperationsWhenReopeningSameVideo() {
+        let app = launch(["--verify-diagnostic-copy"])
+        let frame = app.buttons["videoCard.3"].frame
+        let target = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
+        for _ in 0..<3 {
+            target.press(forDuration: 0.03)
+            verifyOpened(app, number: 3, dimensions: "202x202", diagnostics: true)
+            app.buttons["closePlayer"].tap()
+        }
+        verifyCounts(app, accepted: 3, shown: 3, requested: 3, received: 3, ready: 3, inPlayer: false)
+        let copy = app.buttons["copySelectionTrace.library"]
+        copy.tap()
+        let report = copy.value as! String
+        for number in 1...3 {
+            XCTAssertTrue(report.contains("S\(number) V3 contactCandidate=C\(number) result=終了"), report)
+            XCTAssertTrue(report.contains("S\(number) V3 view.appear"), report)
+            XCTAssertTrue(report.contains("S\(number) V3 close.request"), report)
+        }
+        XCTAssertTrue(report.contains("reason=fullScreenCover.binding"))
+        attach("journal-same-video-three-operations-copied")
+    }
+
+    @MainActor
     private func checkReturning(diagnostics: Bool) {
         let app = launch()
         if !diagnostics { app.buttons["selectionDiagnostics"].tap() }
