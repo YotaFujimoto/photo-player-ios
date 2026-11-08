@@ -95,12 +95,20 @@ geometry_controls='PhotoPlayerUITests/ContactGeometryUITests/testCopyAndToggleHa
 input_on='PhotoPlayerUITests/InputLifecycleTests/testFourToFiveAfterTabReturnWithMonitor'
 input_off='PhotoPlayerUITests/InputLifecycleTests/testSameSingleTapsWithMonitorDisabled'
 input_background='PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn'
+gesture_skip='PhotoPlayerUITests/PlaybackGestureTests/testDoubleTapBoundsSingleTapAndControlsInBothOrientations'
+gesture_hold='PhotoPlayerUITests/PlaybackGestureTests/testHeldDoubleSpeedRestoresRateAndNeverStartsPausedPlayback'
 mkdir -p build/copy-results
 test_status=0
 run_tests build/TestResults.xcresult \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
-  "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" || test_status=$?
+  "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \
+  "-skip-testing:PhotoPlayerUITests/PlaybackGestureTests" || test_status=$?
+# The combined gesture session observed a 5.74s accessibility snapshot and a
+# stale Loading value while the fresh query already showed Playing. Isolate each
+# gesture case in a fresh host, keeping every assertion and deadline unchanged.
+run_tests build/copy-results/GestureSkip.xcresult "-only-testing:$gesture_skip" || test_status=$?
+run_tests build/copy-results/GestureHold.xcresult "-only-testing:$gesture_hold" || test_status=$?
 run_tests build/copy-results/CopyContact.xcresult \
   "-only-testing:$copy_contact" || test_status=$?
 run_tests build/copy-results/CopyReopen.xcresult \
