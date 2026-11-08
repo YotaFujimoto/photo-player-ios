@@ -3,6 +3,17 @@ import UIKit
 import UIKit.UIGestureRecognizerSubclass
 @testable import PhotoPlayer
 
+// The concrete UIKit recognizer owns its transitions and may reset a manually
+// assigned state without a touch sequence. This fixture supplies action inputs;
+// the UI suite separately verifies actual recognition from physical gestures.
+private final class HoldStateFixture: UILongPressGestureRecognizer {
+    private var suppliedState: UIGestureRecognizer.State = .possible
+    override var state: UIGestureRecognizer.State {
+        get { suppliedState }
+        set { suppliedState = newValue }
+    }
+}
+
 final class VideoGestureTests: XCTestCase {
     @MainActor
     func testHoldEndsOnReleaseCancellationFailureAndWindowRemoval() {
@@ -17,15 +28,16 @@ final class VideoGestureTests: XCTestCase {
         view.onHoldEnded = { held = false }
         view.onSkip = { _ in skips += 1 }
         for end in [UIGestureRecognizer.State.ended, .cancelled] {
-            let recognizer = UILongPressGestureRecognizer()
+            let recognizer = HoldStateFixture()
             recognizer.state = .began
+            XCTAssertEqual(recognizer.state, .began)
             view.held(recognizer)
             XCTAssertTrue(held)
             recognizer.state = end
             view.held(recognizer)
             XCTAssertFalse(held)
         }
-        let failed = UILongPressGestureRecognizer()
+        let failed = HoldStateFixture()
         failed.state = .failed
         held = true
         view.held(failed)

@@ -74,12 +74,13 @@ final class PlaybackGestureTests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         app.buttons["playPause"].tap()
         state(app, "Paused")
-        app.sliders["seekSlider"].adjust(toNormalizedSliderPosition: 0)
-        position(app, ["0:00"])
+        // Paused holding must preserve the exact displayed position. It does not
+        // depend on XCTest's approximate slider gesture landing at zero.
+        let stoppedPosition = app.staticTexts["playbackPosition"].label
         setRate(app, "0.25×")
         let surface = app.otherElements["videoSurface"]
         surface.press(forDuration: 2)
-        position(app, ["0:00"])
+        position(app, [stoppedPosition])
         state(app, "Paused")
         app.buttons["playPause"].tap()
         state(app, "Playing")
