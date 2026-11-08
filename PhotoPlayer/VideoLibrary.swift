@@ -138,9 +138,11 @@ struct VideoThumbnail: View {
                 Image(uiImage: image).resizable().scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                     .accessibilityIdentifier("videoThumbnail")
+                    .accessibilityLabel("Video thumbnail")
             } else {
                 Image(systemName: model.inCloud ? "icloud" : "video")
                     .accessibilityIdentifier("thumbnailPlaceholder")
+                    .accessibilityLabel(model.inCloud ? "iCloud video" : "Loading thumbnail")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .foregroundStyle(.secondary)
             }

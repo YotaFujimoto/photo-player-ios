@@ -22,12 +22,14 @@ struct PlayerScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("Close", systemImage: "xmark") {
+                Button {
                     selectionTrace?.controlAction("player.close")
                     if let selectionOperation { selectionTrace?.closeRequested(selectionOperation) }
                     model.close(); dismiss()
+                } label: {
+                    Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
                 }
-                .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel("Close")
                 .accessibilityIdentifier("closePlayer")
                 .background {
                     if let selectionTrace {
@@ -45,9 +47,19 @@ struct PlayerScreen: View {
                     }
                 }
                 Spacer()
-                Button("Playback diagnostics", systemImage: "info.circle") { diagnostics.toggle() }
-                    .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+                Button {
+                    selectionTrace?.controlAction("player.diagnostics")
+                    diagnostics.toggle()
+                } label: {
+                    Image(systemName: "info.circle").frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                    .accessibilityLabel("Playback diagnostics")
                     .accessibilityIdentifier("playerDiagnostics")
+                    .background {
+                        if let selectionTrace {
+                            ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false)
+                        }
+                    }
             }.padding(.horizontal)
             if diagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace, location: "player") }
             GeometryReader { geometry in

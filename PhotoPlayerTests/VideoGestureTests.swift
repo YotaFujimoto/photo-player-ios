@@ -3,8 +3,8 @@ import UIKit
 import UIKit.UIGestureRecognizerSubclass
 @testable import PhotoPlayer
 
-@MainActor
 final class VideoGestureTests: XCTestCase {
+    @MainActor
     func testHoldEndsOnReleaseCancellationFailureAndWindowRemoval() {
         let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
         let window = UIWindow(frame: view.frame)
@@ -37,6 +37,7 @@ final class VideoGestureTests: XCTestCase {
         XCTAssertEqual(Set((window.gestureRecognizers ?? []).map(ObjectIdentifier.init)), windowRecognizers)
     }
 
+    @MainActor
     func testResizeAndDismantleCancelHoldWithoutInstallingRecognizersOnControls() {
         let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
         view.layoutIfNeeded()
