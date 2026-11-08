@@ -45,6 +45,9 @@ final class ContactGeometryUITests: XCTestCase {
         }
         XCTAssertTrue(report.contains("control.action name=library.refresh"))
         XCTAssertTrue(report.contains("control.action name=diagnostics.toggle"))
+        XCTAssertTrue(report.contains("controls=[library.refresh]"), report)
+        XCTAssertEqual(report.components(separatedBy: "\n").filter { $0.contains(" contact.begin ") }.count, 3,
+                       "Toolbar controls over scrolled cells must not create extra cell contacts")
         XCTAssertTrue(report.contains("controls=[copy.library]"))
         attach("geometry-scroll-return-toggle-copied")
     }

@@ -94,14 +94,20 @@ struct LibraryScreen: View {
             }
             .navigationTitle("動画")
             .toolbar {
-                Button(selectionDiagnostics ? "選択確認を終了" : "選択確認", systemImage: "square.dashed") {
+                Button {
                     selectionDiagnostics.toggle()
                     trace.diagnosticsChanged(selectionDiagnostics)
+                } label: {
+                    Image(systemName: "square.dashed").frame(width: 28, height: 28)
+                        .traceControl("diagnostics.toggle", trace: trace)
                 }.accessibilityIdentifier("selectionDiagnostics")
-                    .traceControl("diagnostics.toggle", trace: trace)
-                Button("更新", systemImage: "arrow.clockwise") { trace.controlAction("library.refresh"); library.refresh() }
-                    .accessibilityIdentifier("refreshLibrary")
-                    .traceControl("library.refresh", trace: trace)
+                    .accessibilityLabel(selectionDiagnostics ? "選択確認を終了" : "選択確認")
+                Button {
+                    trace.controlAction("library.refresh"); library.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise").frame(width: 28, height: 28)
+                        .traceControl("library.refresh", trace: trace)
+                }.accessibilityIdentifier("refreshLibrary").accessibilityLabel("更新")
             }
         }
         .task { trace.diagnosticsChanged(selectionDiagnostics, initial: true); library.refresh() }

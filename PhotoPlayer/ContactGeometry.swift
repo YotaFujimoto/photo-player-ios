@@ -18,12 +18,14 @@ struct ContactGeometry {
     let receiver: String
     let windowBounds: CGRect
     let registered: Int
+    private let inputView: UIView?
 
     init(point: CGPoint, window: UIWindow, probes: [ContactProbeView], receiver: UIView?) {
         self.point = point
         self.windowBounds = window.bounds
         self.registered = probes.count
         self.receiver = Self.receiverDescription(receiver, in: window)
+        self.inputView = receiver
         let measurements = probes.filter { $0.window === window }.map { probe in
             let frame = probe.convert(probe.bounds, to: window)
             var visibleFrame = frame.intersection(window.bounds)
@@ -49,6 +51,13 @@ struct ContactGeometry {
     var candidates: [Cell] { cells.filter { $0.visible && $0.visibleFrame.contains(point) } }
     // Never silently pick the first registered cell when geometry is ambiguous.
     var uniqueCell: Cell? { controls.isEmpty && candidates.count == 1 ? candidates[0] : nil }
+    // Geometry alone can overlap a navigation bar or a presented view. Do not
+    // count those inputs as cell contacts when UIKit delivered them elsewhere.
+    var contactCell: Cell? {
+        guard let cell = uniqueCell, let scroll = cell.probe.scrollView,
+              inputView?.isDescendant(of: scroll) == true else { return nil }
+        return cell
+    }
 
     var evidence: String {
         let hits = candidates

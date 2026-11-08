@@ -4,6 +4,25 @@ import SwiftUI
 
 final class ContactGeometryTests: XCTestCase {
     @MainActor
+    func testOverlappingToolbarInputIsNotCountedAsCellContact() {
+        let window = window()
+        defer { window.isHidden = true }
+        let scroll = UIScrollView(frame: window.bounds)
+        window.addSubview(scroll)
+        let cell = ContactProbeView(frame: CGRect(x: 20, y: 60, width: 160, height: 130))
+        cell.number = 4
+        scroll.addSubview(cell)
+        let button = UIButton(frame: CGRect(x: 20, y: 60, width: 44, height: 44))
+        window.addSubview(button)
+        let point = CGPoint(x: 40, y: 80)
+        let toolbar = ContactGeometry(point: point, window: window, probes: [cell], receiver: button)
+        XCTAssertEqual(toolbar.uniqueCell?.number, 4, "Keep the underlying geometry as evidence")
+        XCTAssertNil(toolbar.contactCell, "UIKit delivered this to a different hierarchy")
+        let content = ContactGeometry(point: point, window: window, probes: [cell], receiver: scroll)
+        XCTAssertEqual(content.contactCell?.number, 4)
+    }
+
+    @MainActor
     private func window() -> UIWindow {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.isHidden = false

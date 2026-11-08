@@ -159,9 +159,10 @@ private final class ContactObserver: UIGestureRecognizer {
         guard let trace, let window = view as? UIWindow else { state = .failed; return }
         let point = touch.location(in: window)
         let geometry = trace.geometry(at: point, in: window, receiver: touch.view)
-        guard trace.observesLibrary, let cell = geometry.uniqueCell, let scroll = cell.probe.scrollView else {
+        guard trace.observesLibrary, let cell = geometry.contactCell, let scroll = cell.probe.scrollView else {
             let reason = !trace.observesLibrary ? "library-observation-gate" :
-                !geometry.controls.isEmpty ? "control-region" : geometry.candidates.count > 1 ? "ambiguous-cells" : "outside-cell"
+                !geometry.controls.isEmpty ? "control-region" : geometry.candidates.count > 1 ? "ambiguous-cells" :
+                geometry.uniqueCell != nil ? "receiver-outside-cell-scroll" : "outside-cell"
             _ = trace.otherInputBegan(reason: reason, geometry: geometry)
             // Keep build 5's immediate failure outside the library. In particular,
             // never remain a possible recognizer while a player control is tracking.

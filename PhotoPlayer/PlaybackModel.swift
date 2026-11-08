@@ -301,6 +301,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func beginScrubbing() {
+        trace("scrub begin")
         scrubbing = true
         player.pause()
     }
@@ -319,6 +320,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func endScrubbing() {
+        trace("scrub end")
         scrubTask?.cancel()
         scrubTask = nil
         scrubbing = false
@@ -336,9 +338,12 @@ final class PlaybackModel: ObservableObject {
     private func performSeek(_ request: SeekRequest) {
         let currentSession = session
         trace("seek start \(request.seconds), exact=\(request.exact)")
+        let diagnostics = ProcessInfo.processInfo.arguments.contains("--playback-diagnostics")
         let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) {
-            @Sendable [weak self] finished in Task { @MainActor in
+            @Sendable [weak self] finished in
+            if diagnostics { print("Playback: seek callback received finished=\(finished)") }
+            Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
                 if let next = self.seekQueue.finish() { self.performSeek(next) }
                 else {
