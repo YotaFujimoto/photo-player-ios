@@ -81,7 +81,7 @@ final class ContactGeometryUITests: XCTestCase {
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).press(forDuration: 0.03)
         let selected = app.staticTexts["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "One physical contact must open the video")
-        XCTAssertEqual(selected.label, diagnostics ? "動画 \(number)" : "再生")
+        XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)

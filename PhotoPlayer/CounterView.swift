@@ -5,7 +5,7 @@ struct CounterView: View {
     @AppStorage("manualCounter.v1") private var count = 0
 
     private var buildNumber: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "不明"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
     }
 
     var body: some View {
@@ -14,13 +14,13 @@ struct CounterView: View {
                 Text("PhotoPlayer")
                     .font(.largeTitle.bold())
 
-                Text("ビルド \(buildNumber)")
+                Text("Build \(buildNumber)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("buildNumber")
 
                 VStack(spacing: 8) {
-                    Text("保存済みカウンター")
+                    Text("Saved counter")
                         .font(.headline)
                     Text(String(count))
                         .font(.system(.largeTitle, design: .rounded, weight: .semibold))
@@ -33,7 +33,7 @@ struct CounterView: View {
                         count += 1
                     }
                 } label: {
-                    Label("1 増やす", systemImage: "plus")
+                    Label("Increment", systemImage: "plus")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)

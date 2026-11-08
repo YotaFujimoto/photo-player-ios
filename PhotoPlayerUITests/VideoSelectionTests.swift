@@ -91,7 +91,7 @@ final class VideoSelectionTests: XCTestCase {
                     dx: rect.midX, dy: bottom ? rect.maxY - 3 : rect.minY + 3)).tap()
                 let selected = app.staticTexts["selectedVideo"]
                 XCTAssertTrue(selected.waitForExistence(timeout: 10))
-                XCTAssertEqual(selected.label, "再生")
+                XCTAssertEqual(selected.label, "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
                 XCTAssertTrue(app.buttons["playPause"].waitForExistence(timeout: 15))
                 let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"),
@@ -124,7 +124,7 @@ final class VideoSelectionTests: XCTestCase {
     private func verifySelection(_ number: Int, dimensions: String, in app: XCUIApplication) {
         let selected = app.staticTexts["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "Tap must open a player")
-        XCTAssertEqual(selected.label, "動画 \(number)", "The tapped cell must select its own PHAsset")
+        XCTAssertEqual(selected.label, "Video \(number)", "The tapped cell must select its own PHAsset")
         XCTAssertEqual(selected.value as? String, dimensions)
         let loaded = app.staticTexts["loadedVideoSize"]
         let decoded = XCTNSPredicateExpectation(

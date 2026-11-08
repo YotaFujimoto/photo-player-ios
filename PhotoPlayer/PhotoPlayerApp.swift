@@ -69,8 +69,8 @@ private struct AppRoot: View {
     @State private var tab = 0
     var body: some View {
         TabView(selection: $tab) {
-            LibraryScreen(trace: state.trace).tabItem { Label("動画", systemImage: "play.rectangle") }.tag(0)
-            CounterView().tabItem { Label("導入確認", systemImage: "checkmark.circle") }.tag(1)
+            LibraryScreen(trace: state.trace).tabItem { Label("Videos", systemImage: "play.rectangle") }.tag(0)
+            CounterView().tabItem { Label("Diagnostics", systemImage: "gearshape") }.tag(1)
         }
         .environment(\.scenePhase, state.phase)
         .onChange(of: tab) { _, value in state.trace.lifecycle("tab.\(value == 0 ? "library" : "counter")") }

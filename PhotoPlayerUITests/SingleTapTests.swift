@@ -153,7 +153,7 @@ final class SingleTapTests: XCTestCase {
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55)).press(forDuration: 0.03)
         let header = app.staticTexts["selectedVideo"]
         XCTAssertTrue(header.waitForExistence(timeout: 10))
-        XCTAssertEqual(header.label, "動画 3")
+        XCTAssertEqual(header.label, "Video 3")
         XCTAssertTrue(app.staticTexts["videoLoading"].waitForExistence(timeout: 10))
         verifyCounts(app, accepted: 1, shown: 1, requested: 1, received: 0, ready: 0)
         attach("single-tap-visible-loading")
@@ -171,7 +171,7 @@ final class SingleTapTests: XCTestCase {
     private func verifyOpened(_ app: XCUIApplication, number: Int, dimensions: String, diagnostics: Bool) {
         let selected = app.staticTexts["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "ONE tap must present the player. \(trace(app))")
-        XCTAssertEqual(selected.label, diagnostics ? "動画 \(number)" : "再生")
+        XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)
         if diagnostics {
             let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", dimensions),

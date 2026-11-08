@@ -229,9 +229,9 @@ struct SelectionTracePanel: View {
                 Text(trace.journal.latestContact)
                     .accessibilityIdentifier("selectionJournal.\(location)")
                     .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--verify-diagnostic-copy") ? trace.report : trace.journal.latestContact)
-                Text(trace.journal.events.last ?? "履歴なし").truncationMode(.head)
+                Text(trace.journal.events.last ?? "No events").truncationMode(.head)
             }.allowsHitTesting(false)
-            Button(copiedReport == nil ? "診断をまとめてコピー" : "診断をコピー済み") {
+            Button(copiedReport == nil ? "Copy diagnostics" : "Diagnostics copied") {
                 trace.controlAction("copy.\(location)")
                 trace.lifecycle("copy.snapshot")
                 UIPasteboard.general.string = trace.report
@@ -239,7 +239,7 @@ struct SelectionTracePanel: View {
             }
             .accessibilityIdentifier("copySelectionTrace.\(location)")
             .traceControl("copy.\(location)", trace: trace)
-            .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--verify-diagnostic-copy") ? (copiedReport ?? "未コピー") : "")
+            .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--verify-diagnostic-copy") ? (copiedReport ?? "Not copied") : "")
         }.font(.caption2).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
     }

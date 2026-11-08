@@ -15,39 +15,40 @@ final class VideoPlaybackTests: XCTestCase {
         screenshot("video-library")
         card.tap()
 
+        app.buttons["playerDiagnostics"].tap()
         let state = app.staticTexts["playerState"]
         XCTAssertTrue(state.waitForExistence(timeout: 20))
-        waitForLabel(state, "再生中", timeout: 30)
+        waitForLabel(state, "Playing", timeout: 30)
         app.buttons["playPause"].tap()
-        waitForLabel(state, "一時停止")
+        waitForLabel(state, "Paused")
 
         app.buttons["rateMenu"].tap()
         app.buttons["0.25×"].tap()
-        XCTAssertTrue(app.buttons["rateMenu"].label.contains("0.25"))
+        XCTAssertTrue((app.buttons["rateMenu"].value as? String ?? "").contains("0.25"))
         app.buttons["playPause"].tap()
-        waitForLabel(state, "再生中")
+        waitForLabel(state, "Playing")
         let initialPosition = app.staticTexts["playbackPosition"].label
         let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", initialPosition), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 12), .completed)
-        app.buttons["再生情報"].tap()
+        app.buttons["Playback details"].tap()
         let actualRate = app.staticTexts["actualRate"]
         XCTAssertTrue(actualRate.waitForExistence(timeout: 5))
         let slowRate = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [slowRate], timeout: 10), .completed)
         screenshot("video-slow-playback")
         app.buttons["playPause"].tap()
-        waitForLabel(state, "一時停止")
+        waitForLabel(state, "Paused")
 
         let slider = app.sliders["seekSlider"]
         slider.adjust(toNormalizedSliderPosition: 0.5)
         let middle = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", ["0:14", "0:15", "0:16"]), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [middle], timeout: 15), .completed)
-        waitForLabel(state, "一時停止")
+        waitForLabel(state, "Paused")
         app.buttons["playPause"].tap()
-        waitForLabel(state, "再生中")
+        waitForLabel(state, "Playing")
         let seekStarted = ProcessInfo.processInfo.systemUptime
         slider.adjust(toNormalizedSliderPosition: 0.75)
-        waitForLabel(state, "再生中")
+        waitForLabel(state, "Playing")
         let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
         // XCTest's slider gesture is approximate, and playback keeps advancing while
@@ -63,7 +64,7 @@ final class VideoPlaybackTests: XCTestCase {
         let later = XCTNSPredicateExpectation(predicate: movingPosition, object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [later], timeout: 15), .completed)
         app.buttons["playPause"].tap()
-        waitForLabel(state, "一時停止")
+        waitForLabel(state, "Paused")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(app.buttons["playPause"].isHittable)
         screenshot("video-landscape-seek")

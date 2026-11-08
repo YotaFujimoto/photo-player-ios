@@ -28,14 +28,14 @@ struct LibraryScreen: View {
                     VStack(spacing: 8) {
                         if library.authorization == .limited {
                             HStack {
-                                Text("選択した動画のみ").font(.caption)
+                                Text("Limited access").font(.caption)
                                 Spacer()
-                                Button("選択を変更") { library.changeLimitedSelection() }
+                                Button("Manage") { library.changeLimitedSelection() }
                             }.padding(.horizontal)
                         }
                         if library.videos.isEmpty {
-                            ContentUnavailableView("動画がありません", systemImage: "video",
-                                description: Text("写真ライブラリに動画を追加するか、アクセスできる動画の選択を確認してください。"))
+                            ContentUnavailableView("No videos", systemImage: "video",
+                                description: Text("Add videos to Photos or check access."))
                         } else {
                             ScrollView {
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 12)], spacing: 16) {
@@ -48,9 +48,10 @@ struct LibraryScreen: View {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 VideoThumbnail(video: video, manager: library.thumbnails, revision: library.revision)
                                                     .allowsHitTesting(false)
-                                                Text(selectionDiagnostics ? "動画 \(video.diagnosticNumber)" :
-                                                    (video.asset.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "動画"))
-                                                    .font(.caption).foregroundStyle(.primary)
+                                                if selectionDiagnostics {
+                                                    Text("Video \(video.diagnosticNumber)")
+                                                        .font(.caption).foregroundStyle(.primary)
+                                                }
                                             }
                                             // The cell owns one rectangular tap area. Image clipping
                                             // controls drawing, not the scaled image's hit-test extent.
@@ -65,36 +66,36 @@ struct LibraryScreen: View {
                                         }
                                         .buttonStyle(.plain)
                                         .accessibilityIdentifier("videoCard.\(video.diagnosticNumber)")
+                                        .accessibilityLabel(selectionDiagnostics ? "Video \(video.diagnosticNumber)" : "Video, \(PlaybackPolicy.clock(video.asset.duration))")
                                         .accessibilityValue(video.dimensions)
                                     }
                                 }.padding()
                             }
                         }
-                        Text("iCloudの動画は選択時に取得します。動画の変更・削除は行いません。")
-                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                         if selectionDiagnostics { SelectionTracePanel(trace: trace, location: "library") }
                         if selection != nil {
-                            ProgressView("動画を開いています…").accessibilityIdentifier("openingVideo")
+                            ProgressView("Opening…").accessibilityIdentifier("openingVideo")
                         }
                     }
                 } else if library.authorization == .notDetermined {
                     VStack(spacing: 20) {
-                        ContentUnavailableView("写真の動画を再生", systemImage: "photo.on.rectangle",
-                            description: Text("動画を一覧表示するために、写真ライブラリへのアクセスを許可してください。"))
-                        Button("動画へのアクセスを許可") { Task { await library.requestAccess() } }
+                        ContentUnavailableView("Your videos", systemImage: "photo.on.rectangle",
+                            description: Text("Allow Photos access to browse and play videos."))
+                        Button("Allow access") { Task { await library.requestAccess() } }
                             .buttonStyle(.borderedProminent).accessibilityIdentifier("authorizePhotos")
                     }.padding()
                 } else {
                     VStack {
-                        ContentUnavailableView("写真へのアクセスがありません", systemImage: "lock",
-                            description: Text("設定で写真へのアクセスを許可してください。端末の利用制限がある場合は管理設定も確認してください。"))
-                        Button("設定を開く") {
+                        ContentUnavailableView("Photos access needed", systemImage: "lock",
+                            description: Text("Allow access in Settings."))
+                        Button("Open Settings") {
                             if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                         }.buttonStyle(.bordered)
                     }.padding()
                 }
             }
-            .navigationTitle("動画")
+            .navigationTitle("Videos")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button {
                     selectionDiagnostics.toggle()
@@ -103,13 +104,13 @@ struct LibraryScreen: View {
                     Image(systemName: "square.dashed").frame(width: 28, height: 28)
                         .traceControl("diagnostics.toggle", trace: trace)
                 }.accessibilityIdentifier("selectionDiagnostics")
-                    .accessibilityLabel(selectionDiagnostics ? "選択確認を終了" : "選択確認")
+                    .accessibilityLabel(selectionDiagnostics ? "Hide selection diagnostics" : "Show selection diagnostics")
                 Button {
                     trace.controlAction("library.refresh"); library.refresh()
                 } label: {
                     Image(systemName: "arrow.clockwise").frame(width: 28, height: 28)
                         .traceControl("library.refresh", trace: trace)
-                }.accessibilityIdentifier("refreshLibrary").accessibilityLabel("更新")
+                }.accessibilityIdentifier("refreshLibrary").accessibilityLabel("Refresh videos")
             }
         }
         .task { trace.diagnosticsChanged(selectionDiagnostics, initial: true); library.refresh() }

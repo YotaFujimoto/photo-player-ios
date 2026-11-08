@@ -3,6 +3,10 @@ import Foundation
 enum PlaybackPolicy {
     static let rates: [Float] = [0.25, 0.5, 1, 1.25, 1.5, 2]
 
+    static func skip(from seconds: Double, forward: Bool, duration: Double) -> Double {
+        position(position(seconds, duration: duration) + (forward ? 10 : -10), duration: duration)
+    }
+
     static func position(_ seconds: Double, duration: Double) -> Double {
         guard seconds.isFinite, duration.isFinite, duration > 0 else { return 0 }
         return min(max(seconds, 0), duration)
@@ -18,13 +22,33 @@ enum PlaybackPolicy {
     }
 
     static func errorCode(_ error: Error?) -> String {
-        guard let error else { return "不明" }
+        guard let error else { return "Unknown" }
         let nsError = error as NSError
         let domain = nsError.domain.unicodeScalars.filter {
             CharacterSet.alphanumerics.contains($0) || ".-_".unicodeScalars.contains($0)
         }
         return "\(String(String.UnicodeScalarView(domain)).prefix(64)) / \(nsError.code)"
     }
+}
+
+/// The held rate never overwrites the user's chosen rate.
+struct PlaybackSpeed {
+    private(set) var selected: Float = 1
+    private(set) var isBoosting = false
+    var effective: Float { isBoosting ? 2 : selected }
+
+    mutating func select(_ rate: Float) {
+        guard PlaybackPolicy.rates.contains(rate) else { return }
+        isBoosting = false
+        selected = rate
+    }
+
+    mutating func beginHold(isPlaying: Bool) {
+        guard isPlaying else { return }
+        isBoosting = true
+    }
+
+    mutating func endHold() { isBoosting = false }
 }
 
 /// Invalidates progress and results from cancelled or superseded PhotoKit requests.

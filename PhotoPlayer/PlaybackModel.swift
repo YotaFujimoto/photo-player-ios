@@ -25,14 +25,16 @@ final class PlaybackModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var position = 0.0
     @Published private(set) var duration = 0.0
-    @Published private(set) var selectedRate: Float = 1
+    @Published private var speed = PlaybackSpeed()
+    var selectedRate: Float { speed.selected }
+    var isTemporaryDoubleRate: Bool { speed.isBoosting }
     @Published private(set) var actualRate: Float = 0
     @Published private(set) var wantsPlayback = false
     @Published private(set) var canPlaySlow = false
     @Published private(set) var isSeeking = false
-    @Published private(set) var stateText = "準備中"
+    @Published private(set) var stateText = "Loading…"
     @Published private(set) var pictureSize = CGSize.zero
-    @Published private(set) var hdrDescription = "確認中"
+    @Published private(set) var hdrDescription = "Checking…"
     @Published private(set) var bufferedUntil = 0.0
     @Published private(set) var voicePitch = false
 
@@ -68,9 +70,9 @@ final class PlaybackModel: ObservableObject {
         position = 0
         progress = 0
         hasDownloadProgress = false
-        hdrDescription = "確認中"
-        selectedRate = 1
-        stateText = "準備中"
+        hdrDescription = "Checking…"
+        speed = PlaybackSpeed()
+        stateText = "Loading…"
         isLoading = true
         wantsPlayback = true
         let token = requestGate.begin()
@@ -86,7 +88,7 @@ final class PlaybackModel: ObservableObject {
                 // PhotoKit can report progress for local assets as well as iCloud downloads.
                 self.hasDownloadProgress = true
                 if fraction.isFinite { self.progress = max(self.progress, min(max(fraction, 0), 1)) }
-                if let errorCode { self.failDownload("動画の取得に失敗しました（\(errorCode)）。接続を確認して再試行してください。") }
+                if let errorCode { self.failDownload("Download failed (\(errorCode)). Check your connection and retry.") }
             }
         }
         requestID = manager.requestPlayerItem(forVideo: asset, options: options) { @Sendable [weak self] item, info in
@@ -111,7 +113,7 @@ final class PlaybackModel: ObservableObject {
         isLoading = false
         if result.cancelled {
             wantsPlayback = false
-            errorMessage = "取得をキャンセルしました。"
+            errorMessage = "Download cancelled."
             onLoadEvent?(.failed)
         } else if let item = result.item {
             progress = 1
@@ -119,7 +121,7 @@ final class PlaybackModel: ObservableObject {
             install(item)
         } else {
             wantsPlayback = false
-            errorMessage = "動画を取得できません（\(result.errorCode ?? "利用不可")）。接続・写真のアクセス権を確認して再試行してください。"
+            errorMessage = "Video unavailable (\(result.errorCode ?? "Unavailable")). Check Photos access and your connection."
             onLoadEvent?(.failed)
         }
     }
@@ -132,7 +134,7 @@ final class PlaybackModel: ObservableObject {
         receive(result, token: token)
     }
 
-    func cancelLoading() { failDownload("取得をキャンセルしました。") }
+    func cancelLoading() { failDownload("Download cancelled.") }
 
     private func failDownload(_ message: String) {
         heldResult = nil
@@ -144,13 +146,13 @@ final class PlaybackModel: ObservableObject {
         isLoading = false
         wantsPlayback = false
         errorMessage = message
-        stateText = "取得停止"
+        stateText = "Download stopped"
     }
 
     private func install(_ item: AVPlayerItem) {
         let currentSession = session
         item.asset.loadTracks(withMediaCharacteristic: .containsHDRVideo) { @Sendable [weak self] tracks, _ in
-            let description = tracks.map { $0.isEmpty ? "なし" : "あり" } ?? "不明"
+            let description = tracks.map { $0.isEmpty ? "No" : "Yes" } ?? "Unknown"
             Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
                 self.hdrDescription = description
@@ -177,7 +179,7 @@ final class PlaybackModel: ObservableObject {
                 guard let self, self.session == currentSession else { return }
                 self.pause()
                 self.position = self.duration
-                self.stateText = "終了"
+                self.stateText = "Ended"
             }
         })
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) {
@@ -186,7 +188,7 @@ final class PlaybackModel: ObservableObject {
             Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
                 self.pause()
-                self.errorMessage = "再生に失敗しました（\(code)）。"
+                self.errorMessage = "Playback failed (\(code))."
             }
         })
         notifications.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) {
@@ -211,8 +213,8 @@ final class PlaybackModel: ObservableObject {
             if errorMessage == nil { onLoadEvent?(.failed) }
             pause()
             isReady = false
-            errorMessage = "再生を準備できません（\(PlaybackPolicy.errorCode(item.error))）。"
-            stateText = "エラー"
+            errorMessage = "Cannot play video (\(PlaybackPolicy.errorCode(item.error)))."
+            stateText = "Error"
             return
         }
         let firstReady = !isReady && item.status == .readyToPlay
@@ -227,14 +229,14 @@ final class PlaybackModel: ObservableObject {
             .filter(\.isFinite).max() ?? 0)
         assign(\.actualRate, player.rate)
         let newState: String
-        if !isReady { newState = "準備中" }
-        else if isSeeking { newState = "移動中" }
+        if !isReady { newState = "Loading…" }
+        else if isSeeking { newState = "Seeking…" }
         else {
             switch player.timeControlStatus {
-            case .playing: newState = "再生中"
-            case .waitingToPlayAtSpecifiedRate: newState = "読み込み待ち"
-            case .paused: newState = position >= duration && duration > 0 ? "終了" : "一時停止"
-            @unknown default: newState = "待機中"
+            case .playing: newState = "Playing"
+            case .waitingToPlayAtSpecifiedRate: newState = "Buffering…"
+            case .paused: newState = position >= duration && duration > 0 ? "Ended" : "Paused"
+            @unknown default: newState = "Waiting…"
             }
         }
         assign(\.stateText, newState)
@@ -251,6 +253,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func pause() {
+        speed.endHold()
         assign(\.wantsPlayback, false)
         if player.timeControlStatus != .paused || player.rate != 0 { player.pause() }
         assign(\.actualRate, 0)
@@ -261,7 +264,7 @@ final class PlaybackModel: ObservableObject {
         guard wantsPlayback, isReady, !scrubbing, !seekQueue.isBusy else { return }
         guard selectedRate >= 1 || canPlaySlow else {
             pause()
-            errorMessage = "この動画は低速再生に対応していません。"
+            errorMessage = "Slow playback unavailable."
             return
         }
         if !audioActive {
@@ -275,7 +278,7 @@ final class PlaybackModel: ObservableObject {
                     self.audioActivating = false
                     if let errorCode {
                         self.pause()
-                        self.errorMessage = "音声を準備できません（\(errorCode)）。"
+                        self.errorMessage = "Audio unavailable (\(errorCode))."
                     } else {
                         self.audioActive = true
                         self.resumeIfNeeded()
@@ -284,15 +287,37 @@ final class PlaybackModel: ObservableObject {
             }
             return
         }
-        if player.rate != selectedRate { player.rate = selectedRate }
+        if player.rate != speed.effective { player.rate = speed.effective }
         UIApplication.shared.isIdleTimerDisabled = true
         trace("resume")
     }
 
     func setRate(_ rate: Float) {
         guard PlaybackPolicy.rates.contains(rate), rate >= 1 || canPlaySlow else { return }
-        selectedRate = rate
+        speed.select(rate)
         resumeIfNeeded()
+    }
+
+    func beginTemporaryDoubleRate() {
+        speed.beginHold(isPlaying: wantsPlayback && isReady && !isSeeking && !scrubbing && player.timeControlStatus == .playing)
+        if speed.isBoosting { resumeIfNeeded(); trace("hold began") }
+    }
+
+    func endTemporaryDoubleRate() {
+        guard speed.isBoosting else { return }
+        speed.endHold()
+        resumeIfNeeded()
+        trace("hold ended")
+    }
+
+    func skip(forward: Bool) {
+        guard isReady, duration > 0, !scrubbing else { return }
+        speed.endHold()
+        // While a seek is in flight, accumulate from its latest requested target.
+        // Reading AVPlayer's old currentTime here would discard rapid double taps.
+        let origin = seekQueue.isBusy ? position : player.currentTime().seconds
+        position = PlaybackPolicy.skip(from: origin, forward: forward, duration: duration)
+        enqueueSeek(position, exact: true)
     }
 
     func setVoicePitch(_ value: Bool) {
@@ -302,6 +327,7 @@ final class PlaybackModel: ObservableObject {
 
     func beginScrubbing() {
         trace("scrub begin")
+        speed.endHold()
         scrubbing = true
         player.pause()
     }
@@ -352,7 +378,7 @@ final class PlaybackModel: ObservableObject {
                     if finished { self.resumeIfNeeded() }
                     else {
                         self.pause()
-                        self.errorMessage = "指定位置へ移動できませんでした。再試行してください。"
+                        self.errorMessage = "Cannot seek. Please retry."
                     }
                     // A paused player may not emit another periodic callback after the seek.
                     self.refresh(ifSession: currentSession)
@@ -405,12 +431,12 @@ final class PlaybackModel: ObservableObject {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         return """
         PhotoPlayer build \(build)
-        長さ: \(PlaybackPolicy.clock(duration)) / 位置: \(PlaybackPolicy.clock(position))
-        解像度: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(hdrDescription)
-        速度: 選択 \(selectedRate) / 実際 \(actualRate) / 低速対応: \(canPlaySlow)
-        状態: \(stateText) / Photos取得進捗: \(Int(progress * 100))%
-        音程補正: \(voicePitch ? "音声向け" : "標準")
-        エラー: \(errorMessage ?? "なし")
+        Duration: \(PlaybackPolicy.clock(duration)) / Position: \(PlaybackPolicy.clock(position))
+        Size: \(asset.pixelWidth)×\(asset.pixelHeight) / HDR: \(hdrDescription)
+        Rate: selected \(selectedRate) / actual \(actualRate) / Slow support: \(canPlaySlow)
+        State: \(stateText) / Photos progress: \(Int(progress * 100))%
+        Pitch correction: \(voicePitch ? "Voice" : "Standard")
+        Error: \(errorMessage ?? "No")
         """
     }
 }

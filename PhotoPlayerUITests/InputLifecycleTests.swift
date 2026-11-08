@@ -12,8 +12,8 @@ final class InputLifecycleTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.4"].waitForExistence(timeout: 20))
         for diagnostics in [false, true] {
-            app.tabBars.buttons["導入確認"].tap()
-            app.tabBars.buttons["動画"].tap()
+            app.tabBars.buttons["Diagnostics"].tap()
+            app.tabBars.buttons["Videos"].tap()
             if diagnostics { app.buttons["selectionDiagnostics"].tap() }
             // Cache both screen coordinates before opening 4; no additional
             // wait, element query, retry or second tap between Close and video 5.
@@ -25,7 +25,7 @@ final class InputLifecycleTests: XCTestCase {
                 app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).press(forDuration: 0.03)
                 let selected = app.staticTexts["selectedVideo"]
                 XCTAssertTrue(selected.waitForExistence(timeout: 10))
-                XCTAssertEqual(selected.label, diagnostics ? "動画 \(number)" : "再生")
+                XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
                 ready(app)
                 app.buttons["closePlayer"].tap()
@@ -52,11 +52,11 @@ final class InputLifecycleTests: XCTestCase {
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))
         app.buttons["videoCard.1"].tap()
         ready(app)
-        let state = app.staticTexts["playerState"]
-        expect(state, "label == %@", "再生中")
+        let state = app.buttons["playPause"]
+        expect(state, "value == %@", "Playing")
         XCUIDevice.shared.press(.home)
         app.activate()
-        expect(state, "label == %@", "一時停止")
+        expect(state, "value == %@", "Paused")
         app.buttons["closePlayer"].tap()
         let fifth = app.buttons["videoCard.5"]
         let dimensions = fifth.value as! String
