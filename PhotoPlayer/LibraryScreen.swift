@@ -54,7 +54,7 @@ struct LibraryScreen: View {
                                             // controls drawing, not the scaled image's hit-test extent.
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .contentShape(.interaction, Rectangle())
-                                            .background { ContactProbe(number: video.diagnosticNumber, trace: trace) }
+                                            .background { ContactProbe(number: video.diagnosticNumber, trace: trace).allowsHitTesting(false) }
                                             .overlay {
                                                 if selectionDiagnostics {
                                                     Rectangle().stroke(.orange, lineWidth: 1).allowsHitTesting(false)
@@ -96,12 +96,15 @@ struct LibraryScreen: View {
             .toolbar {
                 Button(selectionDiagnostics ? "選択確認を終了" : "選択確認", systemImage: "square.dashed") {
                     selectionDiagnostics.toggle()
+                    trace.diagnosticsChanged(selectionDiagnostics)
                 }.accessibilityIdentifier("selectionDiagnostics")
-                Button("更新", systemImage: "arrow.clockwise") { library.refresh() }
+                    .traceControl("diagnostics.toggle", trace: trace)
+                Button("更新", systemImage: "arrow.clockwise") { trace.controlAction("library.refresh"); library.refresh() }
                     .accessibilityIdentifier("refreshLibrary")
+                    .traceControl("library.refresh", trace: trace)
             }
         }
-        .task { library.refresh() }
+        .task { trace.diagnosticsChanged(selectionDiagnostics, initial: true); library.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { library.refresh() } }
         .onChange(of: library.revision) { _, _ in
             if let selection, !library.videos.contains(where: { $0.id == selection.id }) {

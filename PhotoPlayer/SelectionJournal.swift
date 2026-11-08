@@ -49,14 +49,14 @@ struct SelectionJournal {
     }
 
     @discardableResult
-    mutating func beginContact(video: Int, scroll: String, receiverInScroll: Bool) -> Int {
+    mutating func beginContact(video: Int, scroll: String, receiverInScroll: Bool, evidence: String = "") -> Int {
         contactCount += 1
         inputNumber += 1
         let id = contactCount
         contacts.append(Contact(id: id, video: video, input: inputNumber))
         contacts = Array(contacts.suffix(16))
         contactCandidate = id
-        append("contact.begin input=I\(inputNumber) \(state) scroll=\(scroll) receiverInScroll=\(receiverInScroll)", contact: id, video: video)
+        append("contact.begin input=I\(inputNumber) \(state) scroll=\(scroll) receiverInScroll=\(receiverInScroll) \(evidence)", contact: id, video: video)
         return id
     }
 
@@ -73,11 +73,22 @@ struct SelectionJournal {
     // Record unmapped/gated window input too. Otherwise a diagnostic guard can
     // hide a new touch and leave the same stale history as build 5.
     @discardableResult
-    mutating func otherInputBegan(reason: String = "outside-cell", geometryVideo: Int? = nil) -> Int {
+    mutating func otherInputBegan(reason: String = "outside-cell", geometryVideo: Int? = nil, evidence: String = "") -> Int {
         contactCandidate = nil
         inputNumber += 1
-        append("input.other.begin input=I\(inputNumber) reason=\(reason) observation=begin-only \(state)", video: geometryVideo)
+        append("input.other.begin input=I\(inputNumber) reason=\(reason) observation=begin-only \(state) \(evidence)", video: geometryVideo)
         return inputNumber
+    }
+
+    mutating func controlAction(_ name: String, detail: String = "") {
+        // The action is certain; association with the last UIKit input is only a
+        // candidate (e.g. an accessibility action may have no physical touch).
+        append("control.action name=\(name) inputCandidate=\(inputNumber == 0 ? "-" : "I\(inputNumber)") association=candidate-not-proof \(detail) \(state)")
+        contactCandidate = nil
+    }
+
+    mutating func diagnosticsInitialized(visible: Bool) {
+        append("diagnostics.initial visible=\(visible) source=library.task \(state)")
     }
 
     @discardableResult
@@ -169,6 +180,7 @@ struct SelectionJournal {
         return (["PhotoPlayer build \(build)",
                  "I=ウィンドウ入力 / C=セル範囲の接触 / S=選択要求 / E=記録順 / +ms=相対記録時刻",
                  "CとSの対応は匿名動画番号と入力順からの候補。記録なしは拒否・消失の断定ではない。",
+                 "point/frame/clipは接触時の同一window座標(pt)。presentationは描画中のlayer範囲（取得できる時のみ）。receiverは実際のtouch.viewのクラスと祖先。control.actionはコピー等の実処理。",
                  "直近16接触・16選択・96イベント。受付前の数値比較は不要。",
                  state, "[contacts]"] + contactLines + ["[selections]"] + operationLines + ["[events]"] + events).joined(separator: "\n")
     }

@@ -41,6 +41,8 @@ final class SingleTapTests: XCTestCase {
         let copied = copy.value as! String
         XCTAssertTrue(copied.hasPrefix(report), "Copy retains the report; its own window input may append events")
         XCTAssertTrue(copied.contains("input.other.begin"))
+        XCTAssertTrue(copied.contains("control.action name=copy.library"))
+        XCTAssertTrue(copied.contains("controls=[copy.library]"))
         attach("journal-new-contact-after-close-copied")
     }
 
@@ -65,6 +67,7 @@ final class SingleTapTests: XCTestCase {
             XCTAssertTrue(report.contains("S\(number) V3 close.request"), report)
         }
         XCTAssertTrue(report.contains("reason=fullScreenCover.binding"))
+        XCTAssertTrue(report.contains("control.action name=copy.library"))
         attach("journal-same-video-three-operations-copied")
     }
 

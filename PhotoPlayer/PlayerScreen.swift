@@ -43,10 +43,16 @@ struct PlayerScreen: View {
         VStack(spacing: 0) {
             HStack {
                 Button("閉じる", systemImage: "xmark") {
+                    selectionTrace?.controlAction("player.close")
                     if let selectionOperation { selectionTrace?.closeRequested(selectionOperation) }
                     model.close(); dismiss()
                 }
                     .accessibilityIdentifier("closePlayer")
+                    .background {
+                        if let selectionTrace {
+                            ContactProbe(number: 0, trace: selectionTrace, control: "player.close").allowsHitTesting(false)
+                        }
+                    }
                 Spacer()
                 VStack(spacing: 2) {
                     Text(selectionDiagnostics ? "動画 \(video.diagnosticNumber)" : "再生").font(.headline)

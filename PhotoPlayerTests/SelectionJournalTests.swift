@@ -2,6 +2,21 @@ import XCTest
 @testable import PhotoPlayer
 
 final class SelectionJournalTests: XCTestCase {
+    func testCopyAndToggleActionsAreExplicitWithoutClaimingTouchIdentity() {
+        var journal = SelectionJournal()
+        journal.diagnosticsInitialized(visible: false)
+        _ = journal.otherInputBegan(evidence: "point=(100.0,700.0) candidates=[] controls=[diagnostics.toggle]")
+        journal.controlAction("diagnostics.toggle", detail: "visible=true")
+        _ = journal.otherInputBegan(evidence: "point=(100.0,730.0) candidates=[] controls=[copy.library]")
+        journal.controlAction("copy.library")
+        let report = journal.report(build: "7")
+        XCTAssertTrue(report.contains("diagnostics.initial visible=false"))
+        XCTAssertTrue(report.contains("control.action name=diagnostics.toggle inputCandidate=I1 association=candidate-not-proof"))
+        XCTAssertTrue(report.contains("control.action name=copy.library inputCandidate=I2 association=candidate-not-proof"))
+        XCTAssertTrue(report.contains("point=(100.0,730.0)"))
+        XCTAssertEqual(journal.accepted, 0)
+        XCTAssertEqual(journal.contactCount, 0)
+    }
     private func begin(_ journal: inout SelectionJournal, video: Int = 2) -> Int {
         journal.beginContact(video: video, scroll: "idle", receiverInScroll: true)
     }

@@ -83,19 +83,26 @@ run_tests() {
   2>&1 | tee -a build/test.log
 }
 
-# Keep the two new clipboard/large accessibility-report cases in fresh test-host
+# Keep clipboard/large accessibility-report cases in fresh test-host
 # sessions. The combined session previously stalled while terminating the app
 # between tests; Xcode's host restart allowed the remaining cases to pass.
 # Every test still runs once, sequentially on this same simulator, with unchanged
 # assertions and individual deadlines. Preserve all result bundles on failure.
 copy_contact='PhotoPlayerUITests/SingleTapTests/testCopyDistinguishesNewUnacceptedContactFromPreviousPlayback'
 copy_reopen='PhotoPlayerUITests/SingleTapTests/testCopyKeepsDistinctOperationsWhenReopeningSameVideo'
+geometry_live='PhotoPlayerUITests/ContactGeometryUITests/testLiveCellGeometryAfterScrollReturnReloadAndToggle'
+geometry_controls='PhotoPlayerUITests/ContactGeometryUITests/testCopyAndToggleHaveDistinctControlInputsAndNeverSelect'
 mkdir -p build/copy-results
 test_status=0
 run_tests build/TestResults.xcresult \
-  "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" || test_status=$?
+  "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
+  "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" || test_status=$?
 run_tests build/copy-results/CopyContact.xcresult \
   "-only-testing:$copy_contact" || test_status=$?
 run_tests build/copy-results/CopyReopen.xcresult \
   "-only-testing:$copy_reopen" || test_status=$?
+run_tests build/copy-results/GeometryLive.xcresult \
+  "-only-testing:$geometry_live" || test_status=$?
+run_tests build/copy-results/GeometryControls.xcresult \
+  "-only-testing:$geometry_controls" || test_status=$?
 exit "$test_status"
