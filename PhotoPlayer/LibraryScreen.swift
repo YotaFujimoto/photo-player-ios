@@ -13,11 +13,13 @@ struct LibraryScreen: View {
     @StateObject private var library = VideoLibrary()
     // Only the diagnostic panels observe these counters; recording a contact
     // must not rebuild every button in the library.
-    @State private var trace = SelectionTrace()
+    let trace: SelectionTrace
     @State private var selection: VideoSelection?
     @State private var selectionDiagnostics = ProcessInfo.processInfo.arguments.contains("--selection-diagnostics")
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+
+    init(trace: SelectionTrace) { self.trace = trace }
 
     var body: some View {
         NavigationStack {

@@ -92,11 +92,15 @@ copy_contact='PhotoPlayerUITests/SingleTapTests/testCopyDistinguishesNewUnaccept
 copy_reopen='PhotoPlayerUITests/SingleTapTests/testCopyKeepsDistinctOperationsWhenReopeningSameVideo'
 geometry_live='PhotoPlayerUITests/ContactGeometryUITests/testLiveCellGeometryAfterScrollReturnReloadAndToggle'
 geometry_controls='PhotoPlayerUITests/ContactGeometryUITests/testCopyAndToggleHaveDistinctControlInputsAndNeverSelect'
+input_on='PhotoPlayerUITests/InputLifecycleTests/testFourToFiveAfterTabReturnWithMonitor'
+input_off='PhotoPlayerUITests/InputLifecycleTests/testSameSingleTapsWithMonitorDisabled'
+input_background='PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn'
 mkdir -p build/copy-results
 test_status=0
 run_tests build/TestResults.xcresult \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
-  "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" || test_status=$?
+  "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
+  "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" || test_status=$?
 run_tests build/copy-results/CopyContact.xcresult \
   "-only-testing:$copy_contact" || test_status=$?
 run_tests build/copy-results/CopyReopen.xcresult \
@@ -105,4 +109,7 @@ run_tests build/copy-results/GeometryLive.xcresult \
   "-only-testing:$geometry_live" || test_status=$?
 run_tests build/copy-results/GeometryControls.xcresult \
   "-only-testing:$geometry_controls" || test_status=$?
+run_tests build/copy-results/InputOn.xcresult "-only-testing:$input_on" || test_status=$?
+run_tests build/copy-results/InputOff.xcresult "-only-testing:$input_off" || test_status=$?
+run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_background" || test_status=$?
 exit "$test_status"

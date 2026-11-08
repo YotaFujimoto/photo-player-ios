@@ -9,8 +9,9 @@ final class SelectionTrace: ObservableObject {
     private var publicationPending = false
     var observesLibrary = true
     private var probes: [WeakProbe] = []
-    private weak var window: UIWindow?
-    private var observer: ContactObserver?
+    private var windows: [WeakWindow] = []
+    private var nextWindow = 0
+    private let session = String(UUID().uuidString.prefix(8))
     private var nextProbeSerial = 0
     private var diagnosticsVisible = false
 
@@ -18,7 +19,36 @@ final class SelectionTrace: ObservableObject {
     var testValue: String {
         "contacts=\(journal.contactCount);accepted=\(journal.accepted);shown=\(journal.shown);requested=\(journal.requested);received=\(journal.received);ready=\(journal.ready)"
     }
-    var report: String { journal.report(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") }
+    var report: String {
+        journal.report(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?",
+                       context: "session=\(session) source=UIApplication.sendEvent; OSからアプリへ配送される前の入力は観測できません。")
+    }
+
+    func lifecycle(_ reason: String) {
+        let live = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        journal.note("lifecycle.\(reason) windows=[\(live.map { windowDescription($0) }.joined(separator: ";"))] probes=\(probes.compactMap(\.view).count)")
+    }
+
+    func windowDescription(_ window: UIWindow?) -> String {
+        guard let window else { return "none" }
+        windows.removeAll { $0.window == nil }
+        if !windows.contains(where: { $0.window === window }) {
+            nextWindow += 1
+            windows.append(WeakWindow(id: nextWindow, window: window))
+        }
+        let id = windows.first { $0.window === window }!.id
+        return "W\(id){key=\(window.isKeyWindow),hidden=\(window.isHidden),interaction=\(window.isUserInteractionEnabled),scene=\(window.windowScene?.activationState.rawValue ?? -99)}"
+    }
+
+    func inputEntry(window: UIWindow?) -> Int {
+        journal.enterInput("windowID=\(windowDescription(window)) diagnostics=\(diagnosticsVisible)")
+    }
+
+    func inputNote(_ text: String) { journal.note(text) }
+
+    func inputEnded(_ input: Int, cancelled: Bool) {
+        journal.note("input.end input=I\(input) cancelled=\(cancelled)")
+    }
 
     // Record synchronously in delivery order. Defer only the UI publication;
     // unlike build 5, an async Task never changes the order of recorded events.
@@ -88,39 +118,30 @@ final class SelectionTrace: ObservableObject {
         guard probe.window != nil else { return }
         if probe.serial == 0 { nextProbeSerial += 1; probe.serial = nextProbeSerial }
         probes.append(WeakProbe(view: probe))
-        // A control in a different presentation window must not move the library
-        // observer away from the window that owns its cells.
-        guard probe.control == nil || window == nil else { return }
-        guard let candidate = probe.window, candidate !== window else { return }
-        if let observer { window?.removeGestureRecognizer(observer) }
-        window = candidate
-        let recognizer = ContactObserver(trace: self)
-        candidate.addGestureRecognizer(recognizer)
-        observer = recognizer
     }
 
     fileprivate func unregister(_ probe: ContactProbeView) {
         probes.removeAll { $0.view == nil || $0.view === probe }
     }
 
-    fileprivate func geometry(at point: CGPoint, in window: UIWindow, receiver: UIView?) -> ContactGeometry {
+    func geometry(at point: CGPoint, in window: UIWindow, receiver: UIView?) -> ContactGeometry {
         ContactGeometry(point: point, window: window, probes: probes.compactMap(\.view), receiver: receiver)
     }
 
-    fileprivate func contactBegan(number: Int, scroll: UIScrollView, receiver: UIView?, geometry: ContactGeometry) -> Int {
+    func contactBegan(number: Int, scroll: UIScrollView, receiver: UIView?, geometry: ContactGeometry, input: Int) -> Int {
         let id = journal.beginContact(video: number, scroll: scrollSnapshot(scroll),
             receiverInScroll: receiver?.isDescendant(of: scroll) == true,
-            evidence: "diagnostics=\(diagnosticsVisible) " + geometry.evidence)
+            evidence: "diagnostics=\(diagnosticsVisible) " + geometry.evidence, input: input)
         // Do not publish diagnostic-only UI changes while the finger is down.
         return id
     }
 
-    fileprivate func otherInputBegan(reason: String, geometry: ContactGeometry?) -> Int {
+    func otherInputBegan(reason: String, geometry: ContactGeometry?, input: Int) -> Int {
         journal.otherInputBegan(reason: reason, geometryVideo: geometry?.uniqueCell?.number,
-            evidence: "diagnostics=\(diagnosticsVisible) " + (geometry?.evidence ?? "geometry=unavailable"))
+            evidence: "diagnostics=\(diagnosticsVisible) " + (geometry?.evidence ?? "geometry=unavailable"), input: input)
     }
 
-    fileprivate func contactEnded(_ id: Int, distance: CGFloat, cancelled: Bool, endVideo: Int?, scroll: UIScrollView?) {
+    func contactEnded(_ id: Int, distance: CGFloat, cancelled: Bool, endVideo: Int?, scroll: UIScrollView?) {
         journal.endContact(id, movement: Double(distance), cancelled: cancelled, endVideo: endVideo, scroll: scrollSnapshot(scroll))
         changed()
     }
@@ -132,70 +153,7 @@ final class SelectionTrace: ObservableObject {
 }
 
 private struct WeakProbe { weak var view: ContactProbeView? }
-
-/// No recognition, prevention, delay, or cancellation: only observes UIKit delivery.
-private final class ContactObserver: UIGestureRecognizer {
-    private weak var trace: SelectionTrace?
-    private var contact: (id: Int, point: CGPoint)?
-    private weak var scroll: UIScrollView?
-    private var distance: CGFloat = 0
-
-    init(trace: SelectionTrace) {
-        self.trace = trace
-        super.init(target: nil, action: nil)
-        cancelsTouchesInView = false
-        delaysTouchesBegan = false
-        delaysTouchesEnded = false
-    }
-
-    override func canPrevent(_ other: UIGestureRecognizer) -> Bool { false }
-    override func canBePrevented(by other: UIGestureRecognizer) -> Bool { false }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard touches.count == 1, let touch = touches.first else {
-            _ = trace?.otherInputBegan(reason: "multiple-touches", geometry: nil)
-            state = .failed; return
-        }
-        guard let trace, let window = view as? UIWindow else { state = .failed; return }
-        let point = touch.location(in: window)
-        let geometry = trace.geometry(at: point, in: window, receiver: touch.view)
-        guard trace.observesLibrary, let cell = geometry.contactCell, let scroll = cell.probe.scrollView else {
-            let reason = !trace.observesLibrary ? "library-observation-gate" :
-                !geometry.controls.isEmpty ? "control-region" : geometry.candidates.count > 1 ? "ambiguous-cells" :
-                geometry.uniqueCell != nil ? "receiver-outside-cell-scroll" : "outside-cell"
-            _ = trace.otherInputBegan(reason: reason, geometry: geometry)
-            // Keep build 5's immediate failure outside the library. In particular,
-            // never remain a possible recognizer while a player control is tracking.
-            // The input's beginning is recorded; no ending/cancellation is inferred.
-            state = .failed; return
-        }
-        let id = trace.contactBegan(number: cell.number, scroll: scroll, receiver: touch.view, geometry: geometry)
-        contact = (id, point)
-        self.scroll = scroll
-    }
-
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard let origin = contact?.point, let touch = touches.first else { return }
-        let point = touch.location(in: view)
-        distance = max(distance, hypot(point.x - origin.x, point.y - origin.y))
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(touches, cancelled: false) }
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(touches, cancelled: true) }
-
-    private func finish(_ touches: Set<UITouch>, cancelled: Bool) {
-        if let contact {
-            let point = touches.first?.location(in: view) ?? contact.point
-            distance = max(distance, hypot(point.x - contact.point.x, point.y - contact.point.y))
-            let geometry = (view as? UIWindow).flatMap { trace?.geometry(at: point, in: $0, receiver: touches.first?.view) }
-            trace?.contactEnded(contact.id, distance: distance, cancelled: cancelled,
-                endVideo: geometry?.uniqueCell?.number, scroll: scroll)
-        }
-        state = .failed
-    }
-
-    override func reset() { contact = nil; scroll = nil; distance = 0 }
-}
+private struct WeakWindow { let id: Int; weak var window: UIWindow? }
 
 final class ContactProbeView: UIView {
     var number = 0 { didSet { if oldValue != number { identityRevision += 1 } } }
@@ -275,6 +233,7 @@ struct SelectionTracePanel: View {
             }.allowsHitTesting(false)
             Button(copiedReport == nil ? "診断をまとめてコピー" : "診断をコピー済み") {
                 trace.controlAction("copy.\(location)")
+                trace.lifecycle("copy.snapshot")
                 UIPasteboard.general.string = trace.report
                 copiedReport = UIPasteboard.general.string
             }

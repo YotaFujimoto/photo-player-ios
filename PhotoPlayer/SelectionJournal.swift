@@ -37,6 +37,16 @@ struct SelectionJournal {
     private var inputNumber = 0
     private let origin = ProcessInfo.processInfo.systemUptime
 
+    mutating func note(_ text: String) { append(text + " " + state) }
+
+    // Called at UIApplication entry, before window, cell, or diagnostic-mode checks.
+    mutating func enterInput(_ evidence: String) -> Int {
+        inputNumber += 1
+        contactCandidate = nil
+        append("input.entry input=I\(inputNumber) source=UIApplication.sendEvent \(evidence) \(state)")
+        return inputNumber
+    }
+
     var phase: String { !closing.isEmpty ? "closing" : visible != nil ? "player" : selected != nil ? "opening" : "library" }
     var state: String { "phase=\(phase) selected=\(tag(selected)) visible=\(tag(visible)) closing=\(closing)" }
     var latestContact: String {
@@ -49,14 +59,15 @@ struct SelectionJournal {
     }
 
     @discardableResult
-    mutating func beginContact(video: Int, scroll: String, receiverInScroll: Bool, evidence: String = "") -> Int {
+    mutating func beginContact(video: Int, scroll: String, receiverInScroll: Bool, evidence: String = "", input: Int? = nil) -> Int {
         contactCount += 1
-        inputNumber += 1
+        if input == nil { inputNumber += 1 }
+        let input = input ?? inputNumber
         let id = contactCount
-        contacts.append(Contact(id: id, video: video, input: inputNumber))
+        contacts.append(Contact(id: id, video: video, input: input))
         contacts = Array(contacts.suffix(16))
         contactCandidate = id
-        append("contact.begin input=I\(inputNumber) \(state) scroll=\(scroll) receiverInScroll=\(receiverInScroll) \(evidence)", contact: id, video: video)
+        append("contact.begin input=I\(input) \(state) scroll=\(scroll) receiverInScroll=\(receiverInScroll) \(evidence)", contact: id, video: video)
         return id
     }
 
@@ -73,11 +84,12 @@ struct SelectionJournal {
     // Record unmapped/gated window input too. Otherwise a diagnostic guard can
     // hide a new touch and leave the same stale history as build 5.
     @discardableResult
-    mutating func otherInputBegan(reason: String = "outside-cell", geometryVideo: Int? = nil, evidence: String = "") -> Int {
+    mutating func otherInputBegan(reason: String = "outside-cell", geometryVideo: Int? = nil, evidence: String = "", input: Int? = nil) -> Int {
         contactCandidate = nil
-        inputNumber += 1
-        append("input.other.begin input=I\(inputNumber) reason=\(reason) observation=begin-only \(state) \(evidence)", video: geometryVideo)
-        return inputNumber
+        if input == nil { inputNumber += 1 }
+        let input = input ?? inputNumber
+        append("input.other.begin input=I\(input) reason=\(reason) observation=begin-only \(state) \(evidence)", video: geometryVideo)
+        return input
     }
 
     mutating func controlAction(_ name: String, detail: String = "") {
@@ -172,13 +184,14 @@ struct SelectionJournal {
         append("load.\(event) \(state)", selection: id)
     }
 
-    func report(build: String) -> String {
+    func report(build: String, context: String = "") -> String {
         let contactLines = contacts.map { contact in
             "C\(contact.id) V\(contact.video) end=\(contact.ended) cancel=\(contact.cancelled) move=\(String(format: "%.1f", contact.movement))pt selectionCandidate=\(tag(contact.selection)) input=I\(contact.input)"
         }
         let operationLines = operations.map { "S\($0.id) V\($0.video) contactCandidate=\($0.contactCandidate.map { "C\($0)" } ?? "-") result=\($0.status)" }
         return (["PhotoPlayer build \(build)",
-                 "I=ウィンドウ入力 / C=セル範囲の接触 / S=選択要求 / E=記録順 / +ms=相対記録時刻",
+                 "I=アプリ入口の入力 / C=セル範囲の接触 / S=選択要求 / E=記録順 / +ms=相対記録時刻",
+                 context,
                  "CとSの対応は匿名動画番号と入力順からの候補。記録なしは拒否・消失の断定ではない。",
                  "point/frame/clipは接触時の同一window座標(pt)。presentationは描画中のlayer範囲（取得できる時のみ）。receiverは実際のtouch.viewのクラスと祖先。control.actionはコピー等の実処理。",
                  "直近16接触・16選択・96イベント。受付前の数値比較は不要。",
