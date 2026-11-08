@@ -76,12 +76,8 @@ struct SelectionJournal {
     mutating func otherInputBegan(reason: String = "outside-cell", geometryVideo: Int? = nil) -> Int {
         contactCandidate = nil
         inputNumber += 1
-        append("input.other.begin input=I\(inputNumber) reason=\(reason) \(state)", video: geometryVideo)
+        append("input.other.begin input=I\(inputNumber) reason=\(reason) observation=begin-only \(state)", video: geometryVideo)
         return inputNumber
-    }
-
-    mutating func otherInputEnded(_ id: Int, movement: Double, cancelled: Bool) {
-        append("input.other.\(cancelled ? "cancel" : "end") input=I\(id) move=\(String(format: "%.1f", movement))pt \(state)")
     }
 
     @discardableResult

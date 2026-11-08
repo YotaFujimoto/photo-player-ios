@@ -99,12 +99,13 @@ final class SelectionJournalTests: XCTestCase {
     func testDiagnosticGateCannotSilentlyHideNewWindowInput() {
         var journal = SelectionJournal()
         let input = journal.otherInputBegan(reason: "library-observation-gate", geometryVideo: 7)
-        journal.otherInputEnded(input, movement: 0, cancelled: false)
+        XCTAssertEqual(input, 1)
         XCTAssertEqual(journal.contactCount, 0)
         XCTAssertEqual(journal.accepted, 0)
         let report = journal.report(build: "6")
         XCTAssertTrue(report.contains("V7 input.other.begin input=I1 reason=library-observation-gate"))
-        XCTAssertTrue(report.contains("input.other.end input=I1 move=0.0pt"))
+        XCTAssertTrue(report.contains("observation=begin-only"))
+        XCTAssertFalse(report.contains("input.other.end"), "An excluded input must not claim an observed ending")
     }
 
     func testSelectionClearingReasonsRemainEvenIfSwiftUIObservationCoalesces() {

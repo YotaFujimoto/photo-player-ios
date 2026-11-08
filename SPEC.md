@@ -53,6 +53,8 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 
 直近16接触・16選択・96イベントのメモリ内履歴を、明示的な「診断をまとめてコピー」で一括コピーできる。接触の開始・終了と選択処理を呼び出し順に同期記録し、描画通知だけを遅延する。指を置いている間は診断だけの描画通知を出さない。観測フラグによる除外やセル範囲外のウィンドウ入力もI番号と理由を記録し、観測用ガードが接触を黙って隠さないようにする。タップ前後の値を利用者が比較する運用を要求しない。個人動画、Photosの識別子、名前、パス、端末情報、絶対時刻を含めず、自動送信や履歴のファイル保存は行わない。
 
+相対記録時刻はアプリ内の履歴開始からの経過時間だけを計測する。`systemUptime` の利用理由を `PrivacyInfo.xcprivacy` に `NSPrivacyAccessedAPICategorySystemBootTime` / `35F9.1` として宣言する。端末起動からの生の値は履歴やコピーへ含めない。[Appleのアプリ内イベント間の経過時間に関する利用理由](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons)に対応する。
+
 ## 後続段階の技術条件（未実装・今回対象外）
 
 - 以下のUI変更は、初回タップ無反応の修正と実機確認を終えた後、段階3のUI実装と一緒に反映する。現在の修正候補には先行して混ぜない。確認済みの再生処理を維持する。
