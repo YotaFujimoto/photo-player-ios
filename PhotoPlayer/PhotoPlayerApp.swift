@@ -18,8 +18,9 @@ final class PhotoPlayerApplication: UIApplication {
         enabled: !ProcessInfo.processInfo.arguments.contains("--disable-input-monitor"))
 
     override func sendEvent(_ event: UIEvent) {
-        let samples = event.type == .touches ? (event.allTouches ?? []).map { InputSample(touch: $0) } : []
-        input.dispatch(samples) { super.sendEvent(event) }
+        input.dispatch(event.type == .touches ? (event.allTouches ?? []).map { InputSample(touch: $0) } : []) {
+            super.sendEvent(event)
+        }
     }
 }
 

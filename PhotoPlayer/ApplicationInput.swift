@@ -44,8 +44,9 @@ final class ApplicationInput {
         trace.inputNote("monitor.start enabled=\(enabled) boundary=UIApplication.sendEvent gestures=0")
     }
 
-    func dispatch(_ samples: [InputSample], forward: () -> Void) {
-        if enabled { for sample in samples { observe(sample) } }
+    func dispatch(_ samples: @autoclosure () -> [InputSample], forward: () -> Void) {
+        // The disabled comparison does not even read touch/window geometry.
+        if enabled { for sample in samples() { observe(sample) } }
         // Unconditional, exactly once, including no-touch events, missing windows,
         // multiple touches, diagnostics off, player controls, and unknown phases.
         forward()

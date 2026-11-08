@@ -95,7 +95,10 @@ final class ApplicationInputTests: XCTestCase {
             let input = ApplicationInput(trace: trace, enabled: enabled)
             let finger = NSObject()
             var forwards = 0
-            input.dispatch([]) { forwards += 1 }
+            var sampleReads = 0
+            func samples() -> [InputSample] { sampleReads += 1; return [] }
+            input.dispatch(samples()) { forwards += 1 }
+            XCTAssertEqual(sampleReads, enabled ? 1 : 0, "Disabled monitoring must bypass touch inspection too")
             for phase in [UITouch.Phase.began, .stationary, .moved, .ended, .cancelled] {
                 input.dispatch([InputSample(key: ObjectIdentifier(finger), phase: phase, point: .zero, window: nil, receiver: nil)]) { forwards += 1 }
             }
