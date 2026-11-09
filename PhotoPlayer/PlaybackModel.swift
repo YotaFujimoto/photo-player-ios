@@ -458,6 +458,17 @@ final class PlaybackModel: ObservableObject {
         }
     }
 
+    func cancelInteractionForRotation() {
+        gestureCancellationID += 1
+        speed.endHold()
+        cancelScrubbing()
+        cancelHorizontalSeek()
+        clearFeedback()
+        // Rotation discards only uncommitted interaction state. An already
+        // committed seek, the selected rate and playback intent stay intact.
+        resumeIfNeeded()
+    }
+
     func suspend() {
         clearFeedback()
         pause()

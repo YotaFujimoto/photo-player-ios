@@ -10,6 +10,7 @@ struct PlayerScreen: View {
     @StateObject private var chrome = PlaybackChrome()
     @State private var diagnostics: Bool
     @State private var rateMenuVisible = false
+    @State private var lastDeviceOrientation = UIDeviceOrientation.unknown
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -69,8 +70,18 @@ struct PlayerScreen: View {
             .statusBarHidden(fullscreen)
             .onAppear { configureLayout(fullscreen: fullscreen) }
             .onChange(of: geometry.size) { _, _ in configureLayout(fullscreen: fullscreen) }
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                let orientation = UIDevice.current.orientation
+                guard [.portrait, .landscapeLeft, .landscapeRight].contains(orientation),
+                      orientation != lastDeviceOrientation else { return }
+                lastDeviceOrientation = orientation
+                // A 180-degree landscape turn does not change geometry.size.
+                configureLayout(fullscreen: fullscreen)
+            }
         }
         .onAppear {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            lastDeviceOrientation = UIDevice.current.orientation
             chrome.setActive(scenePhase == .active)
             if let selectionOperation { selectionTrace?.appear(selectionOperation) }
             model.onLoadEvent = { [weak selectionTrace, selectionOperation] event in
@@ -79,6 +90,7 @@ struct PlayerScreen: View {
             model.load()
         }
         .onDisappear {
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
             chrome.setActive(false); rateMenuVisible = false
             model.close()
             if let selectionOperation { selectionTrace?.disappear(selectionOperation) }
@@ -98,6 +110,7 @@ struct PlayerScreen: View {
 
     private func configureLayout(fullscreen: Bool) {
         rateMenuVisible = false
+        model.cancelInteractionForRotation()
         chrome.layout(fullscreen: fullscreen)
         refreshChrome()
     }

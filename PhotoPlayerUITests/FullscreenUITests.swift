@@ -96,6 +96,11 @@ final class FullscreenUITests: XCTestCase {
         expect(play(app), NSPredicate(format: "exists == false"), timeout: 7)
         XCTAssertEqual(surface(app).frame, canvas)
         capture("fullscreen-hidden-canvas")
+        // The same-size 180-degree rotation must invalidate the old timer too.
+        XCUIDevice.shared.orientation = .landscapeRight
+        fullCanvas(app)
+        XCTAssertTrue(play(app).exists)
+        expect(play(app), NSPredicate(format: "exists == false"), timeout: 7)
         surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.3)).doubleTap()
         XCTAssertFalse(play(app).exists, "Double tap must not toggle the hidden controls")
         state(app, "Playing")

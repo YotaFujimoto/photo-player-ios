@@ -7,6 +7,48 @@ import AVFoundation
 /// Exercise teardown while the boost is actually active, without a human holding a finger.
 final class PlaybackLifecycleTests: XCTestCase {
     @MainActor
+    func testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        model.beginTemporaryDoubleRate()
+        XCTAssertTrue(model.isTemporaryDoubleRate)
+        model.cancelInteractionForRotation()
+        XCTAssertFalse(model.isTemporaryDoubleRate)
+        XCTAssertEqual(model.player.rate, 0.25)
+        for playing in [false, true] {
+            if playing { model.togglePlayback() } else { model.pause() }
+            if playing { try await wait { model.player.timeControlStatus == .playing } }
+            for bar in [true, false] {
+                XCTAssertTrue(bar ? model.beginScrubbing() : model.beginHorizontalSeek())
+                let origin = model.player.currentTime().seconds
+                if bar { model.scrub(to: 20) }
+                else { model.updateHorizontalSeek(translation: 100, width: 300) }
+                let old = model.gestureCancellationID
+                model.cancelInteractionForRotation()
+                XCTAssertGreaterThan(model.gestureCancellationID, old)
+                model.endScrubbing(); model.endHorizontalSeek(); model.endTemporaryDoubleRate()
+                XCTAssertNil(model.seekPreview); XCTAssertFalse(model.isSeeking)
+                XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.15)
+                XCTAssertEqual(model.wantsPlayback, playing)
+                XCTAssertEqual(model.selectedRate, 0.25)
+                XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
+            }
+        }
+        model.pause()
+        model.skip(forward: true)
+        let committed = model.position
+        XCTAssertNotNil(model.skipFeedback)
+        model.cancelInteractionForRotation()
+        XCTAssertNil(model.skipFeedback)
+        try await wait { !model.isSeeking }
+        XCTAssertEqual(model.position, committed, accuracy: 0.15)
+        assertStopped(model)
+    }
+
+    @MainActor
     func testSuspendAndCloseClearAnActiveBoostWithoutLateRestart() async throws {
         let model = try makeModel()
         defer { model.close() }
