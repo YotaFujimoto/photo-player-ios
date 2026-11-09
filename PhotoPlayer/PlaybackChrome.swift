@@ -2,7 +2,7 @@ import SwiftUI
 
 /// UI-only state. Playback position, rate and PhotoKit ownership stay in PlaybackModel.
 struct PlaybackChromeState {
-    enum Blocker: Hashable { case bar, videoGesture, speedMenu, diagnostics, seeking, unavailable }
+    enum Blocker: Hashable { case bar, videoGesture, speedMenu, diagnostics, seeking, unavailable, button(String) }
     static let hideDelay = Duration.seconds(3)
     private(set) var isFullscreen = false
     private(set) var isActive = true

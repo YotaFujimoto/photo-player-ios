@@ -122,6 +122,7 @@ struct PlayerScreen: View {
                 Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("Close").accessibilityIdentifier("closePlayer")
+            .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("closePlayer"), active: $0) }))
             .background {
                 if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.close").allowsHitTesting(false) }
             }
@@ -143,6 +144,7 @@ struct PlayerScreen: View {
                 Image(systemName: "info.circle").frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("Playback diagnostics").accessibilityIdentifier("playerDiagnostics")
+            .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("playerDiagnostics"), active: $0) }))
             .background {
                 if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false) }
             }
@@ -210,7 +212,7 @@ struct PlayerScreen: View {
                     chrome.activity(); model.togglePlayback()
                 }, setRate: {
                     chrome.activity(); model.setRate($0)
-                }))
+                }, pressing: { chrome.block(.button($0), active: $1) }))
             if diagnostics {
                 DisclosureGroup("Playback details") {
                     VStack(alignment: .leading, spacing: 10) {

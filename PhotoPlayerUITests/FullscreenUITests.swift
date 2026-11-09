@@ -25,6 +25,18 @@ final class FullscreenUITests: XCTestCase {
     @MainActor private func state(_ app: XCUIApplication, _ value: String) {
         expect(surface(app), NSPredicate(format: "value == %@", value), timeout: 20)
     }
+    @MainActor private func fullCanvas(_ app: XCUIApplication) {
+        // XCTest can return from orientation changes during the presentation
+        // transform. Wait for the same exact full-screen geometry we assert;
+        // do not sample the rotating rectangle or add a fixed sleep.
+        let canvas = surface(app)
+        expect(canvas, NSPredicate { _, _ in
+            let frame = canvas.frame, screen = app.frame
+            return screen.width > screen.height && abs(frame.minX - screen.minX) <= 1
+                && abs(frame.minY - screen.minY) <= 1 && abs(frame.width - screen.width) <= 1
+                && abs(frame.height - screen.height) <= 1
+        })
+    }
     @MainActor private func observeForFourSeconds() {
         // Deliberately observe longer than the production three-second deadline.
         // This is a timer assertion, not a delay used to make an input succeed.
@@ -48,6 +60,7 @@ final class FullscreenUITests: XCTestCase {
         capture("fullscreen-portrait-feedback-layout")
         for orientation in [UIDeviceOrientation.landscapeLeft, .landscapeRight] {
             XCUIDevice.shared.orientation = orientation
+            fullCanvas(app)
             let canvas = surface(app).frame, screen = app.frame
             XCTAssertEqual(canvas.minX, screen.minX, accuracy: 1)
             XCTAssertEqual(canvas.minY, screen.minY, accuracy: 1)
@@ -67,6 +80,7 @@ final class FullscreenUITests: XCTestCase {
             capture("fullscreen-visible-\(orientation.rawValue)")
         }
         XCUIDevice.shared.orientation = .portrait
+        expect(surface(app), NSPredicate { _, _ in self.surface(app).frame == portrait })
         XCTAssertEqual(surface(app).frame, portrait)
         XCTAssertTrue(play(app).isHittable)
     }
@@ -75,6 +89,7 @@ final class FullscreenUITests: XCTestCase {
         let app = openPaused()
         defer { XCUIDevice.shared.orientation = .portrait }
         XCUIDevice.shared.orientation = .landscapeLeft
+        fullCanvas(app)
         let canvas = surface(app).frame
         let origin = seconds(app), began = ProcessInfo.processInfo.systemUptime
         play(app).tap(); state(app, "Playing")
@@ -89,7 +104,7 @@ final class FullscreenUITests: XCTestCase {
         let reached = seconds(app)
         let ordinary = (ProcessInfo.processInfo.systemUptime - began) * 0.25
         XCTAssertEqual(Double(reached - origin) - ordinary, 10, accuracy: 2)
-        app.playerButton("rateMenu").tap()
+        app.playerButton("rateMenu").press(forDuration: 4)
         let half = app.buttons.matching(identifier: "0.5×").firstMatch
         XCTAssertTrue(half.waitForExistence(timeout: 3))
         observeForFourSeconds()
@@ -113,6 +128,7 @@ final class FullscreenUITests: XCTestCase {
         bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         state(app, "Paused")
         XCUIDevice.shared.orientation = .landscapeLeft
+        fullCanvas(app)
         play(app).tap(); state(app, "Playing")
         expect(play(app), NSPredicate(format: "exists == false"), timeout: 7)
         let view = surface(app)

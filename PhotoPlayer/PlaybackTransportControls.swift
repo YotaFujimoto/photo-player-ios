@@ -20,6 +20,7 @@ struct PlaybackTransportActions {
     var cancel: () -> Void = {}
     var togglePlayback: () -> Void = {}
     var setRate: (Float) -> Void = { _ in }
+    var pressing: (String, Bool) -> Void = { _, _ in }
 }
 
 struct PlaybackTransportControls: View {
@@ -41,11 +42,12 @@ struct PlaybackTransportControls: View {
                     onBegin: actions.begin, onChange: actions.change, onCommit: actions.commit, onCancel: actions.cancel)
                 .frame(height: 44)
             HStack {
-                if fullscreen { playButton.buttonStyle(.plain) }
+                if fullscreen { playButton.buttonStyle(TrackedPlayerButtonStyle(onPress: { actions.pressing("playPause", $0) })) }
                 else { playButton.buttonStyle(.borderedProminent) }
                 Spacer()
                 if fullscreen {
                     Button { ratePresentation.wrappedValue = true } label: { rateLabel }
+                        .buttonStyle(TrackedPlayerButtonStyle(onPress: { actions.pressing("rateMenu", $0) }))
                         .popover(isPresented: ratePresentation) {
                             VStack(spacing: 0) {
                                 ForEach(PlaybackPolicy.rates, id: \.self) { rate in

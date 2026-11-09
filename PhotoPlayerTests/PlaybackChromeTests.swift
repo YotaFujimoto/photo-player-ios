@@ -29,7 +29,7 @@ final class PlaybackChromeTests: XCTestCase {
     }
 
     func testEveryInteractionBlocksHideAndRestartsOnlyAfterRelease() {
-        let blockers: [PlaybackChromeState.Blocker] = [.bar, .videoGesture, .speedMenu, .diagnostics, .seeking, .unavailable]
+        let blockers: [PlaybackChromeState.Blocker] = [.bar, .videoGesture, .speedMenu, .diagnostics, .seeking, .unavailable, .button("playPause")]
         for blocker in blockers {
             var state = PlaybackChromeState()
             state.layout(fullscreen: true); state.playback(playing: true)
@@ -56,6 +56,12 @@ final class PlaybackChromeTests: XCTestCase {
         state.block(.speedMenu, active: true); state.playback(playing: false)
         state.block(.speedMenu, active: false)
         XCTAssertNil(state.timeoutToken); XCTAssertTrue(state.isVisible)
+        state.playback(playing: true)
+        state.block(.button("playPause"), active: true); state.block(.button("rateMenu"), active: true)
+        state.block(.button("playPause"), active: false)
+        XCTAssertNil(state.timeoutToken)
+        state.block(.button("rateMenu"), active: false)
+        XCTAssertNotNil(state.timeoutToken)
     }
 
     func testRotationBackgroundAndCloseInvalidateOldTimers() {
