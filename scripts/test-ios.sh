@@ -101,10 +101,18 @@ playback_seek='PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRa
 mkdir -p build/copy-results
 # Validate the input under investigation first. On failure retain its evidence
 # immediately; a successful candidate still runs every test exactly once.
+run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
-run_tests build/copy-results/SeekInteractions.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests"
+# Isolate each new interaction case too. A combined host showed multi-second
+# accessibility snapshots and timed out before a swipe could be synthesized.
+# Keep every case and deadline, and run each once on the same simulator.
+run_tests build/copy-results/SeekBar.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragHitAreaAndPlaybackIntentInBothOrientations"
+run_tests build/copy-results/SeekHorizontal.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipeDirectionPriorityAndHoldExclusionInBothOrientations"
+run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls"
+run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput"
 test_status=0
 run_tests build/TestResults.xcresult \
+  "-skip-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
   "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \

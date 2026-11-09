@@ -421,6 +421,14 @@ final class PlaybackModel: ObservableObject {
         player.pause()
         isSeeking = true
         if let next = seekQueue.enqueue(request) { performSeek(next) }
+        else {
+            // A newly committed position supersedes the in-flight destination.
+            // Do not make it wait for decoding an obsolete frame. Cancellation
+            // completes that request with finished=false; its completion then
+            // starts the latest queued request, still with only one in flight.
+            trace("new seek cancels superseded destination")
+            player.currentItem?.cancelPendingSeeks()
+        }
     }
 
     private func performSeek(_ request: SeekRequest) {
