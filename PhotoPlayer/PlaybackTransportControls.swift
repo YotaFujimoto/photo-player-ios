@@ -60,10 +60,12 @@ struct PlaybackTransportControls: View {
                                             Spacer()
                                             if rate == state.selectedRate { Image(systemName: "checkmark").accessibilityHidden(true) }
                                         }.padding(.horizontal, 16).frame(height: 44).contentShape(Rectangle())
-                                    }.disabled(rate < 1 && !state.canPlaySlow)
+                                    }.buttonStyle(.plain).disabled(rate < 1 && !state.canPlaySlow)
                                 }
                             }.frame(width: 150).padding(.vertical, 4)
-                                .foregroundStyle(.primary).tint(.accentColor)
+                                // A hierarchical .primary would inherit the
+                                // white video chrome; use the semantic color.
+                                .foregroundStyle(Color.primary)
                                 .presentationCompactAdaptation(.popover)
                         }
                         .disabled(!state.isReady).accessibilityIdentifier("rateMenu")
