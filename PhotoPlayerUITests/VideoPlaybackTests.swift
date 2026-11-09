@@ -47,15 +47,12 @@ final class VideoPlaybackTests: XCTestCase {
         app.buttons["playPause"].tap()
         waitForLabel(state, "Playing")
         let seekStarted = ProcessInfo.processInfo.systemUptime
-        // While playing the thumb keeps moving; let XCTest resolve its current
-        // value instead of estimating a grab point from a rounded clock label.
-        app.sliders["seekSlider"].adjust(toNormalizedSliderPosition: 0.75)
+        app.descendants(matching: .any)["seekSlider"].coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)).tap()
         waitForLabel(state, "Playing")
         let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
-        // XCTest's slider gesture is approximate, and playback keeps advancing while
-        // the state/rate assertions query the UI. Advance the same 22...24-second
-        // acceptance window at the verified 0.25 rate instead of waiting for the past.
+        // Playback advances while the state/rate assertions query the UI.
+        // Retain the prior 22...24-second window advanced at the verified rate.
         let movingPosition = NSPredicate { candidate, _ in
             let elapsed = ProcessInfo.processInfo.systemUptime - seekStarted
             let expectedLabels = (22...24).map {
@@ -78,13 +75,9 @@ final class VideoPlaybackTests: XCTestCase {
 
     @MainActor
     private func dragSlider(_ app: XCUIApplication, to fraction: CGFloat) {
-        let slider = app.sliders["seekSlider"]
-        // Read the indicator itself, not the rounded playback clock. Use one
-        // continuous slow drag; the prior default-speed input committed 17.22s
-        // despite its endpoint being at 50% of the accessibility frame.
-        let current = slider.normalizedSliderPosition
-        XCTAssertTrue((0...1).contains(current))
-        let start = slider.coordinate(withNormalizedOffset: CGVector(dx: current, dy: 0.5))
+        let slider = app.descendants(matching: .any)["seekSlider"]
+        // The full bar now tracks one continuous contact from any starting point.
+        let start = slider.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
         let end = slider.coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0)
     }

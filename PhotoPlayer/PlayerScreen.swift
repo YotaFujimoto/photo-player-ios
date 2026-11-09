@@ -93,13 +93,35 @@ struct PlayerScreen: View {
     }
 
     private var picture: some View {
-        ZStack {
-            PlayerSurface(model: model)
-            if model.isTemporaryDoubleRate {
+        PlayerSurface(model: model)
+        .overlay {
+            if let preview = model.seekPreview, preview.source == .horizontal {
+                VStack(spacing: 4) {
+                    Text(PlaybackPolicy.clock(preview.target)).font(.title2.monospacedDigit())
+                    Text(preview.difference).font(.headline.monospacedDigit())
+                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityElement(children: .combine).accessibilityIdentifier("seekPreview")
+                    .allowsHitTesting(false)
+            } else if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)
                     .background(.regularMaterial, in: Capsule()).allowsHitTesting(false)
                     .accessibilityIdentifier("temporaryRate")
             }
+        }
+        .overlay {
+            if let feedback = model.skipFeedback {
+                HStack {
+                    if feedback.forward { Spacer(minLength: 0) }
+                    VStack(spacing: 4) {
+                        Image(systemName: feedback.forward ? "forward.fill" : "backward.fill").accessibilityHidden(true)
+                        Text(feedback.text).font(.headline.monospacedDigit()).accessibilityIdentifier("skipFeedback")
+                    }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(20)
+                    if !feedback.forward { Spacer(minLength: 0) }
+                }.allowsHitTesting(false).transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: model.skipFeedback == nil)
+        .overlay {
             if model.isLoading {
                 VStack(spacing: 12) {
                     ProgressView(value: model.hasDownloadProgress ? model.progress : nil)
@@ -119,46 +141,26 @@ struct PlayerScreen: View {
                         .accessibilityIdentifier("retryVideo")
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
             } else if !model.isReady { ProgressView().tint(.white) }
-        }.background(.black)
+        }
+        .overlay(alignment: .bottom) {
+            if model.isReady && !model.canPlaySlow {
+                Text("Slow playback unavailable.").font(.caption).padding(8)
+                    .background(.regularMaterial, in: Capsule()).padding(8).allowsHitTesting(false)
+            }
+        }
+        .background(.black)
     }
 
     private var controls: some View {
         VStack(spacing: 12) {
-            HStack {
-                Text(PlaybackPolicy.clock(model.position)).accessibilityIdentifier("playbackPosition")
-                Spacer()
-                Text(PlaybackPolicy.clock(model.duration)).accessibilityIdentifier("playbackDuration")
-            }.font(.caption.monospacedDigit())
-            Slider(value: Binding(get: { model.position }, set: { model.scrub(to: $0) }),
-                   in: 0...max(model.duration, 1), onEditingChanged: { editing in
-                if editing { model.beginScrubbing() } else { model.endScrubbing() }
-            })
-            .disabled(!model.isReady || model.duration <= 0)
-            .accessibilityLabel("Playback position").accessibilityIdentifier("seekSlider")
-
-            HStack {
-                Button { model.togglePlayback() } label: {
-                    Label(model.showsPauseControl ? "Pause" : "Play", systemImage: model.showsPauseControl ? "pause.fill" : "play.fill")
-                        .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
-                }.buttonStyle(.borderedProminent).disabled(!model.isReady)
-                    .accessibilityIdentifier("playPause").accessibilityValue(model.stateText)
-                Spacer()
-                Menu {
-                    ForEach(PlaybackPolicy.rates, id: \.self) { rate in
-                        Button(String(format: "%g×", rate)) { model.setRate(rate) }
-                            .disabled(rate < 1 && !model.canPlaySlow)
-                    }
-                } label: {
-                    Text(String(format: "%g×", model.selectedRate)).frame(minWidth: 44, minHeight: 44)
-                }.disabled(!model.isReady).accessibilityIdentifier("rateMenu")
-                    .accessibilityLabel("Playback speed").accessibilityValue(String(format: "%g×", model.selectedRate))
-            }
-            if diagnostics || model.stateText == "Buffering…" {
-                Text(model.stateText).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("playerState")
-            }
-            if model.isReady && !model.canPlaySlow {
-                Text("Slow playback unavailable.").font(.caption)
-            }
+            PlaybackTransportControls(state: PlaybackTransportState(
+                position: model.displayedPosition, duration: model.duration, isReady: model.isReady,
+                canPlaySlow: model.canPlaySlow, showsPause: model.showsPauseControl,
+                selectedRate: model.selectedRate, stateText: model.stateText,
+                cancellationID: model.gestureCancellationID), diagnostics: diagnostics,
+                actions: PlaybackTransportActions(begin: { model.beginScrubbing() }, change: model.scrub,
+                    commit: model.endScrubbing, cancel: model.cancelScrubbing,
+                    togglePlayback: model.togglePlayback, setRate: model.setRate))
             if diagnostics {
                 DisclosureGroup("Playback details") {
                     VStack(alignment: .leading, spacing: 10) {

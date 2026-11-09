@@ -85,11 +85,12 @@ final class PlaybackLifecycleTests: XCTestCase {
         for playing in [false, true] {
             if playing { model.togglePlayback() } else { model.pause() }
             if playing { try await wait { model.player.timeControlStatus == .playing } }
-            model.beginScrubbing()
+            XCTAssertTrue(model.beginScrubbing())
+            let origin = model.player.currentTime().seconds
             model.scrub(to: 8)
-            // Observe the preview starting (or already reaching its destination),
-            // rather than sleeping for a presumed AVFoundation completion time.
-            try await wait { model.isSeeking || abs(model.player.currentTime().seconds - 8) < 0.25 }
+            XCTAssertEqual(model.displayedPosition, 8)
+            XCTAssertFalse(model.isSeeking, "Finger movement must not issue AVPlayer seeks")
+            XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.1)
             model.scrub(to: 15)
             model.endScrubbing()
             try await wait { !model.isSeeking }
@@ -100,6 +101,118 @@ final class PlaybackLifecycleTests: XCTestCase {
             XCTAssertEqual(model.selectedRate, 0.25)
             XCTAssertNil(model.errorMessage)
         }
+    }
+
+    @MainActor
+    func testHorizontalPreviewCommitsOnceAndCancelRetainsOriginAndRate() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        for playing in [false, true] {
+            model.pause()
+            model.beginScrubbing(); model.scrub(to: 5); model.endScrubbing()
+            try await wait { !model.isSeeking }
+            if playing { model.togglePlayback(); try await wait { model.player.timeControlStatus == .playing } }
+            XCTAssertTrue(model.beginHorizontalSeek())
+            let origin = try XCTUnwrap(model.seekPreview).origin
+            for x in 1...60 { model.updateHorizontalSeek(translation: Double(x), width: 360) }
+            XCTAssertEqual(model.displayedPosition, origin + 10, accuracy: 0.01)
+            XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.1)
+            XCTAssertFalse(model.isSeeking)
+            model.beginTemporaryDoubleRate()
+            XCTAssertFalse(model.isTemporaryDoubleRate)
+            XCTAssertFalse(model.beginScrubbing(), "Another gesture cannot replace an active preview")
+            model.skip(forward: true)
+            XCTAssertNil(model.skipFeedback)
+            model.endHorizontalSeek()
+            model.endHorizontalSeek() // A late duplicate release has no effect.
+            try await wait { !model.isSeeking }
+            if playing { try await wait { model.player.timeControlStatus == .playing } }
+            XCTAssertEqual(model.player.currentTime().seconds, origin + 10, accuracy: 0.25)
+            XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
+            XCTAssertEqual(model.wantsPlayback, playing)
+            XCTAssertTrue(model.beginHorizontalSeek())
+            let cancelledOrigin = model.player.currentTime().seconds
+            model.updateHorizontalSeek(translation: -360, width: 360)
+            XCTAssertEqual(model.displayedPosition, 0)
+            model.cancelHorizontalSeek(); model.endHorizontalSeek()
+            XCTAssertNil(model.seekPreview)
+            XCTAssertFalse(model.isSeeking)
+            if playing { try await wait { model.player.timeControlStatus == .playing } }
+            XCTAssertEqual(model.player.currentTime().seconds, cancelledOrigin, accuracy: 0.25)
+            XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
+            XCTAssertEqual(model.selectedRate, 0.25)
+        }
+    }
+
+    @MainActor
+    func testHeldRateBlocksSwipeAndSuspendDiscardsBothPreviewTypes() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        model.beginTemporaryDoubleRate()
+        XCTAssertTrue(model.isTemporaryDoubleRate)
+        XCTAssertFalse(model.beginHorizontalSeek())
+        XCTAssertNil(model.seekPreview)
+        model.endTemporaryDoubleRate()
+        XCTAssertEqual(model.player.rate, 0.25)
+        for horizontal in [false, true] {
+            XCTAssertTrue(horizontal ? model.beginHorizontalSeek() : model.beginScrubbing())
+            let origin = model.player.currentTime().seconds
+            if horizontal { model.updateHorizontalSeek(translation: 300, width: 300) }
+            else { model.scrub(to: 25) }
+            model.suspend()
+            model.endHorizontalSeek(); model.endScrubbing()
+            XCTAssertNil(model.seekPreview)
+            XCTAssertFalse(model.isSeeking)
+            XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.1)
+            assertStopped(model)
+            XCTAssertEqual(model.selectedRate, 0.25)
+        }
+        XCTAssertTrue(model.beginHorizontalSeek())
+        model.updateHorizontalSeek(translation: 100, width: 300)
+        model.close(); model.endHorizontalSeek()
+        XCTAssertNil(model.seekPreview)
+        XCTAssertNil(model.player.currentItem)
+        assertStopped(model)
+    }
+
+    @MainActor
+    func testBarAndSwipeAtEndPreservePlaybackIntentAndFeedbackUsesClampedDelta() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        model.beginScrubbing(); model.scrub(to: model.duration); model.endScrubbing()
+        try await wait { !model.isSeeking }
+        XCTAssertTrue(model.wantsPlayback)
+        XCTAssertFalse(model.showsPauseControl)
+        XCTAssertEqual(model.player.rate, 0)
+        XCTAssertTrue(model.beginHorizontalSeek())
+        model.updateHorizontalSeek(translation: -50, width: 300)
+        model.endHorizontalSeek()
+        try await wait { !model.isSeeking && model.player.timeControlStatus == .playing }
+        XCTAssertEqual(model.player.rate, 0.25)
+        model.pause()
+        model.beginScrubbing(); model.scrub(to: 28); model.endScrubbing()
+        try await wait { !model.isSeeking }
+        model.skip(forward: true)
+        XCTAssertEqual(model.skipFeedback?.text, "+2s · End")
+        let firstID = model.skipFeedback?.id
+        model.skip(forward: true)
+        XCTAssertNotEqual(model.skipFeedback?.id, firstID)
+        XCTAssertEqual(model.skipFeedback?.text, "End")
+        try await wait { !model.isSeeking && model.skipFeedback == nil }
+        model.skip(forward: false)
+        XCTAssertNotNil(model.skipFeedback)
+        model.suspend()
+        XCTAssertNil(model.skipFeedback)
+        assertStopped(model)
     }
 
     @MainActor private func makeModel() throws -> PlaybackModel {

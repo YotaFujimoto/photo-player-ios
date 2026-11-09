@@ -102,9 +102,11 @@ mkdir -p build/copy-results
 # Validate the input under investigation first. On failure retain its evidence
 # immediately; a successful candidate still runs every test exactly once.
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
+run_tests build/copy-results/SeekInteractions.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests"
 test_status=0
 run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
+  "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \

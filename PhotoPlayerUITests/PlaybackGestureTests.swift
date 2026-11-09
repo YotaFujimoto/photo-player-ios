@@ -32,9 +32,8 @@ final class PlaybackGestureTests: XCTestCase {
             XCUIDevice.shared.orientation = orientation
             let surface = app.otherElements["videoSurface"]
             XCTAssertTrue(surface.isHittable)
-            app.sliders["seekSlider"].adjust(toNormalizedSliderPosition: 0)
-            // Slider adjustment is approximate; the explicit backward skip
-            // reaches the boundary before testing another skip at that boundary.
+            app.descendants(matching: .any)["seekSlider"].coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5)).tap()
+            // Reach the exact boundary before testing another skip there.
             surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).doubleTap()
             position(app, ["0:00"])
             surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).doubleTap()

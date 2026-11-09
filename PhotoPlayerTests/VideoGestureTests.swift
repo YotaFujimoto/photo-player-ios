@@ -14,7 +14,61 @@ private final class HoldStateFixture: UILongPressGestureRecognizer {
     }
 }
 
+private final class HorizontalStateFixture: HorizontalSeekGestureRecognizer {
+    private var suppliedState: UIGestureRecognizer.State = .possible
+    override var state: UIGestureRecognizer.State {
+        get { suppliedState }
+        set { suppliedState = newValue }
+    }
+}
+
 final class VideoGestureTests: XCTestCase {
+    @MainActor
+    func testHorizontalRecognitionAndCancellationDiscardLateEndOnResizeAndRemoval() {
+        let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
+        let window = UIWindow(frame: view.frame)
+        window.addSubview(view); view.layoutIfNeeded()
+        var begins = 0, commits = 0, cancels = 0
+        view.onSwipeBegan = { begins += 1; return true }
+        view.onSwipeEnded = { commits += 1 }
+        view.onSwipeCancelled = { cancels += 1 }
+        for resize in [true, false] {
+            let gesture = HorizontalStateFixture()
+            gesture.start(at: .zero)
+            gesture.move(to: CGPoint(x: 5, y: 2))
+            XCTAssertEqual(gesture.state, .possible)
+            gesture.move(to: CGPoint(x: 15, y: 2))
+            XCTAssertEqual(gesture.state, .began)
+            view.swiped(gesture)
+            if resize { view.frame.size.width = 600; view.layoutIfNeeded() }
+            else { view.removeFromSuperview() }
+            gesture.state = .ended; view.swiped(gesture)
+        }
+        XCTAssertEqual(begins, 2); XCTAssertEqual(cancels, 2); XCTAssertEqual(commits, 0)
+        let vertical = HorizontalStateFixture()
+        vertical.start(at: .zero); vertical.move(to: CGPoint(x: 2, y: 20))
+        XCTAssertEqual(vertical.state, .failed)
+        vertical.move(to: CGPoint(x: 50, y: 20))
+        XCTAssertEqual(vertical.state, .failed, "A rejected vertical contact cannot later become horizontal")
+    }
+
+    @MainActor
+    func testHorizontalCommitAndRejectionAreNotDuplicated() {
+        let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
+        view.layoutIfNeeded()
+        var accepted = true, commits = 0
+        view.onSwipeBegan = { accepted }
+        view.onSwipeEnded = { commits += 1 }
+        let gesture = HorizontalStateFixture()
+        gesture.state = .began; view.swiped(gesture)
+        gesture.state = .ended; view.swiped(gesture); view.swiped(gesture)
+        XCTAssertEqual(commits, 1)
+        accepted = false
+        gesture.state = .began; view.swiped(gesture)
+        gesture.state = .ended; view.swiped(gesture)
+        XCTAssertEqual(commits, 1)
+    }
+
     @MainActor
     func testHoldEndsOnReleaseCancellationFailureAndWindowRemoval() {
         let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
@@ -65,6 +119,6 @@ final class VideoGestureTests: XCTestCase {
         XCTAssertNil(view.onHoldEnded)
         XCTAssertEqual(view.doubleTap.numberOfTapsRequired, 2)
         XCTAssertEqual(Set(view.gestureRecognizers!.map(ObjectIdentifier.init)),
-                       Set([view.doubleTap, view.hold].map(ObjectIdentifier.init)))
+                       Set([view.doubleTap, view.hold, view.horizontal].map(ObjectIdentifier.init)))
     }
 }

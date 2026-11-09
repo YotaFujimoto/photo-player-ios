@@ -25,6 +25,10 @@ final class PlaybackModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var position = 0.0
     @Published private(set) var duration = 0.0
+    @Published private(set) var seekPreview: SeekPreview?
+    @Published private(set) var skipFeedback: SkipFeedback?
+    @Published private(set) var gestureCancellationID = 0
+    var displayedPosition: Double { seekPreview?.target ?? position }
     @Published private var speed = PlaybackSpeed()
     var selectedRate: Float { speed.selected }
     var isTemporaryDoubleRate: Bool { speed.isBoosting }
@@ -49,8 +53,7 @@ final class PlaybackModel: ObservableObject {
     private var seekQueue = SeekQueue()
     private var keepsPlaybackAtSkippedEnd = false
     private var isAtSkippedEnd: Bool { keepsPlaybackAtSkippedEnd && duration > 0 && position >= duration }
-    private var scrubbing = false
-    private var scrubTask: Task<Void, Never>?
+    private var feedbackTask: Task<Void, Never>?
     private var audioActive = false
     private var audioActivating = false
     private var audioRequest = UUID()
@@ -231,7 +234,7 @@ final class PlaybackModel: ObservableObject {
         let seconds = item.duration.seconds
         if seconds.isFinite && seconds > 0 { assign(\.duration, seconds) }
         assign(\.pictureSize, item.presentationSize)
-        if !scrubbing && !seekQueue.isBusy { assign(\.position, PlaybackPolicy.position(player.currentTime().seconds, duration: duration)) }
+        if seekPreview == nil && !seekQueue.isBusy { assign(\.position, PlaybackPolicy.position(player.currentTime().seconds, duration: duration)) }
         assign(\.bufferedUntil, item.loadedTimeRanges.map { CMTimeRangeGetEnd($0.timeRangeValue).seconds }
             .filter(\.isFinite).max() ?? 0)
         assign(\.actualRate, player.rate)
@@ -264,6 +267,8 @@ final class PlaybackModel: ObservableObject {
     }
 
     func pause() {
+        seekPreview = nil
+        gestureCancellationID += 1
         keepsPlaybackAtSkippedEnd = false
         speed.endHold()
         assign(\.wantsPlayback, false)
@@ -273,7 +278,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     private func resumeIfNeeded() {
-        guard wantsPlayback, isReady, !scrubbing, !seekQueue.isBusy else { return }
+        guard wantsPlayback, isReady, seekPreview == nil, !seekQueue.isBusy else { return }
         // At the boundary no frames remain. Retain the pre-skip play intent so
         // a subsequent backward skip resumes, without running beyond duration.
         if isAtSkippedEnd {
@@ -318,7 +323,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func beginTemporaryDoubleRate() {
-        speed.beginHold(isPlaying: wantsPlayback && isReady && !isSeeking && !scrubbing && player.timeControlStatus == .playing)
+        speed.beginHold(isPlaying: wantsPlayback && isReady && !isSeeking && seekPreview == nil && player.timeControlStatus == .playing)
         if speed.isBoosting { resumeIfNeeded(); trace("hold began") }
     }
 
@@ -330,15 +335,14 @@ final class PlaybackModel: ObservableObject {
     }
 
     func skip(forward: Bool) {
-        guard isReady, duration > 0, !scrubbing else { return }
+        guard isReady, duration > 0, seekPreview == nil else { return }
         speed.endHold()
         // While a seek is in flight, accumulate from its latest requested target.
         // Reading AVPlayer's old currentTime here would discard rapid double taps.
         let origin = seekQueue.isBusy ? position : player.currentTime().seconds
         let target = PlaybackPolicy.skip(from: origin, forward: forward, duration: duration)
-        keepsPlaybackAtSkippedEnd = wantsPlayback && target >= duration
-        position = target
-        enqueueSeek(position, exact: true)
+        commitSeek(target)
+        showFeedback(SkipFeedback(forward: forward, origin: PlaybackPolicy.position(origin, duration: duration), target: target, duration: duration))
     }
 
     func setVoicePitch(_ value: Bool) {
@@ -346,41 +350,69 @@ final class PlaybackModel: ObservableObject {
         player.currentItem?.audioTimePitchAlgorithm = value ? .timeDomain : .spectral
     }
 
-    func beginScrubbing() {
-        trace("scrub begin")
-        keepsPlaybackAtSkippedEnd = false
+    @discardableResult func beginScrubbing() -> Bool { beginPreview(.bar) }
+
+    private func beginPreview(_ source: SeekPreview.Source) -> Bool {
+        guard isReady, duration > 0, seekPreview == nil else { return false }
+        if source == .horizontal && speed.isBoosting { return false }
+        let origin = PlaybackPolicy.position(seekQueue.isBusy ? position : player.currentTime().seconds, duration: duration)
+        clearFeedback()
         speed.endHold()
-        scrubbing = true
+        seekPreview = SeekPreview(source: source, origin: origin, target: origin)
         player.pause()
+        trace("preview begin \(source)")
+        return true
     }
 
     func scrub(to seconds: Double) {
-        position = PlaybackPolicy.position(seconds, duration: duration)
-        guard scrubbing else { return }
-        if scrubTask == nil {
-            scrubTask = Task { @MainActor [weak self] in
-                do { try await Task.sleep(for: .milliseconds(120)) } catch { return }
-                guard let self, !Task.isCancelled else { return }
-                self.scrubTask = nil
-                self.enqueueSeek(self.position, exact: false)
-            }
-        }
+        guard var preview = seekPreview, preview.source == .bar else { return }
+        preview.target = PlaybackPolicy.position(seconds, duration: duration)
+        seekPreview = preview
     }
 
-    func endScrubbing() {
-        trace("scrub end")
-        scrubTask?.cancel()
-        scrubTask = nil
-        scrubbing = false
-        let pendingPreview = seekQueue.active?.exact == false
+    func endScrubbing() { commitPreview(.bar) }
+    func cancelScrubbing() { cancelPreview(.bar) }
+
+    @discardableResult func beginHorizontalSeek() -> Bool { beginPreview(.horizontal) }
+    func updateHorizontalSeek(translation: Double, width: Double) {
+        guard var preview = seekPreview, preview.source == .horizontal else { return }
+        preview.target = SeekInteractionPolicy.horizontalPosition(origin: preview.origin, translation: translation, width: width, duration: duration)
+        seekPreview = preview
+    }
+    func endHorizontalSeek() { commitPreview(.horizontal) }
+    func cancelHorizontalSeek() { cancelPreview(.horizontal) }
+
+    private func commitPreview(_ source: SeekPreview.Source) {
+        guard let preview = seekPreview, preview.source == source else { return }
+        seekPreview = nil
+        trace("preview commit \(source) target=\(preview.target)")
+        commitSeek(preview.target)
+    }
+    private func cancelPreview(_ source: SeekPreview.Source) {
+        guard let preview = seekPreview, preview.source == source else { return }
+        seekPreview = nil
+        position = seekQueue.isBusy ? preview.origin : PlaybackPolicy.position(player.currentTime().seconds, duration: duration)
+        resumeIfNeeded()
+    }
+    private func commitSeek(_ seconds: Double) {
+        position = PlaybackPolicy.position(seconds, duration: duration)
+        keepsPlaybackAtSkippedEnd = wantsPlayback && position >= duration
         enqueueSeek(position, exact: true)
-        // The released position supersedes a preview, so it must not wait for
-        // that preview to finish decoding. Cancellation delivers finished=false;
-        // the existing completion path then advances to the queued exact seek.
-        if pendingPreview {
-            trace("scrub commit cancels preview")
-            player.currentItem?.cancelPendingSeeks()
+    }
+
+    private func showFeedback(_ feedback: SkipFeedback) {
+        feedbackTask?.cancel()
+        skipFeedback = feedback
+        feedbackTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: SeekInteractionPolicy.feedbackDuration) } catch { return }
+            guard !Task.isCancelled, self?.skipFeedback?.id == feedback.id else { return }
+            self?.skipFeedback = nil
         }
+    }
+    private func clearFeedback() {
+        feedbackTask?.cancel()
+        feedbackTask = nil
+        skipFeedback = nil
     }
 
     private func enqueueSeek(_ seconds: Double, exact: Bool) {
@@ -404,7 +436,7 @@ final class PlaybackModel: ObservableObject {
                 if let next = self.seekQueue.finish() { self.performSeek(next) }
                 else {
                     self.isSeeking = false
-                    if !self.scrubbing { self.position = PlaybackPolicy.position(self.player.currentTime().seconds, duration: self.duration) }
+                    if self.seekPreview == nil { self.position = PlaybackPolicy.position(self.player.currentTime().seconds, duration: self.duration) }
                     if finished { self.resumeIfNeeded() }
                     else {
                         self.pause()
@@ -419,6 +451,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func suspend() {
+        clearFeedback()
         pause()
         if isLoading { cancelLoading() }
         deactivateAudio()
@@ -432,15 +465,14 @@ final class PlaybackModel: ObservableObject {
     }
 
     func close() {
+        clearFeedback()
         heldResult = nil
         isTestResultHeld = false
         session = UUID()
         requestGate.cancel()
         if let requestID { manager.cancelImageRequest(requestID) }
         requestID = nil
-        scrubTask?.cancel()
-        scrubTask = nil
-        scrubbing = false
+        seekPreview = nil
         seekQueue.cancel()
         player.currentItem?.cancelPendingSeeks()
         pause()
