@@ -15,8 +15,6 @@ if not phones:
 print(phones[0]["udid"])
 ')"
 printf 'Simulator: %s / iOS %s / %s\n' "$SIMULATOR_MODEL" "$SIMULATOR_OS" "$simulator_id" | tee build/simulator.log
-xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
-xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 
 # Export screenshots on test failure too, without losing the original failure status.
 export_test_evidence() {
@@ -36,9 +34,12 @@ export_test_evidence() {
 }
 trap export_test_evidence EXIT
 
-xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
-
+# Do not overlap cold compilation with the simulator's first boot/media import.
+# A launch-time diagnostic on the standard 7 GB VM showed sustained compressor
+# work while the app's main thread was idle. Bound compiler concurrency instead
+# of extending UI test deadlines or changing application behavior.
 xcodebuild build-for-testing \
+  -jobs 2 \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
   -configuration Release \
@@ -47,6 +48,21 @@ xcodebuild build-for-testing \
   -derivedDataPath build/simulator \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee build/test-build.log
+
+record_resources() {
+  {
+    printf '\nResource checkpoint: %s\n' "$1"
+    date -u
+    sysctl vm.swapusage
+    vm_stat
+    # Names and resource usage only; no arguments/environment/credentials.
+    ps -axo pid,ppid,pcpu,rss,comm | sort -k4 -nr | head -n 15
+  } >> build/resources.log 2>&1 || true
+}
+record_resources after-build
+xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
 
 # Grant read access on the synthetic simulator library before exercising the real PhotoKit path.
 xcrun simctl install "$simulator_id" build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayer.app
@@ -64,6 +80,7 @@ xcrun simctl get_app_container "$simulator_id" \
 run_tests() {
   local result_bundle=$1
   shift
+  record_resources "$result_bundle"
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
