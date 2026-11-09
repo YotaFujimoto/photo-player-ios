@@ -106,8 +106,10 @@ run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
 # Keep every case and deadline, and run each once on the same simulator.
-run_tests build/copy-results/SeekBar.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragHitAreaAndPlaybackIntentInBothOrientations"
-run_tests build/copy-results/SeekHorizontal.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipeDirectionPriorityAndHoldExclusionInBothOrientations"
+run_tests build/copy-results/SeekBarPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait"
+run_tests build/copy-results/SeekBarLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape"
+run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait"
+run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape"
 run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls"
 run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput"
 test_status=0
