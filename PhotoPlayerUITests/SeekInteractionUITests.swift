@@ -104,13 +104,16 @@ final class SeekInteractionUITests: XCTestCase {
         let right = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
         right.doubleTap()
         let feedback = app.staticTexts["skipFeedback"]
-        XCTAssertTrue(feedback.waitForExistence(timeout: 2))
+        // waitForExistence's first poll was 1.05s after the gesture in CI,
+        // after this deliberately one-second HUD had already expired. Query
+        // immediately after event synthesis instead of waiting a polling cycle.
+        XCTAssertTrue(feedback.exists)
         XCTAssertTrue(feedback.label.contains("+10s"))
         capture("skip-feedback-forward")
         position(app, near: 25)
         right.doubleTap(); position(app, near: 30, tolerance: 0)
         right.doubleTap()
-        XCTAssertTrue(feedback.waitForExistence(timeout: 2))
+        XCTAssertTrue(feedback.exists)
         XCTAssertEqual(feedback.label, "End")
         XCTAssertEqual(app.staticTexts.matching(identifier: "skipFeedback").count, 1)
         // Hit the overlay's side again: it must not intercept the gesture.
