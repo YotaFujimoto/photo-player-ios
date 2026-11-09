@@ -145,16 +145,25 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
         view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         XCTAssertTrue(play(app).waitForExistence(timeout: 3))
+        play(app).tap(); state(app, "Paused")
+        // Prepare coordinates/position while paused, when controls cannot
+        // expire. Accessibility lookup itself can consume the 3s deadline.
+        let canvas = view.frame
+        let windowOrigin = app.coordinate(withNormalizedOffset: .zero)
+        let holdPoint = windowOrigin.withOffset(CGVector(dx: canvas.midX, dy: canvas.minY + canvas.height * 0.3))
         let start = seconds(app), began = ProcessInfo.processInfo.systemUptime
-        view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).press(forDuration: 4)
+        play(app).tap()
+        holdPoint.press(forDuration: 4)
         XCTAssertTrue(play(app).exists, "A held gesture must suspend the hide timer")
         let extra = Double(seconds(app) - start) - (ProcessInfo.processInfo.systemUptime - began) * 0.25
         XCTAssertGreaterThan(extra, 4); XCTAssertLessThan(extra, 9)
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
-        app.revealPlayerControls()
-        let seek = bar(app)
-        seek.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.05,
-            thenDragTo: seek.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+        app.playerButton("playPause").tap(); state(app, "Paused")
+        let seek = bar(app).frame
+        let barStart = windowOrigin.withOffset(CGVector(dx: seek.minX + seek.width * 0.2, dy: seek.midY))
+        let barEnd = windowOrigin.withOffset(CGVector(dx: seek.midX, dy: seek.midY))
+        play(app).tap()
+        barStart.press(forDuration: 0.05, thenDragTo: barEnd,
             withVelocity: .slow, thenHoldForDuration: 4)
         XCTAssertTrue(play(app).exists, "Bar tracking must suspend the hide timer")
         state(app, "Playing")

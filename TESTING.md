@@ -22,11 +22,13 @@
 
 `8aea3916fe9dde5455908a19b977a07f6b60d002` / [run 42625462986](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42625462986) は単体60件・新しい全画面UI3件・IPA検査4件に成功。全画面の左右回転、ボタン押下／メニュー中の非表示抑止、隠れた状態のジェスチャー、背景復帰を通過した。既存PhotoKit再生UIは停止中の15.0秒シーク後にPausedへ戻らず失敗。詳細ログでは要求後のAVPlayer完了通知がなくSeekingが続いていた。原因は未確定で、待機上限や合格条件は変更しない。証跡は `build/evidence-42625462986/` と `build/diagnostics-42625462986-playback/`。操作部表示／非表示で同じ動画領域、速度メニューの位置と全6速度の表示は画像でも確認。メニューが動画側の白文字を継承して明るい背景で読みにくいため、メニューだけ標準の文字色を明示した。
 
-回転の補強途中の `8400e678a906abf25f7d4caace4613172ddf6d0c` / [run 42627023083](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42627023083) はコンパイル成功後、メニュー文字色を直した後続候補への切替で取消。試験成功・IPA取得とは扱わない。ログは `build/job-42627023083-clean.log` に保存した。最終候補 `61aa7c03342cdf897b590a6fc006bc53119ce3d5` / [run 42627624385](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42627624385) で全98件を検証中。
+回転の補強途中の `8400e678a906abf25f7d4caace4613172ddf6d0c` / [run 42627023083](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42627023083) はコンパイル成功後、メニュー文字色を直した後続候補への切替で取消。試験成功・IPA取得とは扱わない。ログは `build/job-42627023083-clean.log` に保存した。後続 `61aa7c03342cdf897b590a6fc006bc53119ce3d5` / [run 42627624385](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42627624385) の結果は次段落に記録する。
 
 `61aa7c0` / run 42627624385は単体61件・全画面UI3件・IPA検査4件に成功。180度反転時の表示再開と実AVPlayerの取消／速度保持も成功し、メニューの文字色改善を画像で確認した。既存再生UIでは動画選択前の初回セル照会が31秒以上ずつ停滞し、120秒上限でホストが再起動した。前回のシーク通知欠落と同一原因とは断定しない。シミュレーターの圧縮ページは単体前78,848から既存試験前99,026へ増加し、PhotosやAVPlayerの操作前にもAX照会が停止している。追加3UI群と既存回帰群の間で、同じシミュレーターのサービスを一度だけ再起動する境界を設ける。アプリ・写真素材・UserDefaultsは消去せず、各試験は1回、98件と全条件・個別上限を維持する。根本原因の確定やアプリ修正完了とは扱わない。証跡は `build/evidence-42627624385/` と `build/diagnostics-42627624385-playback/`。
 
 ### ビルド11の実機確認票（未実施）
+
+`a675111ba6f8a324c281277e4034d0ce087065d0` / [run 42631315633](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42631315633) は単体61件・全画面UI2件・IPA検査4件に成功し、Lifecycleの長押し後の表示確認で停止した。単タップ表示は14:14:04頃、実際のhold beganは14:14:10頃で、試験の座標照会中に3秒の表示期限が過ぎていた。長押しそのものは2倍へ移行して0.25倍へ復帰している。準備の座標・時刻取得を停止中に行い、再生開始直後に準備済みのwindow座標で長押し／バーを操作するよう試験を修正する。4秒押下、表示維持、速度／移動量のアサーションと自動非表示3秒は変えない。再起動境界へは未到達であり、その効果は未検証。証跡は `build/evidence-42631315633/` と `build/diagnostics-42631315633-fullscreen/`。
 
 削除せず同じ署名設定で更新し、短い端末内動画で確認する。初回にDiagnosticsでBuild 11・値12を確認する。長時間・素材別の再試験や旧一覧症状の反復は依頼しない。
 
