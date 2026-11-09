@@ -119,6 +119,9 @@ mkdir -p build/copy-results
 # Validate the input under investigation first. On failure retain its evidence
 # immediately; a successful candidate still runs every test exactly once.
 run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
+run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
+run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndSpeedMenuOwnership"
+run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
@@ -134,6 +137,7 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
   "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
+  "-skip-testing:PhotoPlayerUITests/FullscreenUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \

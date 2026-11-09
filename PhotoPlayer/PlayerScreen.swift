@@ -7,7 +7,9 @@ struct PlayerScreen: View {
     let selectionTrace: SelectionTrace?
     let selectionOperation: Int?
     @StateObject private var model: PlaybackModel
+    @StateObject private var chrome = PlaybackChrome()
     @State private var diagnostics: Bool
+    @State private var rateMenuVisible = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -20,65 +22,56 @@ struct PlayerScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button {
-                    selectionTrace?.controlAction("player.close")
-                    if let selectionOperation { selectionTrace?.closeRequested(selectionOperation) }
-                    model.close(); dismiss()
-                } label: {
-                    Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
-                }
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("closePlayer")
-                .background {
-                    if let selectionTrace {
-                        ContactProbe(number: 0, trace: selectionTrace, control: "player.close").allowsHitTesting(false)
-                    }
-                }
-                Spacer()
-                VStack(spacing: 2) {
-                    Text(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback").font(.headline)
-                        .accessibilityIdentifier("selectedVideo")
-                        .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
-                    if diagnostics {
-                        Text("\(Int(model.pictureSize.width))x\(Int(model.pictureSize.height))")
-                            .font(.caption.monospacedDigit()).accessibilityIdentifier("loadedVideoSize")
-                    }
-                }
-                Spacer()
-                Button {
-                    selectionTrace?.controlAction("player.diagnostics")
-                    diagnostics.toggle()
-                } label: {
-                    Image(systemName: "info.circle").frame(width: 44, height: 44).contentShape(Rectangle())
-                }
-                    .accessibilityLabel("Playback diagnostics")
-                    .accessibilityIdentifier("playerDiagnostics")
-                    .background {
-                        if let selectionTrace {
-                            ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false)
+        GeometryReader { geometry in
+            let fullscreen = geometry.size.width > geometry.size.height
+            Group {
+                if fullscreen {
+                    ZStack {
+                        // Only the canvas ignores safe areas. Controls retain the
+                        // GeometryReader's safe bounds, including camera/home areas.
+                        picture(fullscreen: true).ignoresSafeArea()
+                        if chrome.isVisible {
+                            VStack(spacing: 0) {
+                                header
+                                    .background(LinearGradient(colors: [.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom))
+                                if diagnostics, let selectionTrace {
+                                    ScrollView { SelectionTracePanel(trace: selectionTrace, location: "player") }
+                                        .frame(maxHeight: min(90, geometry.size.height * 0.25))
+                                        .background(.black.opacity(0.65))
+                                }
+                                Spacer(minLength: 0)
+                                Group {
+                                    if diagnostics {
+                                        ScrollView { controls(fullscreen: true) }
+                                            .frame(maxHeight: geometry.size.height * 0.5)
+                                    } else { controls(fullscreen: true) }
+                                }.padding(12)
+                                    .background(LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .top, endPoint: .bottom))
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 4)
+                            .foregroundStyle(.white).tint(.white)
+                            .transition(.opacity)
                         }
-                    }
-            }.padding(.horizontal)
-            if diagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace, location: "player") }
-            GeometryReader { geometry in
-                if geometry.size.width > geometry.size.height {
-                    HStack(spacing: 0) {
-                        picture.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        ScrollView { controls.padding() }.frame(width: min(280, geometry.size.width * 0.35))
-                    }
+                    }.background(.black)
+                        .animation(.easeOut(duration: 0.18), value: chrome.isVisible)
                 } else {
                     VStack(spacing: 0) {
-                        picture.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        header
+                        if diagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace, location: "player") }
+                        picture(fullscreen: false).frame(maxWidth: .infinity, maxHeight: .infinity)
                         if diagnostics {
-                            ScrollView { controls.padding() }.frame(maxHeight: geometry.size.height * 0.5)
-                        } else { controls.padding() }
+                            ScrollView { controls(fullscreen: false).padding() }
+                                .frame(maxHeight: geometry.size.height * 0.5)
+                        } else { controls(fullscreen: false).padding() }
                     }
                 }
             }
+            .statusBarHidden(fullscreen)
+            .onAppear { configureLayout(fullscreen: fullscreen) }
+            .onChange(of: geometry.size) { _, _ in configureLayout(fullscreen: fullscreen) }
         }
         .onAppear {
+            chrome.setActive(scenePhase == .active)
             if let selectionOperation { selectionTrace?.appear(selectionOperation) }
             model.onLoadEvent = { [weak selectionTrace, selectionOperation] event in
                 if let selectionOperation { selectionTrace?.loadEvent(event, operation: selectionOperation) }
@@ -86,41 +79,87 @@ struct PlayerScreen: View {
             model.load()
         }
         .onDisappear {
+            chrome.setActive(false); rateMenuVisible = false
             model.close()
             if let selectionOperation { selectionTrace?.disappear(selectionOperation) }
         }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { model.suspend() } }
+        .onChange(of: model.showsPauseControl) { _, playing in chrome.playback(playing: playing) }
+        .onChange(of: model.isSeeking) { _, seeking in chrome.block(.seeking, active: seeking) }
+        .onChange(of: model.isReady) { _, _ in refreshAvailability() }
+        .onChange(of: model.errorMessage) { _, _ in refreshAvailability() }
+        .onChange(of: diagnostics) { _, value in chrome.block(.diagnostics, active: value) }
+        .onChange(of: scenePhase) { _, phase in
+            chrome.setActive(phase == .active)
+            rateMenuVisible = false
+            if phase != .active { model.suspend() }
+            else { refreshChrome() }
+        }
     }
 
-    private var picture: some View {
-        PlayerSurface(model: model)
+    private func configureLayout(fullscreen: Bool) {
+        rateMenuVisible = false
+        chrome.layout(fullscreen: fullscreen)
+        refreshChrome()
+    }
+    private func refreshChrome() {
+        chrome.playback(playing: model.showsPauseControl)
+        chrome.block(.diagnostics, active: diagnostics)
+        chrome.block(.seeking, active: model.isSeeking)
+        refreshAvailability()
+    }
+    private func refreshAvailability() {
+        chrome.block(.unavailable, active: !model.isReady || model.errorMessage != nil)
+    }
+
+    private var header: some View {
+        HStack {
+            Button {
+                selectionTrace?.controlAction("player.close")
+                if let selectionOperation { selectionTrace?.closeRequested(selectionOperation) }
+                chrome.setActive(false); rateMenuVisible = false
+                model.close(); dismiss()
+            } label: {
+                Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Close").accessibilityIdentifier("closePlayer")
+            .background {
+                if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.close").allowsHitTesting(false) }
+            }
+            Spacer()
+            VStack(spacing: 2) {
+                Text(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback").font(.headline)
+                    .accessibilityIdentifier("selectedVideo")
+                    .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
+                if diagnostics {
+                    Text("\(Int(model.pictureSize.width))x\(Int(model.pictureSize.height))")
+                        .font(.caption.monospacedDigit()).accessibilityIdentifier("loadedVideoSize")
+                }
+            }
+            Spacer()
+            Button {
+                selectionTrace?.controlAction("player.diagnostics")
+                chrome.activity(); diagnostics.toggle()
+            } label: {
+                Image(systemName: "info.circle").frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Playback diagnostics").accessibilityIdentifier("playerDiagnostics")
+            .background {
+                if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false) }
+            }
+        }.padding(.horizontal)
+    }
+
+    private func picture(fullscreen: Bool) -> some View {
+        PlayerSurface(model: model, fullscreen: fullscreen, onSingleTap: chrome.singleTap,
+                      onActivity: chrome.activity, onInteractionChanged: { chrome.block(.videoGesture, active: $0) })
+        .overlay { SeekFeedbackOverlay(preview: model.seekPreview, skip: model.skipFeedback) }
         .overlay {
-            if let preview = model.seekPreview, preview.source == .horizontal {
-                VStack(spacing: 4) {
-                    Text(PlaybackPolicy.clock(preview.target)).font(.title2.monospacedDigit())
-                    Text(preview.difference).font(.headline.monospacedDigit())
-                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityElement(children: .combine).accessibilityIdentifier("seekPreview")
-                    .allowsHitTesting(false)
-            } else if model.isTemporaryDoubleRate {
+            if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)
                     .background(.regularMaterial, in: Capsule()).allowsHitTesting(false)
                     .accessibilityIdentifier("temporaryRate")
             }
         }
-        .overlay {
-            if let feedback = model.skipFeedback {
-                HStack {
-                    if feedback.forward { Spacer(minLength: 0) }
-                    VStack(spacing: 4) {
-                        Image(systemName: feedback.forward ? "forward.fill" : "backward.fill").accessibilityHidden(true)
-                        Text(feedback.text).font(.headline.monospacedDigit()).accessibilityIdentifier("skipFeedback")
-                    }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(20)
-                    if !feedback.forward { Spacer(minLength: 0) }
-                }.allowsHitTesting(false).transition(.opacity)
-            }
-        }
-        .animation(.easeOut(duration: 0.15), value: model.skipFeedback == nil)
         .overlay {
             if model.isLoading {
                 VStack(spacing: 12) {
@@ -129,16 +168,14 @@ struct PlayerScreen: View {
                         .accessibilityIdentifier("videoLoading")
                     if ProcessInfo.processInfo.arguments.contains("--hold-player-result") {
                         Button("Release test result") { model.releaseTestResult() }
-                            .disabled(!model.isTestResultHeld)
-                            .accessibilityIdentifier("releasePlayerResult")
+                            .disabled(!model.isTestResultHeld).accessibilityIdentifier("releasePlayerResult")
                     }
                     Button("Cancel") { model.cancelLoading() }.accessibilityIdentifier("cancelDownload")
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
             } else if let error = model.errorMessage {
                 VStack(spacing: 12) {
                     Text(error).font(.callout)
-                    Button("Retry") { model.load() }.buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("retryVideo")
+                    Button("Retry") { model.load() }.buttonStyle(.borderedProminent).accessibilityIdentifier("retryVideo")
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
             } else if !model.isReady { ProgressView().tint(.white) }
         }
@@ -151,16 +188,29 @@ struct PlayerScreen: View {
         .background(.black)
     }
 
-    private var controls: some View {
+    private func controls(fullscreen: Bool) -> some View {
         VStack(spacing: 12) {
             PlaybackTransportControls(state: PlaybackTransportState(
                 position: model.displayedPosition, duration: model.duration, isReady: model.isReady,
                 canPlaySlow: model.canPlaySlow, showsPause: model.showsPauseControl,
                 selectedRate: model.selectedRate, stateText: model.stateText,
-                cancellationID: model.gestureCancellationID), diagnostics: diagnostics,
-                actions: PlaybackTransportActions(begin: { model.beginScrubbing() }, change: model.scrub,
-                    commit: model.endScrubbing, cancel: model.cancelScrubbing,
-                    togglePlayback: model.togglePlayback, setRate: model.setRate))
+                cancellationID: model.gestureCancellationID), diagnostics: diagnostics, fullscreen: fullscreen,
+                ratePresentation: Binding(get: { rateMenuVisible }, set: {
+                    rateMenuVisible = $0; chrome.block(.speedMenu, active: $0)
+                }),
+                actions: PlaybackTransportActions(begin: {
+                    let accepted = model.beginScrubbing()
+                    if accepted { chrome.block(.bar, active: true) }
+                    return accepted
+                }, change: model.scrub, commit: {
+                    model.endScrubbing(); chrome.block(.bar, active: false)
+                }, cancel: {
+                    model.cancelScrubbing(); chrome.block(.bar, active: false)
+                }, togglePlayback: {
+                    chrome.activity(); model.togglePlayback()
+                }, setRate: {
+                    chrome.activity(); model.setRate($0)
+                }))
             if diagnostics {
                 DisclosureGroup("Playback details") {
                     VStack(alignment: .leading, spacing: 10) {

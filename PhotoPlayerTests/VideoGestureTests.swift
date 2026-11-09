@@ -22,7 +22,32 @@ private final class HorizontalStateFixture: HorizontalSeekGestureRecognizer {
     }
 }
 
+private final class TapStateFixture: UITapGestureRecognizer {
+    private var suppliedState: UIGestureRecognizer.State = .possible
+    override var state: UIGestureRecognizer.State {
+        get { suppliedState }
+        set { suppliedState = newValue }
+    }
+}
+
 final class VideoGestureTests: XCTestCase {
+    @MainActor func testSingleTapIsFullscreenOnlyAndTeardownClearsCallbacks() {
+        let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 600, height: 320))
+        var taps = 0, interactions: [Bool] = []
+        view.onSingleTap = { taps += 1 }
+        view.onInteractionChanged = { interactions.append($0) }
+        let tap = TapStateFixture(); tap.state = .ended
+        view.singleTapped(tap); XCTAssertEqual(taps, 0)
+        view.singleTap.isEnabled = true
+        tap.state = .failed; view.singleTapped(tap); XCTAssertEqual(taps, 0)
+        tap.state = .ended; view.singleTapped(tap); XCTAssertEqual(taps, 1)
+        let held = HoldStateFixture(); held.state = .began; view.held(held)
+        XCTAssertEqual(interactions, [true])
+        view.cancelGestures(); XCTAssertEqual(interactions, [true, false])
+        XCTAssertEqual(view.playerLayer.videoGravity, .resizeAspect)
+        PlayerSurface.dismantleUIView(view, coordinator: ())
+        XCTAssertNil(view.onSingleTap); XCTAssertNil(view.onInteractionChanged)
+    }
     @MainActor
     func testHorizontalRecognitionAndCancellationDiscardLateEndOnResizeAndRemoval() {
         let view = VideoGestureView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
@@ -119,6 +144,6 @@ final class VideoGestureTests: XCTestCase {
         XCTAssertNil(view.onHoldEnded)
         XCTAssertEqual(view.doubleTap.numberOfTapsRequired, 2)
         XCTAssertEqual(Set(view.gestureRecognizers!.map(ObjectIdentifier.init)),
-                       Set([view.doubleTap, view.hold, view.horizontal].map(ObjectIdentifier.init)))
+                       Set([view.singleTap, view.doubleTap, view.hold, view.horizontal].map(ObjectIdentifier.init)))
     }
 }

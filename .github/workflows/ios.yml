@@ -63,7 +63,7 @@ jobs:
       - name: Test persistence and PhotoKit playback on one iPhone simulator
         # Includes a cold Release build (~9 min) and the expanded UI suite.
         # Individual test deadlines and every assertion remain unchanged.
-        timeout-minutes: 35
+        timeout-minutes: 40
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
