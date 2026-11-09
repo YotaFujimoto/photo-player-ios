@@ -122,6 +122,16 @@ run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndSpeedMenuOwnership"
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
+# The added fullscreen group leaves a longer-lived simulator service session
+# before the existing regressions. Evidence showed 31s accessibility queries
+# before the first card tap, plus growing compressed memory across the group.
+# Establish one clean service boundary, not a retry or an application delay.
+# Keep this same device, installed app, Photos fixtures and UserDefaults intact.
+record_resources before-regression-reboot
+xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+record_resources after-regression-reboot
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
