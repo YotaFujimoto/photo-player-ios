@@ -480,3 +480,5 @@ run `42442902221` はUI試験の起動に成功したが、スクロール・画
 
 
 dbfc266 / run 42781769682は番号素材の生成後、回転メタデータの検査で停止。FFmpeg 9では旧rotateタグがdisplay matrixを作らないため、[公式のdisplay_rotation入力オプション](https://ffmpeg.org/ffmpeg.html)へ変更する。回転90度の実測検査は維持。コンパイル・XCTestには未到達。ログはbuild/failed-42781769682.log。
+
+ac88ed1 / run 42781965771は番号・回転・可変間隔素材の生成と検査を通過。SwiftコンパイルでUIImageViewサブクラスの初期化にframe引数が必要とのエラーが出たため、明示的なzero frame初期化へ修正する。XCTest未実行。ログはbuild/failed-42781965771.log。

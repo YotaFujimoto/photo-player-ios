@@ -81,7 +81,7 @@ final class FrameTimelineControl: UIControl {
 
 struct FrameTimeline: UIViewRepresentable {
     @ObservedObject var model: FrameExtractionModel
-    func makeUIView(context: Context) -> FrameTimelineControl { FrameTimelineControl() }
+    func makeUIView(context: Context) -> FrameTimelineControl { FrameTimelineControl(frame: .zero) }
     func updateUIView(_ view: FrameTimelineControl, context: Context) {
         view.onBegin = model.beginInteraction; view.onMove = model.move
         view.onEnd = model.finishInteraction; view.onCancel = model.cancelInteraction

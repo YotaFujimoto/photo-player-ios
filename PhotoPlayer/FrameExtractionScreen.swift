@@ -54,7 +54,7 @@ final class FramePreviewView: UIImageView {
 
 struct FramePreview: UIViewRepresentable {
     @ObservedObject var model: FrameExtractionModel
-    func makeUIView(context: Context) -> FramePreviewView { FramePreviewView() }
+    func makeUIView(context: Context) -> FramePreviewView { FramePreviewView(frame: .zero) }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: FramePreviewView, context: Context) -> CGSize? {
         guard let width = proposal.width, let height = proposal.height else { return nil }
         return CGSize(width: width, height: height)
