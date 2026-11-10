@@ -11,6 +11,12 @@ on:
       - 'scripts/**'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
+    inputs:
+      verification:
+        description: 'Full verification produces an IPA; frames checks produce evidence only.'
+        type: choice
+        options: [full, frames]
+        default: full
 
 permissions:
   contents: read
@@ -32,6 +38,7 @@ jobs:
       XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
       SIMULATOR_MODEL: iPhone 17
       SIMULATOR_OS: '27.0'
+      FRAME_CHECK_ONLY: ${{ inputs.verification == 'frames' && 'true' || 'false' }}
     defaults:
       run:
         shell: bash
@@ -70,9 +77,11 @@ jobs:
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
+        if: inputs.verification != 'frames'
         run: bash scripts/archive-ios.sh
 
       - name: Upload verified device IPA
+        if: inputs.verification != 'frames'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: PhotoPlayer-device-ipa

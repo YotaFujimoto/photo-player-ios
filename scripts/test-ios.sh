@@ -100,6 +100,18 @@ run_tests() {
   2>&1 | tee -a build/test.log
 }
 
+run_frame_ui() {
+  local frame_status=0
+  xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov
+  run_tests build/copy-results/FrameEndpoints.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testFixedWindowIndependentCursorAndEndpointButtons" || frame_status=$?
+  run_tests build/copy-results/FramePixelsGestures.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testEntryPixelsFrameStepsSwipeAndNormalGestureRestoration" || frame_status=$?
+  run_tests build/copy-results/FrameSaveLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || frame_status=$?
+  return "$frame_status"
+}
+
 # Keep clipboard/large accessibility-report cases in fresh test-host
 # sessions. The combined session previously stalled while terminating the app
 # between tests; Xcode's host restart allowed the remaining cases to pass.
@@ -120,6 +132,12 @@ mkdir -p build/copy-results
 # immediately; a successful candidate still runs every test exactly once.
 run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
+if [[ "${FRAME_CHECK_ONLY:-false}" == true ]]; then
+  # An explicitly requested diagnostic CI scope, never a distributable build.
+  # The workflow skips both archive and IPA upload in this mode.
+  run_frame_ui
+  exit 0
+fi
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
 run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
@@ -185,11 +203,5 @@ run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
   "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || test_status=$?
 # Import numbered frame material only after the original twelve/thirteen-video
 # selection regressions. Each frame UI case gets a fresh host on this same phone.
-xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov
-run_tests build/copy-results/FrameEndpoints.xcresult \
-  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testFixedWindowIndependentCursorAndEndpointButtons" || test_status=$?
-run_tests build/copy-results/FramePixelsGestures.xcresult \
-  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testEntryPixelsFrameStepsSwipeAndNormalGestureRestoration" || test_status=$?
-run_tests build/copy-results/FrameSaveLandscape.xcresult \
-  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || test_status=$?
+run_frame_ui || test_status=$?
 exit "$test_status"
