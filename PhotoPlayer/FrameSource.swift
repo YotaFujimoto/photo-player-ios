@@ -65,11 +65,11 @@ actor FrameSource: FrameProviding {
             try Task.checkCancellation()
             // A compressed buffer can contain several samples or a zero-sample
             // marker. Query each sample's PTS; do not treat a buffer as a frame.
-            let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]]
+            let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[String: Any]]
             for index in 0..<CMSampleBufferGetNumSamples(sample) {
                 try Task.checkCancellation()
                 if let attachments, index < attachments.count,
-                   attachments[index][kCMSampleAttachmentKey_DoNotDisplay] as? Bool == true { continue }
+                   attachments[index][kCMSampleAttachmentKey_DoNotDisplay as String] as? Bool == true { continue }
                 var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
                 guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr else {
                     throw FrameExportError.unsupported
