@@ -25,7 +25,8 @@ final class FrameSourceTests: XCTestCase {
         return value
     }
     func testThirtyFPSActualPixelsPreviewAndJPEGMatchEveryChosenFrame() async throws {
-        let source=FrameSource(input:FrameAsset(asset:try Self.asset("frames-30"),entry:CMTime(value:21,timescale:30),disallowed:false,fileStem:"synthetic"))
+        for name in ["frames-30", "frames-reordered"] {
+        let source=FrameSource(input:FrameAsset(asset:try Self.asset(name),entry:CMTime(value:21,timescale:30),disallowed:false,fileStem:"synthetic"))
         let times=try await source.catalogue()
         XCTAssertEqual(times.count,91); XCTAssertEqual(times.first,CMTime(value:21,timescale:30))
         let state=FrameSelection(times:times)
@@ -41,6 +42,7 @@ final class FrameSourceTests: XCTestCase {
             let jpeg=try XCTUnwrap(CGImageSourceCreateImageAtIndex(data,0,nil))
             XCTAssertEqual(jpeg.width,160); XCTAssertEqual(jpeg.height,96)
             XCTAssertEqual(try Self.number(jpeg),21+index)
+        }
         }
     }
     func testFractionalRateAndEndWindowUseExistingFrames() async throws {

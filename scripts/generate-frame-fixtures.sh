@@ -20,6 +20,9 @@ python3 scripts/numbered_frames.py 901 | ffmpeg -hide_banner -loglevel warning -
 ffmpeg -hide_banner -loglevel warning -y -display_rotation:v:0 90 -i build/frame-fixtures/frames-30.mov \
   -map 0:v -c copy build/frame-fixtures/frames-rotated.mov
 ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-30.mov \
+  -c:v libx264 -preset medium -crf 10 -pix_fmt yuv420p -g 30 -bf 2 -threads 2 \
+  build/frame-fixtures/frames-reordered.mov
+ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-30.mov \
   -vf "setpts='if(lt(N,45),N,45+(N-45)*2)/(30*TB)'" -fps_mode vfr \
   -c:v libx264 -preset ultrafast -crf 10 -pix_fmt yuv420p -threads 2 build/frame-fixtures/frames-variable.mov
 ffprobe -v error -show_streams -of json build/frame-fixtures/frames-rotated.mov > build/frame-fixtures/rotation.json

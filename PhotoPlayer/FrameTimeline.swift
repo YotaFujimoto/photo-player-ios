@@ -34,12 +34,12 @@ final class FrameTimelineControl: UIControl {
     override func draw(_ rect: CGRect) {
         guard let selection, let context = UIGraphicsGetCurrentContext() else { return }
         let y = bounds.midY
-        context.setFillColor(UIColor.white.withAlphaComponent(0.25).cgColor)
+        context.setFillColor(UIColor.label.resolvedColor(with: traitCollection).withAlphaComponent(0.25).cgColor)
         context.fill(CGRect(x: 10, y: y - 2, width: max(0, bounds.width - 20), height: 4))
         let start = x(selection.start, selection), end = x(selection.end, selection)
         context.setFillColor(UIColor.systemBlue.withAlphaComponent(0.65).cgColor)
         context.fill(CGRect(x: start, y: y - 6, width: max(1, end - start), height: 12))
-        context.setFillColor(UIColor.white.cgColor)
+        context.setFillColor(UIColor.label.resolvedColor(with: traitCollection).cgColor)
         for index in selection.indices { context.fill(CGRect(x: x(index, selection) - 0.5, y: y - 3, width: 1, height: 6)) }
         for edge in [start, end] { context.fill(CGRect(x: edge - 1, y: y - 10, width: 2, height: 20)) }
         context.fillEllipse(in: CGRect(x: x(selection.position, selection) - 6, y: y - 6, width: 12, height: 12))

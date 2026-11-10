@@ -95,6 +95,7 @@ final class FrameExtractionModelTests: XCTestCase {
         let files=writer.batches[0].map(\.url)
         XCTAssertTrue(files.allSatisfy { FileManager.default.fileExists(atPath:$0.path) })
         XCTAssertFalse(model.canClose); model.close(); XCTAssertEqual(model.phase,.saving)
+        model.backgrounded(); XCTAssertEqual(model.phase,.saving)
         XCTAssertEqual(model.savedCount,0)
         writer.complete()
         try await wait { model.phase == .saved }
