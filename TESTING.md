@@ -478,3 +478,5 @@ run `42442902221` はUI試験の起動に成功したが、スクロール・画
 
 ビルド12の初回CI: 6456bcb / run 42781458378はIPA検査4件・メディア方針検査を通過後、標準FFmpegにdrawtextがなく合成素材生成で停止。アプリのコンパイル・XCTestは未実行。番号画像を標準Pythonだけで描き、RGBをFFmpegへ流す方式へ修正する。画素によるフレーム照合条件は維持。ログはbuild/failed-42781458378.log。
 
+
+dbfc266 / run 42781769682は番号素材の生成後、回転メタデータの検査で停止。FFmpeg 9では旧rotateタグがdisplay matrixを作らないため、[公式のdisplay_rotation入力オプション](https://ffmpeg.org/ffmpeg.html)へ変更する。回転90度の実測検査は維持。コンパイル・XCTestには未到達。ログはbuild/failed-42781769682.log。
