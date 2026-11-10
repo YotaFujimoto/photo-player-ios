@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build:
     runs-on: xcode-27
-    timeout-minutes: 70
+    timeout-minutes: 80
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       EXPECTED_XCODE_VERSION: '27.1'
@@ -71,9 +71,10 @@ jobs:
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
         # Includes a cold Release build, 30 serial test hosts and evidence export.
-        # The 40-minute job stopped after 87 passing tests with eight still pending.
+        # The 60-minute step stopped after 130 passing tests as the last HDR UI
+        # host started. Reserve time for the complete suite and evidence export.
         # Individual 120/180-second deadlines and every assertion remain unchanged.
-        timeout-minutes: 60
+        timeout-minutes: 70
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
