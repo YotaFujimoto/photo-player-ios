@@ -8,7 +8,9 @@ extension XCUIApplication {
         if !play.exists {
             otherElements.matching(identifier: "videoSurface").firstMatch
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            XCTAssertTrue(play.waitForExistence(timeout: 3))
+            // The tap synchronizes the UI; avoid the one-second first polling
+            // interval spending a third of the real auto-hide window.
+            XCTAssertTrue(play.exists)
         }
     }
     @MainActor func playerButton(_ identifier: String) -> XCUIElement {

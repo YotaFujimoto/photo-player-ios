@@ -46,6 +46,8 @@
 
 次の切り分けではCIの30秒合成動画のキーフレーム間隔を、未指定のエンコーダ既定値から明示的な2秒へ変更する。[Appleはsample-accurate seekに追加のデコード遅延があり得ると説明](https://developer.apple.com/documentation/avfoundation/avplayer/seek(to:tolerancebefore:toleranceafter:completionhandler:))している。[FFmpegのGOP設定](https://github.com/FFmpeg/FFmpeg/blob/master/doc/encoders.texi)を用い、旧形式も生成して両者の全300フレーム・キーフレーム時刻を `fixture-seek-info.json` に実測記録する。H.264のフレーム間圧縮・同じAAC音声・解像度・長さ・fpsを保持し、15秒をキーフレームにせず、途中位置の正確なシークを引き続き検証する。99件の精度・時間上限・アサーションは維持するが、素材の条件が変わることを明記する。これはUI試験のデコード負荷を明示する切り分けであり、過去の原因確定、長いGOPの解消、実機素材への合格拡張ではない。
 
+`ce38ec26091e937abbad9323f088a4ae2c34445b` / [run 42754587906](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42754587906) では、元素材は0・25秒、新素材は0から2秒ごとのキーフレームで、両方300フレームと実測した。単体61・Canvas UI1・IPA検査4に成功。Chrome UIは単タップで表示した後、存在待ちの最初の照会に1.1秒を使い、35.35秒の単タップに対して再生ボタンの入力合成は38.51秒となった。3秒の期限後も再生が続いて停止確認に失敗。今回はシークの完了記録があり、前のシーク通知欠落とは区別する。短いHUD試験と同様、タップの同期完了直後に `exists` を確認し、そのままボタンを押す手順へ変更する。表示存在・停止状態・移動量等のアサーションは維持し、アプリの時間設定と入力処理は変更しない。素材変更で既存バー回帰が解消したかは未到達のため未判定。証跡は `build/evidence-42754587906/`、`build/failed-42754587906.log`、`build/diagnostics-42754587906-chrome/`。
+
 ### ビルド11の実機確認票（未実施）
 
 削除せず同じ署名設定で更新し、短い端末内動画で確認する。初回にDiagnosticsでBuild 11・値12を確認する。長時間・素材別の再試験や旧一覧症状の反復は依頼しない。
