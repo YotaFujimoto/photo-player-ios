@@ -103,9 +103,11 @@ final class FrameExtractionUITests: XCTestCase {
     }
 
     @MainActor func testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused() {
-        let app=open(); enter(app)
+        let app=open()
         defer { XCUIDevice.shared.orientation = .portrait }
         XCUIDevice.shared.orientation = .landscapeLeft
+        enter(app)
+        XCUIDevice.shared.orientation = .landscapeRight
         let preview=element(app,"framePreview")
         expect(preview,NSPredicate { object,_ in
             guard let item=object as? XCUIElement else { return false }
@@ -131,10 +133,21 @@ final class FrameExtractionUITests: XCTestCase {
         let success=element(app,"frameSaveSuccess")
         XCTAssertTrue(success.waitForExistence(timeout:30))
         XCTAssertEqual(success.label,"Saved 10 photos.")
+        let noticeFrame=success.frame
+        XCTAssertGreaterThan(noticeFrame.height,0)
+        XCTAssertFalse(noticeFrame.intersects(element(app,"selectedVideo").frame))
         value(app,"videoSurface","Paused")
         XCTAssertEqual(app.playerButton("rateMenu").value as? String,"0.25×")
         XCTAssertFalse(element(app,"frameTimeline").exists)
         capture("frame-save-returned-paused")
+        // Enter on one side, leave on the other, then rotate 180 degrees after
+        // auto-hide. The normal player must not retain the old entry orientation.
+        let play=app.buttons.matching(identifier:"playPause").firstMatch
+        play.tap(); value(app,"videoSurface","Playing")
+        expect(play,NSPredicate(format:"exists == false"))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        expect(play,NSPredicate(format:"exists == true"))
+        play.tap(); value(app,"videoSurface","Paused")
     }
 
     /// Decode the generated video's eight binary blocks from displayed pixels,

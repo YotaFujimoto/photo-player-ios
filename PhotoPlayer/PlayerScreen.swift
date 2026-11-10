@@ -32,6 +32,7 @@ struct PlayerScreen: View {
                     let time = extraction.displayedTime ?? extraction.entryTime
                     extraction.close()
                     self.extraction = nil
+                    lastDeviceOrientation = UIDevice.current.orientation
                     chrome.setActive(scenePhase == .active)
                     model.returnFromFrames(at: time)
                     if count > 0 { saveNotice = "Saved \(count) \(count == 1 ? "photo" : "photos")." }
@@ -196,7 +197,8 @@ struct PlayerScreen: View {
         .overlay(alignment: .top) {
             if let saveNotice {
                 Text(saveNotice).font(.callout).padding(10)
-                    .background(.regularMaterial, in: Capsule()).padding(8)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.horizontal, 8).padding(.top, fullscreen ? 60 : 8)
                     .accessibilityIdentifier("frameSaveSuccess").allowsHitTesting(false)
                     .task(id: saveNotice) {
                         do { try await Task.sleep(for: .seconds(3)) } catch { return }

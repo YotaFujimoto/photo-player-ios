@@ -93,12 +93,7 @@ actor FrameSource: FrameProviding {
                 }
             }
         }
-        let first = times.lastIndex { $0.seconds <= entry + 0.000001 } ?? 0
-        let start = times[first]
-        let end = CMTimeAdd(start, CMTime(value: 3, timescale: 1))
-        let window = times[first...].filter { CMTimeCompare($0, end) <= 0 }
-        guard !window.isEmpty else { throw FrameExportError.noFrames }
-        return Array(window)
+        return try FrameSelection.window(times, entry: entry)
     }
 
     func image(at time: CMTime, fullSize: Bool = false) async throws -> FrameImage {

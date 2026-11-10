@@ -13,6 +13,14 @@ struct FrameSelection: Sendable {
         self.times = times
         end = times.count - 1
     }
+    static func window(_ measured: [CMTime], entry: Double) throws -> [CMTime] {
+        // Missing timing before the entry must never silently move W0 forward.
+        guard let first = measured.lastIndex(where: { $0.seconds <= entry + 0.000001 }) else {
+            throw FrameExportError.unsupported
+        }
+        let end = CMTimeAdd(measured[first], CMTime(value: 3, timescale: 1))
+        return Array(measured[first...].filter { CMTimeCompare($0, end) <= 0 })
+    }
     var canSetStart: Bool { position <= end }
     var canSetEnd: Bool { position >= start }
     mutating func show(_ index: Int) { position = min(max(index, 0), times.count - 1) }
