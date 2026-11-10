@@ -33,6 +33,7 @@ test -n "$xcodegen_bin"
 chmod +x "$xcodegen_bin"
 test "$("$xcodegen_bin" --version)" = "Version: $XCODEGEN_VERSION"
 "$xcodegen_bin" --version | tee -a build/toolchain.txt
+mkdir -p build/frame-fixtures
 "$xcodegen_bin" generate --spec project.yml
 
 cat build/toolchain.txt >> "$GITHUB_STEP_SUMMARY"

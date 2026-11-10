@@ -150,6 +150,7 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
   "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
   "-skip-testing:PhotoPlayerUITests/FullscreenUITests" \
+  "-skip-testing:PhotoPlayerUITests/FrameExtractionUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \
@@ -182,4 +183,13 @@ run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
   "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentPortrait" || test_status=$?
 run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
   "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || test_status=$?
+# Import numbered frame material only after the original twelve/thirteen-video
+# selection regressions. Each frame UI case gets a fresh host on this same phone.
+xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov
+run_tests build/copy-results/FrameEndpoints.xcresult \
+  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testFixedWindowIndependentCursorAndEndpointButtons" || test_status=$?
+run_tests build/copy-results/FramePixelsGestures.xcresult \
+  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testEntryPixelsFrameStepsSwipeAndNormalGestureRestoration" || test_status=$?
+run_tests build/copy-results/FrameSaveLandscape.xcresult \
+  "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || test_status=$?
 exit "$test_status"

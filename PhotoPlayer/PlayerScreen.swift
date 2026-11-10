@@ -10,6 +10,8 @@ struct PlayerScreen: View {
     @StateObject private var chrome = PlaybackChrome()
     @State private var diagnostics: Bool
     @State private var rateMenuVisible = false
+    @State private var extraction: FrameExtractionModel?
+    @State private var saveNotice: String?
     @State private var lastDeviceOrientation = UIDeviceOrientation.unknown
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -25,6 +27,16 @@ struct PlayerScreen: View {
     var body: some View {
         GeometryReader { geometry in
             let fullscreen = geometry.size.width > geometry.size.height
+            if let extraction {
+                FrameExtractionScreen(model: extraction) { count in
+                    let time = extraction.displayedTime ?? extraction.entryTime
+                    extraction.close()
+                    self.extraction = nil
+                    chrome.setActive(scenePhase == .active)
+                    model.returnFromFrames(at: time)
+                    if count > 0 { saveNotice = "Saved \(count) \(count == 1 ? "photo" : "photos")." }
+                }
+            } else {
             Group {
                 if fullscreen {
                     ZStack {
@@ -78,6 +90,7 @@ struct PlayerScreen: View {
                 // A 180-degree landscape turn does not change geometry.size.
                 configureLayout(fullscreen: fullscreen)
             }
+            }
         }
         .onAppear {
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
@@ -92,6 +105,7 @@ struct PlayerScreen: View {
         .onDisappear {
             UIDevice.current.endGeneratingDeviceOrientationNotifications()
             chrome.setActive(false); rateMenuVisible = false
+            extraction?.close()
             model.close()
             if let selectionOperation { selectionTrace?.disappear(selectionOperation) }
         }
@@ -161,6 +175,17 @@ struct PlayerScreen: View {
             .background {
                 if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false) }
             }
+            Button {
+                guard let input = model.beginFrameExtraction() else { return }
+                rateMenuVisible = false; saveNotice = nil
+                chrome.setActive(false)
+                extraction = FrameExtractionModel(source: FrameSource(input: input), fileStem: input.fileStem, entryTime: input.entry)
+            } label: {
+                Image(systemName: "photo.badge.plus").frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Save frames").accessibilityIdentifier("extractFrames")
+            .disabled(!model.isReady || model.isSeeking || model.seekPreview != nil)
+            .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("extractFrames"), active: $0) }))
         }.padding(.horizontal)
     }
 
@@ -168,6 +193,17 @@ struct PlayerScreen: View {
         PlayerSurface(model: model, fullscreen: fullscreen, onSingleTap: chrome.singleTap,
                       onActivity: chrome.activity, onInteractionChanged: { chrome.block(.videoGesture, active: $0) })
         .overlay { SeekFeedbackOverlay(preview: model.seekPreview, skip: model.skipFeedback) }
+        .overlay(alignment: .top) {
+            if let saveNotice {
+                Text(saveNotice).font(.callout).padding(10)
+                    .background(.regularMaterial, in: Capsule()).padding(8)
+                    .accessibilityIdentifier("frameSaveSuccess").allowsHitTesting(false)
+                    .task(id: saveNotice) {
+                        do { try await Task.sleep(for: .seconds(3)) } catch { return }
+                        self.saveNotice = nil
+                    }
+            }
+        }
         .overlay {
             if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)

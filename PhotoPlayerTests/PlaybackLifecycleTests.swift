@@ -7,6 +7,27 @@ import AVFoundation
 /// Exercise teardown while the boost is actually active, without a human holding a finger.
 final class PlaybackLifecycleTests: XCTestCase {
     @MainActor
+    func testFrameModePausesAndReturnsAtMeasuredTimeWithSelectedSpeed() async throws {
+        let model = try makeModel()
+        defer { model.close() }
+        model.load()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.setRate(0.25)
+        let input = try XCTUnwrap(model.beginFrameExtraction())
+        XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.selectedRate,0.25)
+        let source=FrameSource(input:input)
+        let times=try await source.catalogue()
+        let chosen=try XCTUnwrap(times.last)
+        model.returnFromFrames(at:chosen)
+        try await wait { !model.isSeeking }
+        XCTAssertEqual(model.player.currentTime().seconds,chosen.seconds,accuracy:0.0001)
+        XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.selectedRate,0.25)
+        model.togglePlayback()
+        try await wait { model.player.timeControlStatus == .playing }
+        model.beginTemporaryDoubleRate(); XCTAssertEqual(model.player.rate,2)
+        model.endTemporaryDoubleRate(); XCTAssertEqual(model.player.rate,0.25)
+    }
+    @MainActor
     func testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek() async throws {
         let model = try makeModel()
         defer { model.close() }

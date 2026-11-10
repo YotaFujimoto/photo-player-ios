@@ -79,6 +79,7 @@ struct RequestGate {
 struct SeekRequest: Equatable {
     let seconds: Double
     let exact: Bool
+    var timescale: Int32 = 600
 }
 
 /// One in-flight seek; only the most recent pending position is retained.

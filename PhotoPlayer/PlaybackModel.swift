@@ -415,9 +415,9 @@ final class PlaybackModel: ObservableObject {
         skipFeedback = nil
     }
 
-    private func enqueueSeek(_ seconds: Double, exact: Bool) {
+    private func enqueueSeek(_ seconds: Double, exact: Bool, timescale: Int32 = 600) {
         guard isReady, duration > 0 else { return }
-        let request = SeekRequest(seconds: PlaybackPolicy.position(seconds, duration: duration), exact: exact)
+        let request = SeekRequest(seconds: PlaybackPolicy.position(seconds, duration: duration), exact: exact, timescale: timescale)
         player.pause()
         isSeeking = true
         if let next = seekQueue.enqueue(request) { performSeek(next) }
@@ -436,7 +436,7 @@ final class PlaybackModel: ObservableObject {
         trace("seek start \(request.seconds), exact=\(request.exact)")
         let diagnostics = ProcessInfo.processInfo.arguments.contains("--playback-diagnostics")
         let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
-        player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: 600), toleranceBefore: tolerance, toleranceAfter: tolerance) {
+        player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: request.timescale), toleranceBefore: tolerance, toleranceAfter: tolerance) {
             @Sendable [weak self] finished in
             if diagnostics { print("Playback: seek callback received finished=\(finished)") }
             Task { @MainActor in
@@ -456,6 +456,28 @@ final class PlaybackModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func beginFrameExtraction() -> FrameAsset? {
+        guard isReady, !isSeeking, seekPreview == nil, let item = player.currentItem else { return nil }
+        clearFeedback()
+        pause()
+        let entry = player.currentTime()
+        let resources = PHAssetResource.assetResources(for: asset)
+        let edited = resources.contains { $0.type == .adjustmentData || $0.type == .adjustmentBaseVideo }
+        let unsupported = edited || asset.mediaSubtypes.contains(.videoHighFrameRate) ||
+            asset.mediaSubtypes.contains(.videoTimelapse) || item.videoComposition != nil
+        let name = resources.first { $0.type == .video }?.originalFilename
+        return FrameAsset(asset: item.asset, entry: entry, disallowed: unsupported,
+                          fileStem: FrameFileName.stem(original: name, identifier: asset.localIdentifier))
+    }
+
+    func returnFromFrames(at time: CMTime) {
+        pause()
+        guard time.isNumeric else { return }
+        // Preserve the measured time base (e.g. 30000 for 29.97 fps) on return.
+        position = time.seconds
+        enqueueSeek(time.seconds, exact: true, timescale: time.timescale)
     }
 
     func cancelInteractionForRotation() {

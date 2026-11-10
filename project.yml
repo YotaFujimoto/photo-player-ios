@@ -38,6 +38,9 @@ targets:
     platform: iOS
     sources:
       - path: PhotoPlayerTests
+      - path: build/frame-fixtures
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: PhotoPlayer
     settings:
