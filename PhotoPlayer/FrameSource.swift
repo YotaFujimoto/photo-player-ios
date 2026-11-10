@@ -142,14 +142,11 @@ actor FrameSource: FrameProviding {
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[String: Any]]
-            for index in 0..<CMSampleBufferGetNumSamples(sample) {
+            let outputTimes = try FrameTiming.outputTimes(sample)
+            for (index, time) in outputTimes.enumerated() {
                 try Task.checkCancellation()
                 if let attachments, index < attachments.count,
                    attachments[index][kCMSampleAttachmentKey_DoNotDisplay as String] as? Bool == true { continue }
-                var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
-                guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr,
-                      timing.presentationTimeStamp.isNumeric else { throw FrameExportError.invalidTiming }
-                let time = timing.presentationTimeStamp
                 if time.seconds >= lower, CMTimeCompare(time, duration) < 0, time.seconds <= upper { times.append(time) }
                 guard times.count <= 4096 else { throw FrameExportError.tooManyFrames }
             }

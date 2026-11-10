@@ -19,7 +19,7 @@ final class FrameSourceTests: XCTestCase {
             guard let sample = output.copyNextSampleBuffer() else { break }
             var timing = CMSampleTimingInfo()
             CMSampleBufferGetSampleTimingInfo(sample, at: 0, timingInfoOut: &timing)
-            print("Synthetic sample", CMSampleBufferGetPresentationTimeStamp(sample), timing,
+            print("Synthetic sample", CMSampleBufferGetPresentationTimeStamp(sample), "output", CMSampleBufferGetOutputPresentationTimeStamp(sample), timing,
                   CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as Any)
         }
     }

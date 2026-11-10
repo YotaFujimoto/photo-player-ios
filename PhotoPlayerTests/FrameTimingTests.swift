@@ -3,6 +3,17 @@ import CoreMedia
 @testable import PhotoPlayer
 
 final class FrameTimingTests: XCTestCase {
+    func testContainerOutputTimestampIsUsedInsteadOfMediaTimestamp() throws {
+        var sample: CMSampleBuffer?
+        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 30), presentationTimeStamp: CMTime(value: 2, timescale: 30), decodeTimeStamp: .zero)
+        XCTAssertEqual(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil, formatDescription: nil,
+                                               sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                               sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sample), noErr)
+        let buffer = try XCTUnwrap(sample)
+        XCTAssertEqual(CMSampleBufferSetOutputPresentationTimeStamp(buffer, newValue: .zero), noErr)
+        XCTAssertEqual(CMTimeCompare(CMSampleBufferGetPresentationTimeStamp(buffer), timing.presentationTimeStamp), 0)
+        XCTAssertEqual(try FrameTiming.outputTimes(buffer), [.zero])
+    }
     func testRoundedCadenceAndTrueVariableIntervalsAreDifferent() {
         let rounded=(0...90).map { CMTime(value:Int64((Double($0)*1001/30000*600).rounded()),timescale:600) }
         XCTAssertFalse(FrameTiming.isVariable(rounded))

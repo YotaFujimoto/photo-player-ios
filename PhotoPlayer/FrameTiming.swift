@@ -3,6 +3,31 @@ import Foundation
 
 /// Classification affects the label, never whether measured frames may be used.
 enum FrameTiming {
+    /// Compressed media PTS and output/display PTS can differ because of the
+    /// container's timeline mapping, even without a Photos user adjustment.
+    static func outputTimes(_ sample: CMSampleBuffer) throws -> [CMTime] {
+        let count = CMSampleBufferGetNumSamples(sample)
+        guard count > 0 else { return [] }
+        guard count <= 4096 else { throw FrameExportError.tooManyFrames }
+        var needed = 0
+        guard CMSampleBufferGetOutputSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &needed) == noErr,
+              needed == 1 || needed == count else { throw FrameExportError.invalidTiming }
+        var timing = Array(repeating: CMSampleTimingInfo(), count: needed)
+        let status = timing.withUnsafeMutableBufferPointer {
+            CMSampleBufferGetOutputSampleTimingInfoArray(sample, entryCount: needed, arrayToFill: $0.baseAddress, entriesNeededOut: nil)
+        }
+        guard status == noErr else { throw FrameExportError.invalidTiming }
+        return try (0..<count).map { index in
+            let item = timing[needed == 1 ? 0 : index]
+            var time = item.presentationTimeStamp
+            if needed == 1 && index > 0 {
+                guard item.duration.isNumeric, item.duration.seconds > 0 else { throw FrameExportError.invalidTiming }
+                time = CMTimeAdd(time, CMTimeMultiply(item.duration, multiplier: Int32(index)))
+            }
+            guard time.isNumeric else { throw FrameExportError.invalidTiming }
+            return time
+        }
+    }
     static func precision(_ times: [CMTime]) -> Double {
         times.filter { $0.timescale > 0 }.map { 1 / Double($0.timescale) }.max() ?? 0
     }
