@@ -69,7 +69,7 @@ actor FrameSource: FrameProviding {
     private var isHDR = false
     init(input: FrameAsset) { self.input = input }
 
-    func diagnosticReport() -> String {
+    func diagnosticReport() async -> String {
         ([input.flags.report] + notes + [lastResult, imageResult]).joined(separator: "\n")
     }
     private func failure(_ error: Error, fallback: FrameExportError, stage: String) -> Error {
@@ -158,6 +158,7 @@ actor FrameSource: FrameProviding {
         let unique = FrameTiming.uniqueSorted(times)
         notes.append("duplicatePTS=\(times.count - unique.count)")
         guard !unique.isEmpty else { throw FrameExportError.noFrames }
+        notes.append(String(format: "firstPTSRelativeToEntry=%.9fs", unique[0].seconds - entry))
         frameTimes = try FrameSelection.window(unique, entry: entry)
         notes.append(FrameTiming.report(frameTimes))
         lastResult = "stage=catalogue result=ready"

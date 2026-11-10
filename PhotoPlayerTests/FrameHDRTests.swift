@@ -17,6 +17,7 @@ final class FrameHDRTests: XCTestCase {
     }
     func testHLGAndPQProduceMatchingSDRProfilesGradientsColorsAndJPEGFrames() async throws {
         for name in ["frames-hlg","frames-pq"] {
+            try await FrameSourceTests.probe(FrameSourceTests.asset(name))
             let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(name),entry:.zero,fileStem:"synthetic"))
             let times=try await source.catalogue()
             let folder=try FrameWorkspace.create(id:UUID()); defer { FrameWorkspace.remove(folder) }
