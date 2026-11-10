@@ -52,9 +52,23 @@ final class FullscreenUITests: XCTestCase {
         image.name = name; image.lifetime = .keepAlways; add(image)
     }
 
+    @MainActor private func finish(_ app: XCUIApplication) {
+        // All functional assertions run before cleanup. A final unasserted
+        // rotation with the player still presented stalled XCTest's animation
+        // idle notification after its event loop was already idle. Close using
+        // the normal UI before resetting orientation and ending this test host.
+        let close = app.buttons.matching(identifier: "closePlayer").firstMatch
+        if close.exists { close.tap() }
+        XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .portrait
+        expect(app, NSPredicate { _, _ in app.frame.height > app.frame.width })
+        app.terminate()
+        XCTAssertEqual(app.state, .notRunning)
+    }
+
     @MainActor func testLandscapeCanvasSafeControlsAndPortraitPreserved() {
         let app = openPaused()
-        defer { XCUIDevice.shared.orientation = .portrait }
+        defer { finish(app) }
         let portrait = surface(app).frame
         XCTAssertLessThan(portrait.height, app.frame.height)
         capture("fullscreen-portrait-feedback-layout")
@@ -87,7 +101,7 @@ final class FullscreenUITests: XCTestCase {
 
     @MainActor func testAutoHideSingleDoubleTapAndPausedControls() {
         let app = openPaused()
-        defer { XCUIDevice.shared.orientation = .portrait }
+        defer { finish(app) }
         XCUIDevice.shared.orientation = .landscapeLeft
         fullCanvas(app)
         let canvas = surface(app).frame
@@ -118,7 +132,7 @@ final class FullscreenUITests: XCTestCase {
 
     @MainActor func testSpeedMenuPinsControlsThroughPressAndSelection() {
         let app = openPaused()
-        defer { XCUIDevice.shared.orientation = .portrait }
+        defer { finish(app) }
         XCUIDevice.shared.orientation = .landscapeLeft
         fullCanvas(app)
         let canvas = surface(app).frame
@@ -148,7 +162,7 @@ final class FullscreenUITests: XCTestCase {
 
     @MainActor func testHiddenSwipeHeldRateBarAndLifecycleCleanup() {
         let app = openPaused()
-        defer { XCUIDevice.shared.orientation = .portrait }
+        defer { finish(app) }
         bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         state(app, "Paused")
         XCUIDevice.shared.orientation = .landscapeLeft
