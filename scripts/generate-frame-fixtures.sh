@@ -36,10 +36,12 @@ for transfer in hlg pq; do
   tag=arib-std-b67
   if [[ "$transfer" == pq ]]; then tag=smpte2084; fi
   python3 scripts/hdr_frames.py "$transfer" 151 | ffmpeg -hide_banner -loglevel warning -y \
-    -f rawvideo -pixel_format yuv444p10le -video_size 160x96 -framerate 30 -i pipe:0 \
+    -f rawvideo -pixel_format yuv444p10le -video_size 160x96 -framerate 30 \
+    -color_primaries bt2020 -color_trc "$tag" -colorspace bt2020nc -color_range tv -i pipe:0 \
     -c:v libx265 -preset ultrafast -crf 10 -pix_fmt yuv420p10le -tag:v hvc1 \
     -color_primaries bt2020 -color_trc "$tag" -colorspace bt2020nc -color_range tv \
-    -x265-params pools=1:frame-threads=1:log-level=error -threads 2 "build/frame-fixtures/frames-$transfer.mov"
+    -x265-params "pools=1:frame-threads=1:log-level=error:colorprim=bt2020:transfer=$tag:colormatrix=bt2020nc:range=limited" \
+    -threads 2 "build/frame-fixtures/frames-$transfer.mov"
 done
 ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-hlg.mov \
   -vf "setpts='if(lt(N,45),N,45+(N-45)*2)/(30*TB)'" -fps_mode vfr \
