@@ -120,7 +120,8 @@ mkdir -p build/copy-results
 # immediately; a successful candidate still runs every test exactly once.
 run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
-run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndSpeedMenuOwnership"
+run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
+run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
 # The added fullscreen group leaves a longer-lived simulator service session
 # before the existing regressions. Evidence showed 31s accessibility queries

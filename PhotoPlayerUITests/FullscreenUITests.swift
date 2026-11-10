@@ -85,7 +85,7 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertTrue(play(app).isHittable)
     }
 
-    @MainActor func testAutoHideSingleDoubleTapAndSpeedMenuOwnership() {
+    @MainActor func testAutoHideSingleDoubleTapAndPausedControls() {
         let app = openPaused()
         defer { XCUIDevice.shared.orientation = .portrait }
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -112,13 +112,23 @@ final class FullscreenUITests: XCTestCase {
         let reached = seconds(app)
         let ordinary = (stopped - began) * 0.25
         XCTAssertEqual(Double(reached - origin) - ordinary, 10, accuracy: 2)
-        // Resolve the target while paused, then exercise the real playing
-        // deadline. Do not spend that deadline resolving a disappearing button.
-        let rateFrame = app.buttons.matching(identifier: "rateMenu").firstMatch.frame
-        let ratePoint = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: rateFrame.midX, dy: rateFrame.midY))
+        observeForFourSeconds()
+        XCTAssertTrue(play(app).exists)
+    }
+
+    @MainActor func testSpeedMenuPinsControlsThroughPressAndSelection() {
+        let app = openPaused()
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        fullCanvas(app)
+        let canvas = surface(app).frame
+        // Target the actual control. An app-root coordinate still lazily
+        // snapshots the whole hierarchy at input time and can outlive the
+        // three-second deadline, then press the video underneath instead.
+        let rateButton = app.buttons.matching(identifier: "rateMenu").firstMatch
+        XCTAssertTrue(rateButton.isHittable)
         play(app).tap()
-        ratePoint.press(forDuration: 4)
+        rateButton.press(forDuration: 4)
         let half = app.buttons.matching(identifier: "0.5×").firstMatch
         XCTAssertTrue(half.waitForExistence(timeout: 3))
         observeForFourSeconds()
@@ -155,11 +165,9 @@ final class FullscreenUITests: XCTestCase {
         view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         XCTAssertTrue(play(app).waitForExistence(timeout: 3))
         play(app).tap(); state(app, "Paused")
-        // Prepare coordinates/position while paused, when controls cannot
-        // expire. Accessibility lookup itself can consume the 3s deadline.
-        let canvas = view.frame
-        let windowOrigin = app.coordinate(withNormalizedOffset: .zero)
-        let holdPoint = windowOrigin.withOffset(CGVector(dx: canvas.midX, dy: canvas.minY + canvas.height * 0.3))
+        // Prepare while paused and anchor to the video, not the app root.
+        // This keeps input lookup scoped to the actual interaction surface.
+        let holdPoint = view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
         let start = seconds(app), began = ProcessInfo.processInfo.systemUptime
         play(app).tap()
         holdPoint.press(forDuration: 4)
@@ -168,9 +176,9 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertGreaterThan(extra, 4); XCTAssertLessThan(extra, 9)
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
         app.playerButton("playPause").tap(); state(app, "Paused")
-        let seek = bar(app).frame
-        let barStart = windowOrigin.withOffset(CGVector(dx: seek.minX + seek.width * 0.2, dy: seek.midY))
-        let barEnd = windowOrigin.withOffset(CGVector(dx: seek.midX, dy: seek.midY))
+        let seek = bar(app)
+        let barStart = seek.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+        let barEnd = seek.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         play(app).tap()
         barStart.press(forDuration: 0.05, thenDragTo: barEnd,
             withVelocity: .slow, thenHoldForDuration: 4)
