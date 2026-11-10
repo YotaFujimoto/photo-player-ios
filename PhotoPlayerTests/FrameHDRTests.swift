@@ -38,7 +38,7 @@ final class FrameHDRTests: XCTestCase {
                     file.name = "\(name)-\(index)-encoded-JPEG"; file.lifetime = .keepAlways; add(file)
                 }
                 print("HDR JPEG bytes", name, index, data.count)
-                XCTAssertNotNil(data.range(of:Data("ICC_PROFILE".utf8)),"The JPEG must carry the actual profile, not only a label")
+                XCTAssertNotNil(data.range(of:Data("ICC_PROFILE".utf8)),"\(name) frame \(index): the JPEG must carry the actual profile, not only a label")
                 let imageSource=try XCTUnwrap(CGImageSourceCreateWithData(data as CFData,nil))
                 let jpeg=try XCTUnwrap(CGImageSourceCreateImageAtIndex(imageSource,0,nil))
                 let properties=try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(imageSource,0,nil) as? [String:Any])

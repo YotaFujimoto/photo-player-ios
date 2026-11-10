@@ -189,11 +189,8 @@ actor FrameSource: FrameProviding {
     func writeJPEG(at time: CMTime, to url: URL) async throws -> CMTime {
         let result = try await image(at: time, fullSize: true)
         try Task.checkCancellation()
-        // ImageIO embeds the converted CGImage's sRGB profile; the name alone
-        // would not convert or correctly tag the original wide-gamut pixels.
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { throw FrameExportError.storage }
-        CGImageDestinationAddImage(destination, result.image, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { throw FrameExportError.storage }
+        let data = try FrameJPEG.encode(result.image)
+        try data.write(to: url, options: .atomic)
         return result.time
     }
 }

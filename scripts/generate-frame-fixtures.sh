@@ -34,13 +34,19 @@ ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-30.mov \
   -x265-params pools=1:frame-threads=1:log-level=error -threads 2 build/frame-fixtures/frames-hevc.mov
 for transfer in hlg pq; do
   tag=arib-std-b67
-  if [[ "$transfer" == pq ]]; then tag=smpte2084; fi
+  hdr_metadata=''
+  if [[ "$transfer" == pq ]]; then
+    tag=smpte2084
+    # BT.2020 / D65 mastering display, 1000 nit peak. The synthetic pattern's
+    # maximum average frame luminance is 438.1 nits (rounded upward).
+    hdr_metadata=':master-display=G(8500,39850)B(6550,2300)R(35400,14600)WP(15635,16450)L(10000000,1):max-cll=1000,439'
+  fi
   python3 scripts/hdr_frames.py "$transfer" 151 | ffmpeg -hide_banner -loglevel warning -y \
     -f rawvideo -pixel_format yuv444p10le -video_size 160x96 -framerate 30 \
     -color_primaries bt2020 -color_trc "$tag" -colorspace bt2020nc -color_range tv -i pipe:0 \
     -c:v libx265 -preset ultrafast -crf 10 -pix_fmt yuv420p10le -tag:v hvc1 \
     -color_primaries bt2020 -color_trc "$tag" -colorspace bt2020nc -color_range tv \
-    -x265-params "pools=1:frame-threads=1:log-level=error:colorprim=bt2020:transfer=$tag:colormatrix=bt2020nc:range=limited" \
+    -x265-params "pools=1:frame-threads=1:log-level=error:colorprim=bt2020:transfer=$tag:colormatrix=bt2020nc:range=limited$hdr_metadata" \
     -threads 2 "build/frame-fixtures/frames-$transfer.mov"
 done
 ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-hlg.mov \
@@ -64,7 +70,8 @@ for name in ('30','2997','rounded','hevc','hlg','pq','variable','hlg-variable','
     probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_streams','-show_frames','-of','json',f'build/frame-fixtures/frames-{name}.mov']))
     stream=probe['streams'][0]
     times=[float(frame['best_effort_timestamp_time']) for frame in probe['frames']]
-    report[name]={'stream':stream,'times':times}
+    side_data=probe['frames'][0].get('side_data_list',[])
+    report[name]={'stream':stream,'times':times,'firstFrameSideData':side_data}
     with open('build/frame-fixtures/fixture-report.json','w') as output: json.dump(report,output,indent=2)
     print(name, {key:stream.get(key) for key in ('codec_name','pix_fmt','color_primaries','color_space','color_transfer')}, flush=True)
     assert len(times)==151 and all(b>a for a,b in zip(times,times[1:])), name
@@ -72,6 +79,10 @@ for name in ('30','2997','rounded','hevc','hlg','pq','variable','hlg-variable','
         assert stream['codec_name']=='hevc' and stream['pix_fmt']=='yuv420p10le', stream
         assert stream.get('color_primaries')=='bt2020' and stream.get('color_space')=='bt2020nc', stream
         assert stream.get('color_transfer')==('smpte2084' if name=='pq' else 'arib-std-b67'), stream
+    if name=='pq':
+        metadata=stream.get('side_data_list',[])+side_data
+        assert any(d.get('side_data_type')=='Mastering display metadata' for d in metadata), metadata
+        assert any(d.get('side_data_type')=='Content light level metadata' and d.get('max_content')==1000 and d.get('max_average')==439 for d in metadata), metadata
 assert report['rounded']['stream']['time_base']=='1/600'
 for name in ('variable','hlg-variable','hdr-ui'):
     times=report[name]['times']
