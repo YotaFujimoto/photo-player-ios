@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import ImageIO
 import UniformTypeIdentifiers
+import CoreImage
 
 struct FrameInputFlags: Sendable {
     var adjustmentData = false
@@ -44,6 +45,20 @@ extension FrameProviding {
 }
 
 enum FrameColor {
+    static func toneMappedSRGB(_ image: CGImage) throws -> CGImage {
+        guard image.colorSpace != nil else { throw FrameExportError.colorProfile }
+        // PQ forceSDR fails in the verified runtime while matchSource decodes
+        // correctly. Core Image's official HDR option performs tone mapping
+        // first; explicit sRGB rendering is the separate color conversion.
+        let mapped = CIImage(cgImage: image, options: [.toneMapHDRtoSDR: true])
+        guard let working = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020),
+              let output = CGColorSpace(name: CGColorSpace.sRGB) else { throw FrameExportError.colorConversion }
+        let context = CIContext(options: [.workingColorSpace: working, .cacheIntermediates: false])
+        guard let converted = context.createCGImage(mapped, from: mapped.extent, format: .RGBA8, colorSpace: output) else {
+            throw FrameExportError.colorConversion
+        }
+        return converted
+    }
     static func sRGB(_ image: CGImage) throws -> CGImage {
         guard let input = image.colorSpace, input.model == .rgb else { throw FrameExportError.colorProfile }
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
@@ -67,6 +82,7 @@ actor FrameSource: FrameProviding {
     private var lastResult = "not-started"
     private var imageResult = "not-generated"
     private var isHDR = false
+    private var isPQ = false
     init(input: FrameAsset) { self.input = input }
 
     func diagnosticReport() async -> String {
@@ -111,12 +127,14 @@ actor FrameSource: FrameProviding {
         let formats = try await track.load(.formatDescriptions)
         let hdrTracks = try await input.asset.loadTracks(withMediaCharacteristic: .containsHDRVideo)
         isHDR = !hdrTracks.isEmpty
+        isPQ = false
         notes.append(String(format: "nominalFPS=%.6f hdrCharacteristic=%@", rate.isFinite ? rate : 0, isHDR ? "true" : "false"))
         for format in formats {
             let transfer = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction))
             let primaries = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_ColorPrimaries))
             let matrix = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_YCbCrMatrix))
             if transfer == "HLG" || transfer == "PQ" { isHDR = true }
+            if transfer == "PQ" { isPQ = true }
             notes.append(String(format: "codec=0x%08x transfer=%@ primaries=%@ matrix=%@", CMFormatDescriptionGetMediaSubType(format), transfer, primaries, matrix))
         }
         if let reason = input.flags.rejection { throw reason }
@@ -124,7 +142,9 @@ actor FrameSource: FrameProviding {
         guard tracks.count == 1 else { throw FrameExportError.multipleTracks }
         guard !formats.isEmpty else { throw FrameExportError.missingFormat }
         guard formats.allSatisfy({ [kCMVideoCodecType_H264, kCMVideoCodecType_HEVC].contains(CMFormatDescriptionGetMediaSubType($0)) }) else { throw FrameExportError.codec }
-        if #available(iOS 18.0, *) { notes.append("toneMapping=AVAssetImageGenerator.forceSDR colorConversion=tagged-source-to-sRGB") }
+        if #available(iOS 18.0, *) {
+            notes.append("toneMapping=\(isPQ ? "CoreImage.toneMapHDRtoSDR" : "AVAssetImageGenerator.forceSDR") colorConversion=tagged-source-to-sRGB")
+        }
         else {
             guard !isHDR else { throw FrameExportError.hdrRequiresNewerOS }
             notes.append("toneMapping=SDR-source colorConversion=tagged-source-to-sRGB")
@@ -175,7 +195,7 @@ actor FrameSource: FrameProviding {
             guard let index = frameTimes.firstIndex(where: { CMTimeCompare($0, time) == 0 }) else { throw FrameExportError.invalidTiming }
             let current = AVAssetImageGenerator(asset: input.asset)
             current.appliesPreferredTrackTransform = true
-            if #available(iOS 18.0, *) { current.dynamicRangePolicy = .forceSDR }
+            if #available(iOS 18.0, *) { current.dynamicRangePolicy = isPQ ? .matchSource : .forceSDR }
             else if isHDR { throw FrameExportError.hdrRequiresNewerOS }
             current.requestedTimeToleranceBefore = .zero
             current.requestedTimeToleranceAfter = .zero
@@ -185,7 +205,9 @@ actor FrameSource: FrameProviding {
             let result = try await current.image(at: time)
             try Task.checkCancellation()
             guard FrameTiming.matches(actual: result.actualTime, index: index, times: frameTimes) else { throw FrameExportError.mismatch }
-            let converted = try FrameColor.sRGB(result.image)
+            let converted: CGImage
+            if isPQ { converted = try FrameColor.toneMappedSRGB(result.image) }
+            else { converted = try FrameColor.sRGB(result.image) }
             imageResult = String(format: "image=SDR-sRGB8 sourceTagged=%@ actualTimeDelta=%.9fs mode=%@", result.image.colorSpace == nil ? "false" : "true", CMTimeSubtract(result.actualTime, time).seconds, fullSize ? "full" : "preview")
             lastResult = "stage=image result=ready"
             return FrameImage(image: converted, time: frameTimes[index])

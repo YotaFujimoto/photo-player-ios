@@ -9,7 +9,7 @@ final class PhotoFrameWriterTests: XCTestCase {
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.notEnoughSpace.rawValue)), .storage)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.accessUserDenied.rawValue)), .permission)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)), .storage)
-        for fixture in ["frames-30","frames-hlg","frames-variable"] {
+        for fixture in ["frames-30","frames-hlg","frames-pq","frames-variable"] {
         let before = PHAsset.fetchAssets(with: .image, options: nil)
         let existing = (0..<before.count).map { before.object(at:$0).localIdentifier }
         let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(fixture),entry:.zero,flags:.init(),fileStem:"synthetic"))
@@ -34,10 +34,23 @@ final class PhotoFrameWriterTests: XCTestCase {
         var found=Set<String>()
         for index in 0..<after.count {
             let asset=after.object(at:index)
-            let name=PHAssetResource.assetResources(for:asset).first?.originalFilename ?? ""
+            let resource = try XCTUnwrap(PHAssetResource.assetResources(for:asset).first { $0.type == .photo })
+            let name=resource.originalFilename
             guard let ordinal=photos.firstIndex(where: { $0.filename == name }) else { continue }
             XCTAssertTrue(found.insert(name).inserted)
             XCTAssertEqual(asset.pixelWidth,160); XCTAssertEqual(asset.pixelHeight,96)
+            // requestImageData(.current) can return a Photos-rendered rendition.
+            // Validate the registered ORIGINAL resource's bytes/profile too.
+            let restored = folder.appendingPathComponent("registered-\(ordinal).jpg")
+            let resourceOptions = PHAssetResourceRequestOptions(); resourceOptions.isNetworkAccessAllowed = false
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().writeData(for: resource, toFile: restored, options: resourceOptions) { @Sendable error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
+            }
+            let originalData = try Data(contentsOf: restored)
+            XCTAssertEqual(originalData, try Data(contentsOf: photos[ordinal].url))
+            XCTAssertNotNil(originalData.range(of: Data("ICC_PROFILE\0".utf8)), "Original Photos resource must retain its sRGB profile")
             let options=PHImageRequestOptions()
             options.version = .current; options.deliveryMode = .highQualityFormat; options.isNetworkAccessAllowed=false
             let data: Data = try await withCheckedThrowingContinuation { continuation in
@@ -47,7 +60,6 @@ final class PhotoFrameWriterTests: XCTestCase {
                 }
             }
             let imageSource=try XCTUnwrap(CGImageSourceCreateWithData(data as CFData,nil))
-            XCTAssertNotNil(data.range(of: Data("ICC_PROFILE\0".utf8)), "Saved Photos resource must retain its sRGB profile")
             let image=try XCTUnwrap(CGImageSourceCreateImageAtIndex(imageSource,0,nil))
             XCTAssertEqual(try FrameSourceTests.number(image),indices[ordinal])
         }

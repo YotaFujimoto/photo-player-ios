@@ -4,25 +4,6 @@ import ImageIO
 @testable import PhotoPlayer
 
 final class FrameSourceTests: XCTestCase {
-    // Synthetic fixture probe only: compare compressed reader timing and
-    // attachments against ffprobe before changing any frame-boundary rule.
-    static func probe(_ asset: AVAsset) async throws {
-        let tracks = try await asset.loadTracks(withMediaType: .video)
-        let track = try XCTUnwrap(tracks.first)
-        let range = try await track.load(.timeRange)
-        print("Synthetic track time range", range)
-        let reader = try AVAssetReader(asset: asset)
-        reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(value: 325, timescale: 100))
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
-        reader.add(output); XCTAssertTrue(reader.startReading()); defer { reader.cancelReading() }
-        for _ in 0..<8 {
-            guard let sample = output.copyNextSampleBuffer() else { break }
-            var timing = CMSampleTimingInfo()
-            CMSampleBufferGetSampleTimingInfo(sample, at: 0, timingInfoOut: &timing)
-            print("Synthetic sample", CMSampleBufferGetPresentationTimeStamp(sample), "output", CMSampleBufferGetOutputPresentationTimeStamp(sample), timing,
-                  CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as Any)
-        }
-    }
     static func asset(_ name: String) throws -> AVURLAsset {
         let root = try XCTUnwrap(Bundle(for: FrameSourceTests.self).url(forResource: "frame-fixtures", withExtension: nil))
         let url = root.appendingPathComponent(name + ".mov")
