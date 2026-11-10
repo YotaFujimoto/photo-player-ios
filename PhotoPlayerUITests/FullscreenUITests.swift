@@ -18,9 +18,18 @@ final class FullscreenUITests: XCTestCase {
     }
     @MainActor private func surface(_ app: XCUIApplication) -> XCUIElement { app.otherElements.matching(identifier: "videoSurface").firstMatch }
     @MainActor private func play(_ app: XCUIApplication) -> XCUIElement { app.buttons.matching(identifier: "playPause").firstMatch }
-    @MainActor private func bar(_ app: XCUIApplication) -> XCUIElement { app.descendants(matching: .any).matching(identifier: "seekSlider").firstMatch }
+    @MainActor private func bar(_ app: XCUIApplication) -> XCUIElement { app.otherElements.matching(identifier: "seekSlider").firstMatch }
     @MainActor private func expect(_ element: XCUIElement, _ predicate: NSPredicate, timeout: TimeInterval = 10) {
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: timeout), .completed)
+        // XCTest's first predicate poll waits about a second even when the
+        // state is already true. That consumed the remaining three-second
+        // control visibility window after the bar gesture. Observe immediately
+        // and wait only if needed, within the SAME total assertion deadline.
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        let matches = predicate.evaluate(with: element)
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if matches && remaining >= 0 { return }
+        guard remaining > 0 else { XCTFail("State query exceeded its assertion deadline"); return }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: remaining), .completed)
     }
     @MainActor private func state(_ app: XCUIApplication, _ value: String) {
         expect(surface(app), NSPredicate(format: "value == %@", value), timeout: 20)
