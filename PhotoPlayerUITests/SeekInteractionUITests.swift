@@ -49,6 +49,8 @@ final class SeekInteractionUITests: XCTestCase {
 
     @MainActor func testBarTapDragAndPlaybackIntentPortrait() { verifyBar(in: .portrait) }
     @MainActor func testBarTapDragAndPlaybackIntentLandscape() { verifyBar(in: .landscapeLeft) }
+    @MainActor func testOriginalLongGOPBarTapDragAndPlaybackIntentPortrait() { verifyBar(in: .portrait) }
+    @MainActor func testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape() { verifyBar(in: .landscapeLeft) }
 
     @MainActor private func verifyBar(in orientation: UIDeviceOrientation) {
         let app = open()

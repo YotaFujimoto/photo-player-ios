@@ -118,7 +118,8 @@ playback_seek='PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRa
 mkdir -p build/copy-results
 # Validate the input under investigation first. On failure retain its evidence
 # immediately; a successful candidate still runs every test exactly once.
-run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
+run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
+  "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
 run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
@@ -169,4 +170,16 @@ run_tests build/copy-results/GeometryControls.xcresult \
 run_tests build/copy-results/InputOn.xcresult "-only-testing:$input_on" || test_status=$?
 run_tests build/copy-results/InputOff.xcresult "-only-testing:$input_off" || test_status=$?
 run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_background" || test_status=$?
+# A second, explicitly identified fixture condition, never a retry of a failed
+# case. Preserve the former 25-second-GOP decoding coverage alongside bounded UI
+# material. The import is last so all twelve-card selection assertions stay intact.
+xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
+run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
+  "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"
+run_tests build/copy-results/OriginalPlaybackSeek.xcresult \
+  "-only-testing:PhotoPlayerUITests/VideoPlaybackTests/testOriginalLongGOPPhotoKitVideoPlaybackRateAndSeek" || test_status=$?
+run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
+  "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentPortrait" || test_status=$?
+run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
+  "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || test_status=$?
 exit "$test_status"

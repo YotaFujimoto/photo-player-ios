@@ -23,11 +23,18 @@ ffmpeg -hide_banner -loglevel warning -y -i build/fixture-source/synthetic-video
   -g 20 -keyint_min 20 -sc_threshold 0 -c:a copy \
   -metadata creation_time=2024-02-01T00:00:00Z -movflags +faststart \
   build/fixtures/synthetic-video.mov 2>&1 | tee -a build/fixtures.log
+# Keep the original elementary streams for a separate regression pass after the
+# twelve-card UI suite. Only the date changes so Photos sorts this clip first.
+ffmpeg -hide_banner -loglevel warning -y -i build/fixture-source/synthetic-video.mov \
+  -map 0 -c copy -metadata creation_time=2025-02-01T00:00:00Z -movflags +faststart \
+  build/fixture-source/long-gop-regression.mov 2>&1 | tee -a build/fixtures.log
 python3 - <<'PY' | tee -a build/fixtures.log
 import json, pathlib, subprocess
 report = {}
-for label, directory in [('original', 'fixture-source'), ('ui', 'fixtures')]:
-    path = pathlib.Path('build') / directory / 'synthetic-video.mov'
+for label, relative in [('original', 'fixture-source/synthetic-video.mov'),
+                        ('ui', 'fixtures/synthetic-video.mov'),
+                        ('regression', 'fixture-source/long-gop-regression.mov')]:
+    path = pathlib.Path('build') / relative
     info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error',
         '-select_streams', 'v:0', '-show_frames', '-show_entries',
         'frame=key_frame,best_effort_timestamp_time', '-of', 'json', str(path)]))
@@ -39,6 +46,14 @@ assert report['ui']['frame_count'] == report['original']['frame_count'] == 300, 
 assert 0 < report['ui']['max_keyframe_gap'] <= 2.001, report
 assert len(report['ui']['keyframe_times']) < 300, 'Keep inter-frame decoding coverage'
 assert 15.0 not in report['ui']['keyframe_times'], 'Paused 15s test must remain off-keyframe'
+assert report['original'] == report['regression'], 'Keep the original GOP/frame sequence'
+def packet_hashes(path):
+    data = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-show_packets',
+        '-show_data_hash', 'sha256', '-show_entries', 'packet=stream_index,data_hash',
+        '-of', 'json', str(path)]))
+    return [[p['data_hash'] for p in data['packets'] if p['stream_index'] == stream] for stream in [0, 1]]
+assert packet_hashes('build/fixture-source/synthetic-video.mov') == packet_hashes('build/fixture-source/long-gop-regression.mov'), 'Original video/audio packets must be unchanged'
+report['original_packets_preserved'] = True
 pathlib.Path('build/fixture-seek-info.json').write_text(json.dumps(report, indent=2))
 print('Synthetic seek workload:', report)
 PY

@@ -61,7 +61,7 @@ jobs:
         run: bash scripts/generate-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        # Includes a cold Release build, 22 serial test hosts and evidence export.
+        # Includes a cold Release build, 26 serial test hosts and evidence export.
         # The 40-minute job stopped after 87 passing tests with eight still pending.
         # Individual 120/180-second deadlines and every assertion remain unchanged.
         timeout-minutes: 60

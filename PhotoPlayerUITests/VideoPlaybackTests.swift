@@ -4,6 +4,16 @@ import UIKit
 final class VideoPlaybackTests: XCTestCase {
     @MainActor
     func testPhotoKitVideoPlaybackRateAndSeek() {
+        verifyPhotoKitVideoPlaybackRateAndSeek(expectedVideos: 12)
+    }
+
+    @MainActor
+    func testOriginalLongGOPPhotoKitVideoPlaybackRateAndSeek() {
+        verifyPhotoKitVideoPlaybackRateAndSeek(expectedVideos: 13)
+    }
+
+    @MainActor
+    private func verifyPhotoKitVideoPlaybackRateAndSeek(expectedVideos: Int) {
         continueAfterFailure = false
         let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--playback-diagnostics"]
@@ -11,7 +21,7 @@ final class VideoPlaybackTests: XCTestCase {
         let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.'"))
         let card = cards.matching(NSPredicate(format: "value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20))
-        XCTAssertEqual(cards.count, 12, "Only the twelve synthetic videos, not still images, should be listed")
+        XCTAssertEqual(cards.count, expectedVideos, "Only the imported synthetic videos, not still images, should be listed")
         XCTAssertTrue(card.images["videoThumbnail"].waitForExistence(timeout: 15))
         screenshot("video-library")
         card.tap()
