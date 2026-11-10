@@ -68,6 +68,7 @@ schemes:
     test:
       config: Release
       gatherCoverageData: false
+      preferredScreenCaptureFormat: screenshots
       targets:
         - PhotoPlayerTests
         - PhotoPlayerUITests
