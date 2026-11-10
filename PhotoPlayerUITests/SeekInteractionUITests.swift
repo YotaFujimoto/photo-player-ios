@@ -13,7 +13,7 @@ final class SeekInteractionUITests: XCTestCase {
         if !held { state(app, "Playing"); app.playerButton("playPause").tap(); state(app, "Paused") }
         return app
     }
-    @MainActor private func bar(_ app: XCUIApplication) -> XCUIElement { app.revealPlayerControls(); return app.descendants(matching: .any).matching(identifier: "seekSlider").firstMatch }
+    @MainActor private func bar(_ app: XCUIApplication) -> XCUIElement { app.revealPlayerControls(); return app.otherElements.matching(identifier: "seekSlider").firstMatch }
     @MainActor private func setPosition(_ app: XCUIApplication, fraction: CGFloat, y: CGFloat = 0.5) {
         bar(app).coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: y)).tap()
     }
@@ -74,8 +74,12 @@ final class SeekInteractionUITests: XCTestCase {
         // the entire hierarchy again while synthesizing input, which can spend
         // the three-second fullscreen deadline after a successful seek.
         let pauseButton = app.playerButton("playPause")
+        // The hierarchy confirms the custom UIControl is an Other element.
+        // Resolve this typed input target while paused, before the hide timer;
+        // searching every AX type after Play spent the timer in input lookup.
+        let playingSeek = bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         pauseButton.tap(); state(app, "Playing")
-        setPosition(app, fraction: 0.25)
+        playingSeek.tap()
         let seekReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Playing")
         app.revealPlayerControls()
