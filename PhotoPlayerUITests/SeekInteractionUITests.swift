@@ -102,6 +102,14 @@ final class SeekInteractionUITests: XCTestCase {
         drag(bar(app), from: 0.5, to: 1.02); position(app, near: 30, tolerance: 0)
         drag(bar(app), from: 0.5, to: -0.02); position(app, near: 0, tolerance: 0)
         capture("bar-tap-drag-\(orientation.rawValue)")
+        // Finish the real player lifecycle before XCTest's crash-reporter
+        // synchronization. Two runs completed all bar assertions, then stalled
+        // in that framework cleanup with the player/application still open.
+        app.playerButton("closePlayer").tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .portrait
+        app.terminate()
+        XCTAssertEqual(app.state, .notRunning)
     }
 
     @MainActor func testLoadingErrorAndSeekOverlaysNeverMoveNormalControls() {

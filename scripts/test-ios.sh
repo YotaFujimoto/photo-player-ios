@@ -135,6 +135,8 @@ run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests"
 if [[ "${FRAME_CHECK_ONLY:-false}" == true ]]; then
   # An explicitly requested diagnostic CI scope, never a distributable build.
   # The workflow skips both archive and IPA upload in this mode.
+  run_tests build/copy-results/SeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape"
   run_frame_ui
   exit 0
 fi
