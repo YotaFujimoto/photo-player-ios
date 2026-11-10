@@ -475,3 +475,6 @@ run `42442902221` はUI試験の起動に成功したが、スクロール・画
 - `action.enter` と `decision.accept` があれば、そのSの `selection.write` を追う。nilへの変更は `fullScreenCover.binding` と `asset-missing-after-library-refresh` を区別し、古い画面の終了通知と今回の選択の順序を確認する。`decision.reject` は明示的な拒否に限る（現行のButton処理には拒否ガードがない）。
 - 選択が残っていて `view.appear` がなければ画面提示まで、表示後に `load.requested` がなければ取得開始まで、取得開始後なら `received`／`ready`／`failed` までを調べる。`cover.dismiss` は対象を持たない通知なので、記録された終了候補だけで今回のSを終了済みと決めない。
 - 根拠となるE番号と順序をSTATUS.mdへ記録してから修正する。実機のコピーに個人情報が追加されていないか確認し、公開文書には切り分けに必要な匿名の技術結果だけを転記する。
+
+ビルド12の初回CI: 6456bcb / run 42781458378はIPA検査4件・メディア方針検査を通過後、標準FFmpegにdrawtextがなく合成素材生成で停止。アプリのコンパイル・XCTestは未実行。番号画像を標準Pythonだけで描き、RGBをFFmpegへ流す方式へ修正する。画素によるフレーム照合条件は維持。ログはbuild/failed-42781458378.log。
+

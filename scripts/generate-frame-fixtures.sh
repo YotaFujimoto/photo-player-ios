@@ -2,20 +2,19 @@
 set -euo pipefail
 mkdir -p build/frame-fixtures
 # Large binary blocks identify actual decoded frames independently of timestamps.
-pattern="geq=lum='if(lt(Y,32),if(mod(floor(N/pow(2,floor(X/20))),2),235,16),64)':cb=128:cr=128,drawtext=text='%{n}':x=10:y=55:fontsize=24:fontcolor=white"
 for rate in 30 30000/1001; do
   label=30
   if [[ "$rate" != 30 ]]; then label=2997; fi
-  ffmpeg -hide_banner -loglevel warning -y \
-    -f lavfi -i "nullsrc=size=160x96:rate=$rate,$pattern" -frames:v 151 \
+  python3 scripts/numbered_frames.py 151 | ffmpeg -hide_banner -loglevel warning -y \
+    -f rawvideo -pixel_format rgb24 -video_size 160x96 -framerate "$rate" -i pipe:0 \
     -c:v libx264 -preset ultrafast -crf 10 -pix_fmt yuv420p -g 30 -threads 2 \
     -metadata creation_time=2026-02-01T00:00:00Z -movflags +faststart \
     "build/frame-fixtures/frames-$label.mov"
 done
 # A longer copy of the same pixel-number pattern keeps UI setup independent of
 # reaching the end while accessibility queries are being processed.
-ffmpeg -hide_banner -loglevel warning -y \
-  -f lavfi -i "nullsrc=size=160x96:rate=30,$pattern" -frames:v 901 \
+python3 scripts/numbered_frames.py 901 | ffmpeg -hide_banner -loglevel warning -y \
+  -f rawvideo -pixel_format rgb24 -video_size 160x96 -framerate 30 -i pipe:0 \
   -c:v libx264 -preset ultrafast -crf 10 -pix_fmt yuv420p -g 30 -threads 2 \
   -metadata creation_time=2026-02-01T00:00:00Z -movflags +faststart build/frame-fixtures/frames-ui.mov
 ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-30.mov \
