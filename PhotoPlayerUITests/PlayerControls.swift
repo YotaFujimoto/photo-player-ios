@@ -1,6 +1,24 @@
 import XCTest
 
 extension XCUIApplication {
+    /// Poll from now, within the original three-second assertion deadline.
+    /// A tap can return before UIKit's double-tap failure dependency resolves;
+    /// XCTest's waitForExistence first polls about a second later. Neither an
+    /// immediate one-shot query nor that initial polling gap fits this UI.
+    @MainActor func waitForRevealedPlayerControls(file: StaticString = #filePath, line: UInt = #line) {
+        let play = buttons.matching(identifier: "playPause").firstMatch
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        repeat {
+            let visible = play.exists
+            if ProcessInfo.processInfo.systemUptime >= deadline { break }
+            if visible { return }
+            // Yield the test runner between observations, never delay an input
+            // once the expected state is visible or retry the user's tap.
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        XCTFail("Player controls did not appear within 3 seconds", file: file, line: line)
+    }
+
     /// Explicitly use the new single-tap UI when a test needs a hidden control.
     /// Never retries an input or changes application auto-hide timing.
     @MainActor func revealPlayerControls() {
@@ -8,9 +26,7 @@ extension XCUIApplication {
         if !play.exists {
             otherElements.matching(identifier: "videoSurface").firstMatch
                 .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            // The tap synchronizes the UI; avoid the one-second first polling
-            // interval spending a third of the real auto-hide window.
-            XCTAssertTrue(play.exists)
+            waitForRevealedPlayerControls()
         }
     }
     @MainActor func playerButton(_ identifier: String) -> XCUIElement {

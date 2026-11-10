@@ -105,10 +105,7 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertFalse(play(app).exists, "Double tap must not toggle the hidden controls")
         state(app, "Playing")
         surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        // tap() has already synchronized the UI. waitForExistence first polls
-        // a second later, consuming the three-second production display window
-        // before the following button input can be synthesized.
-        XCTAssertTrue(play(app).exists)
+        app.waitForRevealedPlayerControls()
         play(app).tap()
         let stopped = ProcessInfo.processInfo.systemUptime
         state(app, "Paused")
@@ -143,7 +140,7 @@ final class FullscreenUITests: XCTestCase {
         expect(play(app), NSPredicate(format: "exists == false"), timeout: 7)
         XCTAssertEqual(surface(app).frame, canvas)
         surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        XCTAssertTrue(play(app).exists)
+        app.waitForRevealedPlayerControls()
         play(app).tap(); state(app, "Paused")
         observeForFourSeconds()
         XCTAssertTrue(play(app).exists)
@@ -166,7 +163,7 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertFalse(play(app).exists)
         XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
         view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        XCTAssertTrue(play(app).exists)
+        app.waitForRevealedPlayerControls()
         play(app).tap(); state(app, "Paused")
         // Prepare while paused and anchor to the video, not the app root.
         // This keeps input lookup scoped to the actual interaction surface.
