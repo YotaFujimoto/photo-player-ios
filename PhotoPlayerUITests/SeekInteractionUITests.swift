@@ -18,7 +18,14 @@ final class SeekInteractionUITests: XCTestCase {
         bar(app).coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: y)).tap()
     }
     @MainActor private func state(_ app: XCUIApplication, _ value: String) {
-        expect(app.otherElements.matching(identifier: "videoSurface").firstMatch, NSPredicate(format: "value == %@", value))
+        let started = ProcessInfo.processInfo.systemUptime
+        let surface = app.otherElements.matching(identifier: "videoSurface").firstMatch
+        // Observe immediately. XCTest's predicate wait first polled about a
+        // second later, spending the fullscreen control lifetime unnecessarily.
+        // Keep the same state condition and total fifteen-second deadline.
+        if surface.value as? String == value { return }
+        let remaining = max(0, 15 - (ProcessInfo.processInfo.systemUptime - started))
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: surface)], timeout: remaining), .completed)
     }
     @MainActor private func expect(_ element: XCUIElement, _ predicate: NSPredicate) {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: 15), .completed)
@@ -75,7 +82,7 @@ final class SeekInteractionUITests: XCTestCase {
         // the three-second fullscreen deadline after a successful seek.
         let pauseButton = app.playerButton("playPause")
         // The hierarchy confirms the custom UIControl is an Other element.
-        // Resolve this typed input target while paused, before the hide timer;
+        // Prepare this typed input target while paused, before the hide timer;
         // searching every AX type after Play spent the timer in input lookup.
         let playingSeek = bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         pauseButton.tap(); state(app, "Playing")
