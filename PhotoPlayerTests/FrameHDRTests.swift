@@ -21,15 +21,23 @@ final class FrameHDRTests: XCTestCase {
             let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(name),entry:.zero,fileStem:"synthetic"))
             let times=try await source.catalogue()
             let folder=try FrameWorkspace.create(id:UUID()); defer { FrameWorkspace.remove(folder) }
+            do {
             for index in [0,21,60,90] {
+                print("HDR check", name, index, "preview")
                 let preview=try await source.image(at:times[index])
                 XCTAssertEqual(try FrameSourceTests.number(preview.image),index)
                 XCTAssertEqual(preview.image.colorSpace?.name.map { $0 as String },CGColorSpace.sRGB as String)
                 XCTAssertEqual(preview.image.bitsPerComponent,8)
                 let url=folder.appendingPathComponent("\(index).jpg")
+                print("HDR check", name, index, "JPEG")
                 let actual=try await source.writeJPEG(at:times[index],to:url)
                 XCTAssertEqual(CMTimeCompare(actual,times[index]),0)
                 let data=try Data(contentsOf:url)
+                if index == 0 || index == 21 {
+                    let file = XCTAttachment(data: data, uniformTypeIdentifier: "public.jpeg")
+                    file.name = "\(name)-\(index)-encoded-JPEG"; file.lifetime = .keepAlways; add(file)
+                }
+                print("HDR JPEG bytes", name, index, data.count)
                 XCTAssertNotNil(data.range(of:Data("ICC_PROFILE".utf8)),"The JPEG must carry the actual profile, not only a label")
                 let imageSource=try XCTUnwrap(CGImageSourceCreateWithData(data as CFData,nil))
                 let jpeg=try XCTUnwrap(CGImageSourceCreateImageAtIndex(imageSource,0,nil))
@@ -58,6 +66,10 @@ final class FrameHDRTests: XCTestCase {
                     attachment.name="\(name)-SDR-sRGB-JPEG"; attachment.lifetime = .keepAlways; add(attachment)
                     print("\(name) neutral SDR levels=\(ramp) profile=\(profile)")
                 }
+            }
+            } catch {
+                print("HDR source failure", name, await source.diagnosticReport())
+                throw error
             }
             let report=await source.diagnosticReport()
             XCTAssertTrue(report.contains(name == "frames-hlg" ? "transfer=HLG" : "transfer=PQ"))
