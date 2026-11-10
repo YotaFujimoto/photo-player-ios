@@ -9,9 +9,10 @@ final class PhotoFrameWriterTests: XCTestCase {
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.notEnoughSpace.rawValue)), .storage)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.accessUserDenied.rawValue)), .permission)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)), .storage)
+        for fixture in ["frames-30","frames-hlg","frames-variable"] {
         let before = PHAsset.fetchAssets(with: .image, options: nil)
         let existing = (0..<before.count).map { before.object(at:$0).localIdentifier }
-        let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset("frames-30"),entry:.zero,disallowed:false,fileStem:"synthetic"))
+        let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(fixture),entry:.zero,flags:.init(),fileStem:"synthetic"))
         let times=try await source.catalogue()
         let indices=FrameSelection(times:times).indices
         let operation=UUID(), folder=try FrameWorkspace.create(id:UUID())
@@ -50,5 +51,6 @@ final class PhotoFrameWriterTests: XCTestCase {
             XCTAssertEqual(try FrameSourceTests.number(image),indices[ordinal])
         }
         XCTAssertEqual(found.count,10)
+        }
     }
 }

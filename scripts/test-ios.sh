@@ -109,6 +109,9 @@ run_frame_ui() {
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testEntryPixelsFrameStepsSwipeAndNormalGestureRestoration" || frame_status=$?
   run_tests build/copy-results/FrameSaveLandscape.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || frame_status=$?
+  xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-hdr-ui.mov
+  run_tests build/copy-results/FrameHDR.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameHDRUITests" || frame_status=$?
   return "$frame_status"
 }
 
@@ -171,6 +174,7 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
   "-skip-testing:PhotoPlayerUITests/FullscreenUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameExtractionUITests" \
+  "-skip-testing:PhotoPlayerUITests/FrameHDRUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \

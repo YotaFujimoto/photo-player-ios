@@ -2,130 +2,199 @@
 import ImageIO
 import UniformTypeIdentifiers
 
-/// AVAsset is read-only; the actor owns its readers/generators. Never pass an AVPlayer.
+struct FrameInputFlags: Sendable {
+    var adjustmentData = false
+    var adjustmentBaseVideo = false
+    var highFrameRate = false
+    var timelapse = false
+    var videoComposition = false
+    var rejection: FrameExportError? {
+        if adjustmentData || adjustmentBaseVideo { return .adjusted }
+        if highFrameRate { return .highFrameRateCapture }
+        if timelapse { return .timelapse }
+        if videoComposition { return .videoComposition }
+        return nil
+    }
+    var report: String {
+        "adjustmentData=\(adjustmentData) adjustmentBaseVideo=\(adjustmentBaseVideo) highFrameRate=\(highFrameRate) timelapse=\(timelapse) videoComposition=\(videoComposition)"
+    }
+}
+
+/// AVAsset is read-only; the actor owns its readers/generators, never an AVPlayer.
 struct FrameAsset: @unchecked Sendable {
     let asset: AVAsset
     let entry: CMTime
-    let disallowed: Bool
+    var flags = FrameInputFlags()
     let fileStem: String
 }
 struct FrameImage: @unchecked Sendable {
     let image: CGImage
+    /// Canonical measured presentation time, after checking generator actualTime.
     let time: CMTime
 }
-
 protocol FrameProviding: Sendable {
     func catalogue() async throws -> [CMTime]
     func image(at time: CMTime, fullSize: Bool) async throws -> FrameImage
     func writeJPEG(at time: CMTime, to url: URL) async throws -> CMTime
     func cancel() async
+    func diagnosticReport() async -> String
+}
+extension FrameProviding {
+    func diagnosticReport() async -> String { "source=unavailable" }
+}
+
+enum FrameColor {
+    static func sRGB(_ image: CGImage) throws -> CGImage {
+        guard let input = image.colorSpace, input.model == .rgb else { throw FrameExportError.colorProfile }
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: image.width, height: image.height,
+                                      bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw FrameExportError.colorConversion }
+        // Drawing converts tagged source primaries/transfer into sRGB AFTER
+        // AVFoundation tone mapping. Relabeling a profile is not conversion.
+        context.setRenderingIntent(.perceptual)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let converted = context.makeImage() else { throw FrameExportError.colorConversion }
+        return converted
+    }
 }
 
 actor FrameSource: FrameProviding {
     let input: FrameAsset
     private var generator: AVAssetImageGenerator?
+    private var frameTimes: [CMTime] = []
+    private var notes: [String] = []
+    private var lastResult = "not-started"
+    private var imageResult = "not-generated"
+    private var isHDR = false
     init(input: FrameAsset) { self.input = input }
 
+    func diagnosticReport() -> String {
+        ([input.flags.report] + notes + [lastResult, imageResult]).joined(separator: "\n")
+    }
+    private func failure(_ error: Error, fallback: FrameExportError, stage: String) -> Error {
+        let ns = error as NSError
+        let domain = [AVFoundationErrorDomain, NSOSStatusErrorDomain, NSCocoaErrorDomain, NSURLErrorDomain].contains(ns.domain) ? ns.domain : "other"
+        let reason = (error as? FrameExportError) ?? fallback
+        lastResult = "stage=\(stage) reason=\(reason.rawValue) system=\(domain):\(ns.code)"
+        return error is CancellationError ? error : reason
+    }
+    private func colorTag(_ value: CFPropertyList?) -> String {
+        guard let string = value as? String else { return "unspecified" }
+        // Never copy arbitrary profile names/metadata from a user's file.
+        if string == kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String { return "PQ" }
+        if string == kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String { return "HLG" }
+        if string == "ITU_R_709_2" { return "709" }
+        if string == "ITU_R_2020" { return "2020" }
+        if string == "P3_D65" { return "P3-D65" }
+        if string == "sRGB" { return "sRGB" }
+        return "other"
+    }
+
     func catalogue() async throws -> [CMTime] {
-        guard !input.disallowed, input.asset is AVURLAsset else { throw FrameExportError.unsupported }
+        notes = []; frameTimes = []; imageResult = "not-generated"
+        do { return try await readCatalogue() }
+        catch { throw failure(error, fallback: .readFailed, stage: "catalogue") }
+    }
+    private func readCatalogue() async throws -> [CMTime] {
         let tracks = try await input.asset.loadTracks(withMediaType: .video)
-        guard tracks.count == 1, let track = tracks.first else { throw FrameExportError.unsupported }
-        let hdr = try await input.asset.loadTracks(withMediaCharacteristic: .containsHDRVideo)
+        notes.append("asset=\(input.asset is AVURLAsset ? "url" : "composition") tracks=\(tracks.count)")
+        guard let track = tracks.first else { throw FrameExportError.multipleTracks }
         let rate = try await track.load(.nominalFrameRate)
         let formats = try await track.load(.formatDescriptions)
-        guard hdr.isEmpty, !formats.isEmpty, (9.99...60.01).contains(rate),
-              formats.allSatisfy({ [kCMVideoCodecType_H264, kCMVideoCodecType_HEVC].contains(CMFormatDescriptionGetMediaSubType($0)) })
-        else { throw FrameExportError.unsupported }
-        // Reject HDR transfer tags too, even if a media characteristic is absent.
+        let hdrTracks = try await input.asset.loadTracks(withMediaCharacteristic: .containsHDRVideo)
+        isHDR = !hdrTracks.isEmpty
+        notes.append(String(format: "nominalFPS=%.6f hdrCharacteristic=%@", rate.isFinite ? rate : 0, isHDR ? "true" : "false"))
         for format in formats {
-            let transfer = CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String
-            if transfer == kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String ||
-                transfer == kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String {
-                throw FrameExportError.unsupported
-            }
+            let transfer = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction))
+            let primaries = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_ColorPrimaries))
+            let matrix = colorTag(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_YCbCrMatrix))
+            if transfer == "HLG" || transfer == "PQ" { isHDR = true }
+            notes.append(String(format: "codec=0x%08x transfer=%@ primaries=%@ matrix=%@", CMFormatDescriptionGetMediaSubType(format), transfer, primaries, matrix))
+        }
+        if let reason = input.flags.rejection { throw reason }
+        guard input.asset is AVURLAsset else { throw FrameExportError.assetComposition }
+        guard tracks.count == 1 else { throw FrameExportError.multipleTracks }
+        guard !formats.isEmpty else { throw FrameExportError.missingFormat }
+        guard formats.allSatisfy({ [kCMVideoCodecType_H264, kCMVideoCodecType_HEVC].contains(CMFormatDescriptionGetMediaSubType($0)) }) else { throw FrameExportError.codec }
+        if #available(iOS 18.0, *) { notes.append("toneMapping=AVAssetImageGenerator.forceSDR colorConversion=tagged-source-to-sRGB") }
+        else {
+            guard !isHDR else { throw FrameExportError.hdrRequiresNewerOS }
+            notes.append("toneMapping=SDR-source colorConversion=tagged-source-to-sRGB")
         }
         let duration = try await input.asset.load(.duration)
+        guard input.entry.isNumeric, duration.isNumeric, duration.seconds > 0 else { throw FrameExportError.invalidTiming }
         let entry = min(max(input.entry.seconds, 0), duration.seconds)
-        guard entry.isFinite, duration.seconds > 0 else { throw FrameExportError.noFrames }
-        // Compressed samples preserve PTS, including inter-frame dependencies.
-        // Request a bounded window, never decode the movie from its beginning.
-        let lower = max(0, entry - 0.25)
-        let upper = min(duration.seconds, entry + 3.25)
+        // Bounded compressed metadata, including a preceding frame for sparse
+        // VFR. This does not decode a two-hour movie from its beginning.
+        let lower = max(0, entry - 3), upper = min(duration.seconds, entry + 3.25)
+        notes.append(String(format: "metadataWindowSeconds=%.4f", upper - lower))
         let reader = try AVAssetReader(asset: input.asset)
         reader.timeRange = CMTimeRange(start: CMTime(seconds: lower, preferredTimescale: 60_000),
-                                     end: CMTime(seconds: upper, preferredTimescale: 60_000))
+                                      end: CMTime(seconds: upper, preferredTimescale: 60_000))
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
         output.alwaysCopiesSampleData = false
-        guard reader.canAdd(output) else { throw FrameExportError.unsupported }
+        guard reader.canAdd(output) else { throw FrameExportError.readFailed }
         reader.add(output)
-        guard reader.startReading() else { throw FrameExportError.noFrames }
+        guard reader.startReading() else { throw reader.error ?? FrameExportError.readFailed }
         defer { reader.cancelReading() }
         var times: [CMTime] = []
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
-            // A compressed buffer can contain several samples or a zero-sample
-            // marker. Query each sample's PTS; do not treat a buffer as a frame.
             let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[String: Any]]
             for index in 0..<CMSampleBufferGetNumSamples(sample) {
                 try Task.checkCancellation()
                 if let attachments, index < attachments.count,
                    attachments[index][kCMSampleAttachmentKey_DoNotDisplay as String] as? Bool == true { continue }
                 var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
-                guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr else {
-                    throw FrameExportError.unsupported
-                }
+                guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr,
+                      timing.presentationTimeStamp.isNumeric else { throw FrameExportError.invalidTiming }
                 let time = timing.presentationTimeStamp
-                if time.isNumeric, time.seconds >= lower, CMTimeCompare(time, duration) < 0, time.seconds <= upper {
-                    times.append(time)
-                }
+                if time.seconds >= lower, CMTimeCompare(time, duration) < 0, time.seconds <= upper { times.append(time) }
+                guard times.count <= 4096 else { throw FrameExportError.tooManyFrames }
             }
         }
-        guard reader.status == .completed else { throw FrameExportError.noFrames }
-        times.sort { CMTimeCompare($0, $1) < 0 }
-        guard !times.isEmpty, times.count < 400 else { throw FrameExportError.noFrames }
-        // Uniform measured intervals, including 1001/30000, not an assumed 1/30.
-        if times.count > 1 {
-            let delta = CMTimeSubtract(times[1], times[0]).seconds
-            guard delta > 0, abs(delta - 1 / Double(rate)) <= 0.0001 else { throw FrameExportError.unsupported }
-            for index in 1..<times.count {
-                guard abs(CMTimeSubtract(times[index], times[index - 1]).seconds - delta) <= 0.00002 else {
-                    throw FrameExportError.unsupported
-                }
-            }
-        }
-        return try FrameSelection.window(times, entry: entry)
+        guard reader.status == .completed else { throw reader.error ?? FrameExportError.readFailed }
+        let unique = FrameTiming.uniqueSorted(times)
+        notes.append("duplicatePTS=\(times.count - unique.count)")
+        guard !unique.isEmpty else { throw FrameExportError.noFrames }
+        frameTimes = try FrameSelection.window(unique, entry: entry)
+        notes.append(FrameTiming.report(frameTimes))
+        lastResult = "stage=catalogue result=ready"
+        return frameTimes
     }
 
     func image(at time: CMTime, fullSize: Bool = false) async throws -> FrameImage {
-        try Task.checkCancellation()
-        let current = AVAssetImageGenerator(asset: input.asset)
-        current.appliesPreferredTrackTransform = true
-        current.requestedTimeToleranceBefore = .zero
-        current.requestedTimeToleranceAfter = .zero
-        current.maximumSize = fullSize ? .zero : CGSize(width: 1280, height: 1280)
-        generator = current
-        defer { if generator === current { generator = nil } }
-        let result = try await current.image(at: time)
-        try Task.checkCancellation()
-        guard CMTimeCompare(result.actualTime, time) == 0 else { throw FrameExportError.mismatch }
-        return FrameImage(image: result.image, time: result.actualTime)
+        do {
+            try Task.checkCancellation()
+            guard let index = frameTimes.firstIndex(where: { CMTimeCompare($0, time) == 0 }) else { throw FrameExportError.invalidTiming }
+            let current = AVAssetImageGenerator(asset: input.asset)
+            current.appliesPreferredTrackTransform = true
+            if #available(iOS 18.0, *) { current.dynamicRangePolicy = .forceSDR }
+            else if isHDR { throw FrameExportError.hdrRequiresNewerOS }
+            current.requestedTimeToleranceBefore = .zero
+            current.requestedTimeToleranceAfter = .zero
+            current.maximumSize = fullSize ? .zero : CGSize(width: 1280, height: 1280)
+            generator = current
+            defer { if generator === current { generator = nil } }
+            let result = try await current.image(at: time)
+            try Task.checkCancellation()
+            guard FrameTiming.matches(actual: result.actualTime, index: index, times: frameTimes) else { throw FrameExportError.mismatch }
+            let converted = try FrameColor.sRGB(result.image)
+            imageResult = String(format: "image=SDR-sRGB8 sourceTagged=%@ actualTimeDelta=%.9fs mode=%@", result.image.colorSpace == nil ? "false" : "true", CMTimeSubtract(result.actualTime, time).seconds, fullSize ? "full" : "preview")
+            lastResult = "stage=image result=ready"
+            return FrameImage(image: converted, time: frameTimes[index])
+        } catch { throw failure(error, fallback: .imageFailed, stage: "image") }
     }
-
     func cancel() { generator?.cancelAllCGImageGeneration() }
 
     func writeJPEG(at time: CMTime, to url: URL) async throws -> CMTime {
         let result = try await image(at: time, fullSize: true)
         try Task.checkCancellation()
-        // Explicit 8-bit sRGB output. HDR is rejected before generating images.
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: nil, width: result.image.width, height: result.image.height,
-                                      bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw FrameExportError.storage }
-        context.draw(result.image, in: CGRect(x: 0, y: 0, width: result.image.width, height: result.image.height))
-        guard let converted = context.makeImage(),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
-        else { throw FrameExportError.storage }
-        CGImageDestinationAddImage(destination, converted, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary)
+        // ImageIO embeds the converted CGImage's sRGB profile; the name alone
+        // would not convert or correctly tag the original wide-gamut pixels.
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { throw FrameExportError.storage }
+        CGImageDestinationAddImage(destination, result.image, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { throw FrameExportError.storage }
         return result.time
     }

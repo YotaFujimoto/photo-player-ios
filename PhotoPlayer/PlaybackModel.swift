@@ -464,11 +464,12 @@ final class PlaybackModel: ObservableObject {
         pause()
         let entry = player.currentTime()
         let resources = PHAssetResource.assetResources(for: asset)
-        let edited = resources.contains { $0.type == .adjustmentData || $0.type == .adjustmentBaseVideo }
-        let unsupported = edited || asset.mediaSubtypes.contains(.videoHighFrameRate) ||
-            asset.mediaSubtypes.contains(.videoTimelapse) || item.videoComposition != nil
+        let flags = FrameInputFlags(adjustmentData: resources.contains { $0.type == .adjustmentData },
+                                    adjustmentBaseVideo: resources.contains { $0.type == .adjustmentBaseVideo },
+                                    highFrameRate: asset.mediaSubtypes.contains(.videoHighFrameRate),
+                                    timelapse: asset.mediaSubtypes.contains(.videoTimelapse), videoComposition: item.videoComposition != nil)
         let name = resources.first { $0.type == .video }?.originalFilename
-        return FrameAsset(asset: item.asset, entry: entry, disallowed: unsupported,
+        return FrameAsset(asset: item.asset, entry: entry, flags: flags,
                           fileStem: FrameFileName.stem(original: name, identifier: asset.localIdentifier))
     }
 

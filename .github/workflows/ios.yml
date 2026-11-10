@@ -70,7 +70,7 @@ jobs:
           bash scripts/generate-frame-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        # Includes a cold Release build, 29 serial test hosts and evidence export.
+        # Includes a cold Release build, 30 serial test hosts and evidence export.
         # The 40-minute job stopped after 87 passing tests with eight still pending.
         # Individual 120/180-second deadlines and every assertion remain unchanged.
         timeout-minutes: 60
@@ -102,6 +102,7 @@ jobs:
             build/simulators.json
             build/fixture-info.json
             build/fixture-seek-info.json
+            build/frame-fixtures/fixture-report.json
             build/TestResults.xcresult
             build/copy-results/
             build/screenshots/

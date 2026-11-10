@@ -14,6 +14,7 @@ import CoreMedia
     let source: any FrameProviding
     let fileStem: String
     let entryTime: CMTime
+    var onDiagnostic: ((String) -> Void)?
     private let writer: any FramePhotoWriting
     private var setupTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
@@ -21,6 +22,7 @@ import CoreMedia
     private var pending: (Int, Int)?
     private var requestedIndex: Int?
     private var revision = 0
+    private var diagnosticRevision = 0
     private var closed = false
     private var interactionOrigin: Double?
     var canSetEndpoints: Bool { phase == .ready && !isPreviewing && !isInteracting && preview != nil }
@@ -46,9 +48,11 @@ import CoreMedia
                 selection = FrameSelection(times: times)
                 phase = .ready
                 request(index: 0)
+                await recordDiagnostic(stage: "catalogue-ready")
             } catch {
                 guard !closed else { return }
                 self.error = message(error); phase = .unavailable
+                await recordDiagnostic(stage: "catalogue-failed", error: error)
             }
         }
     }
@@ -76,10 +80,12 @@ import CoreMedia
                     preview = result.image
                     self.selection?.show(index)
                     isPreviewing = false
+                    await recordDiagnostic(stage: "preview-ready")
                 } catch {
                     guard !closed, revision == token else { continue }
                     self.error = message(error)
                     isPreviewing = false; requestedIndex = nil
+                    await recordDiagnostic(stage: "preview-failed", error: error)
                 }
             }
             previewTask = nil
@@ -148,10 +154,12 @@ import CoreMedia
                 // photos were created. Await the real transaction result.
                 try await writer.save(photos)
                 savedCount = photos.count; phase = .saved
+                await recordDiagnostic(stage: "saved")
             } catch {
                 guard !closed else { return }
                 self.error = error is CancellationError ? "Preparation stopped. Tap Done to try again." : message(error)
                 phase = (error as? FrameExportError) == .uncertain ? .uncertain : .ready
+                await recordDiagnostic(stage: "save-failed", error: error)
             }
         }
     }
@@ -172,6 +180,16 @@ import CoreMedia
         closed = true; revision += 1; pending = nil
         setupTask?.cancel(); previewTask?.cancel(); saveTask?.cancel()
         Task { await source.cancel() }
+    }
+    private func recordDiagnostic(stage: String, error: Error? = nil) async {
+        guard let onDiagnostic else { return }
+        diagnosticRevision += 1
+        let token = diagnosticRevision
+        let report = await source.diagnosticReport()
+        guard diagnosticRevision == token else { return }
+        // Whitelisted reason only. Never forward localized errors or URLs.
+        let reason = (error as? FrameExportError)?.rawValue ?? (error == nil ? "none" : error is CancellationError ? "cancelled" : "operation-failed")
+        onDiagnostic(report + "\noperationStage=\(stage) reason=\(reason)")
     }
     private func message(_ error: Error) -> String {
         if let known = error as? FrameExportError { return known.localizedDescription }

@@ -180,7 +180,12 @@ struct PlayerScreen: View {
                 guard let input = model.beginFrameExtraction() else { return }
                 rateMenuVisible = false; saveNotice = nil
                 chrome.setActive(false)
-                extraction = FrameExtractionModel(source: FrameSource(input: input), fileStem: input.fileStem, entryTime: input.entry)
+                let frameModel = FrameExtractionModel(source: FrameSource(input: input), fileStem: input.fileStem, entryTime: input.entry)
+                if let selectionTrace {
+                    let operation = selectionTrace.beginFrameOperation(video: video.diagnosticNumber)
+                    frameModel.onDiagnostic = { [weak selectionTrace] report in selectionTrace?.recordFrameOperation(operation, text: report) }
+                }
+                extraction = frameModel
             } label: {
                 Image(systemName: "photo.badge.plus").frame(width: 44, height: 44).contentShape(Rectangle())
             }

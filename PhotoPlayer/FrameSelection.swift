@@ -16,7 +16,7 @@ struct FrameSelection: Sendable {
     static func window(_ measured: [CMTime], entry: Double) throws -> [CMTime] {
         // Missing timing before the entry must never silently move W0 forward.
         guard let first = measured.lastIndex(where: { $0.seconds <= entry + 0.000001 }) else {
-            throw FrameExportError.unsupported
+            throw FrameExportError.entryFrameMissing
         }
         let end = CMTimeAdd(measured[first], CMTime(value: 3, timescale: 1))
         return Array(measured[first...].filter { CMTimeCompare($0, end) <= 0 })
@@ -35,19 +35,37 @@ struct FrameSelection: Sendable {
     var summary: String {
         let chosen = indices
         guard chosen.count > 1 else { return "1 frame" }
-        let interval = CMTimeSubtract(times[chosen[1]], times[chosen[0]]).seconds
-        return String(format: "%.3f s · %d", interval, chosen.count)
+        let interval = CMTimeSubtract(times[chosen.last!], times[chosen[0]]).seconds / Double(chosen.count - 1)
+        return (FrameTiming.isVariable(times) ? "≈" : "") + String(format: "%.3f s · %d", interval, chosen.count)
     }
     func nearest(to seconds: Double) -> Int {
         times.indices.min { abs(times[$0].seconds - seconds) < abs(times[$1].seconds - seconds) } ?? 0
     }
 }
 
-enum FrameExportError: Error, LocalizedError, Equatable {
-    case unsupported, noFrames, mismatch, permission, storage, saveFailed, uncertain
+enum FrameExportError: String, Error, LocalizedError, Equatable {
+    case adjusted, highFrameRateCapture, timelapse, videoComposition, assetComposition
+    case multipleTracks, missingFormat, codec, invalidTiming, tooManyFrames, entryFrameMissing
+    case hdrRequiresNewerOS, colorProfile, colorConversion, readFailed, imageFailed
+    case noFrames, mismatch, permission, storage, saveFailed, uncertain
     var errorDescription: String? {
         switch self {
-        case .unsupported: "Frame saving requires an unedited SDR video with a constant frame rate (10–60 fps)."
+        case .adjusted: "Videos with photo-library adjustments are not supported yet."
+        case .highFrameRateCapture: "High-frame-rate capture is not supported yet."
+        case .timelapse: "Time-lapse frame saving is not supported yet."
+        case .videoComposition: "This video uses unsupported playback adjustments."
+        case .assetComposition: "Composed videos are not supported yet."
+        case .multipleTracks: "Frame saving needs one video track."
+        case .missingFormat: "Video format information is missing."
+        case .codec: "This video codec is not supported for frame saving."
+        case .invalidTiming: "Could not read this video's frame timestamps."
+        case .tooManyFrames: "Too many frames in this short interval."
+        case .entryFrameMissing: "Could not locate the displayed frame. Try another position."
+        case .hdrRequiresNewerOS: "HDR frame saving requires iOS 18 or later."
+        case .colorProfile: "The frame's color profile is unavailable."
+        case .colorConversion: "Could not convert this frame's colors."
+        case .readFailed: "Could not read video frames. Try again."
+        case .imageFailed: "Could not decode this frame. Try again."
         case .noFrames: "Frames unavailable. Try another position."
         case .mismatch: "Cannot match this frame accurately."
         case .permission: "Allow adding photos in Settings."

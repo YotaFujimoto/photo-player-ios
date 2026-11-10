@@ -14,6 +14,8 @@ final class SelectionTrace: ObservableObject {
     private let session = String(UUID().uuidString.prefix(8))
     private var nextProbeSerial = 0
     private var diagnosticsVisible = false
+    private var nextFrameOperation = 0
+    private var frameReports: [(id: Int, video: Int, text: String)] = []
 
     var summary: String { "接触 \(journal.contactCount) / 受付 \(journal.accepted) / 表示 \(journal.shown) / 取得 \(journal.requested)→\(journal.received)" }
     var testValue: String {
@@ -21,7 +23,20 @@ final class SelectionTrace: ObservableObject {
     }
     var report: String {
         journal.report(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?",
-                       context: "session=\(session) source=UIApplication.sendEvent; OSからアプリへ配送される前の入力は観測できません。")
+                       context: "session=\(session) source=UIApplication.sendEvent; OSからアプリへ配送される前の入力は観測できません。\n[frame extraction: last 8 operations]\n" +
+                       frameReports.map { "F\($0.id) V\($0.video)\n\($0.text)" }.joined(separator: "\n"))
+    }
+
+    func beginFrameOperation(video: Int) -> Int {
+        nextFrameOperation += 1
+        frameReports.append((nextFrameOperation, video, "stage=opening"))
+        frameReports = Array(frameReports.suffix(8))
+        return nextFrameOperation
+    }
+    func recordFrameOperation(_ id: Int, text: String) {
+        guard let index = frameReports.firstIndex(where: { $0.id == id }) else { return }
+        frameReports[index].text = text
+        changed()
     }
 
     func lifecycle(_ reason: String) {

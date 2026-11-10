@@ -18,7 +18,7 @@ final class FrameSelectionTests: XCTestCase {
         let times = (0...90).map { CMTime(value: Int64($0 + 150), timescale: 30) }
         XCTAssertEqual(try FrameSelection.window(times,entry:5),times)
         XCTAssertThrowsError(try FrameSelection.window(times,entry:4)) {
-            XCTAssertEqual($0 as? FrameExportError,.unsupported,"Missing preceding timing cannot shift entry to a later frame")
+            XCTAssertEqual($0 as? FrameExportError,.entryFrameMissing,"Missing preceding timing cannot shift entry to a later frame")
         }
         var state = FrameSelection(times: times)
         state.show(30); state.setStart()
