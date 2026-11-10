@@ -7,7 +7,10 @@ final class FrameTimingTests: XCTestCase {
         let rounded=(0...90).map { CMTime(value:Int64((Double($0)*1001/30000*600).rounded()),timescale:600) }
         XCTAssertFalse(FrameTiming.isVariable(rounded))
         XCTAssertFalse(FrameSelection(times:rounded).summary.hasPrefix("≈"))
-        let variable=(0...90).map { CMTime(value:Int64($0 < 45 ? $0 : 45+($0-45)*2),timescale:30) }
+        let variable: [CMTime] = (0...90).map { (index: Int) in
+            let tick: Int = index < 45 ? index : 45 + (index - 45) * 2
+            return CMTime(value: Int64(tick), timescale: 30)
+        }
         var selection=FrameSelection(times:variable)
         XCTAssertTrue(FrameTiming.isVariable(variable)); XCTAssertTrue(selection.summary.hasPrefix("≈"))
         XCTAssertEqual(selection.indices,(0..<10).map { $0*10 })
