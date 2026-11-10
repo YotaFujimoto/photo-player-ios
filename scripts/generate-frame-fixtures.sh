@@ -62,12 +62,14 @@ for name in ('30','2997','rounded','hevc','hlg','pq','variable','hlg-variable','
     probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_streams','-show_frames','-of','json',f'build/frame-fixtures/frames-{name}.mov']))
     stream=probe['streams'][0]
     times=[float(frame['best_effort_timestamp_time']) for frame in probe['frames']]
+    report[name]={'stream':stream,'times':times}
+    with open('build/frame-fixtures/fixture-report.json','w') as output: json.dump(report,output,indent=2)
+    print(name, {key:stream.get(key) for key in ('codec_name','pix_fmt','color_primaries','color_space','color_transfer')}, flush=True)
     assert len(times)==151 and all(b>a for a,b in zip(times,times[1:])), name
     if name in ('hlg','pq','hlg-variable','hdr-ui'):
         assert stream['codec_name']=='hevc' and stream['pix_fmt']=='yuv420p10le', stream
-        assert stream['color_primaries']=='bt2020' and stream['color_space']=='bt2020nc', stream
-        assert stream['color_transfer']==('smpte2084' if name=='pq' else 'arib-std-b67'), stream
-    report[name]={'stream':stream,'times':times}
+        assert stream.get('color_primaries')=='bt2020' and stream.get('color_space')=='bt2020nc', stream
+        assert stream.get('color_transfer')==('smpte2084' if name=='pq' else 'arib-std-b67'), stream
 assert report['rounded']['stream']['time_base']=='1/600'
 for name in ('variable','hlg-variable','hdr-ui'):
     times=report[name]['times']
