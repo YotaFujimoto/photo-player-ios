@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # CI-only synthetic media. Software encoding avoids unavailable VM video hardware.
-mkdir -p build/fixtures
+mkdir -p build/fixtures build/fixture-source
 if ! command -v ffmpeg >/dev/null; then
   HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg
 fi
@@ -11,8 +11,37 @@ ffmpeg -hide_banner -loglevel warning -y \
   -f lavfi -i 'testsrc2=size=320x180:rate=10' \
   -f lavfi -i 'sine=frequency=440:sample_rate=48000' \
   -t 30 -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -threads 2 \
-  -c:a aac -b:a 64k -metadata creation_time=2024-02-01T00:00:00Z -movflags +faststart build/fixtures/synthetic-video.mov \
+  -c:a aac -b:a 64k -metadata creation_time=2024-02-01T00:00:00Z -movflags +faststart build/fixture-source/synthetic-video.mov \
   2>&1 | tee -a build/fixtures.log
+# Make the UI fixture's decoding workload explicit instead of inheriting x264's
+# default GOP at only 10 fps. Keep inter-frame H.264 and the original AAC audio;
+# 15s and fractional bar targets still require sample-accurate non-keyframe seeks.
+# This is a UI-test input bound, not a change to production seeking or a claim
+# about arbitrary media. Retain and measure the original encoding for comparison.
+ffmpeg -hide_banner -loglevel warning -y -i build/fixture-source/synthetic-video.mov \
+  -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -threads 2 \
+  -g 20 -keyint_min 20 -sc_threshold 0 -c:a copy \
+  -metadata creation_time=2024-02-01T00:00:00Z -movflags +faststart \
+  build/fixtures/synthetic-video.mov 2>&1 | tee -a build/fixtures.log
+python3 - <<'PY' | tee -a build/fixtures.log
+import json, pathlib, subprocess
+report = {}
+for label, directory in [('original', 'fixture-source'), ('ui', 'fixtures')]:
+    path = pathlib.Path('build') / directory / 'synthetic-video.mov'
+    info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error',
+        '-select_streams', 'v:0', '-show_frames', '-show_entries',
+        'frame=key_frame,best_effort_timestamp_time', '-of', 'json', str(path)]))
+    frames = info['frames']
+    keys = [float(f['best_effort_timestamp_time']) for f in frames if f['key_frame']]
+    report[label] = {'frame_count': len(frames), 'keyframe_times': keys,
+                     'max_keyframe_gap': max(b-a for a,b in zip(keys, keys[1:]))}
+assert report['ui']['frame_count'] == report['original']['frame_count'] == 300, report
+assert 0 < report['ui']['max_keyframe_gap'] <= 2.001, report
+assert len(report['ui']['keyframe_times']) < 300, 'Keep inter-frame decoding coverage'
+assert 15.0 not in report['ui']['keyframe_times'], 'Paused 15s test must remain off-keyframe'
+pathlib.Path('build/fixture-seek-info.json').write_text(json.dumps(report, indent=2))
+print('Synthetic seek workload:', report)
+PY
 ffmpeg -hide_banner -loglevel warning -y -i build/fixtures/synthetic-video.mov \
   -frames:v 1 -update 1 build/fixtures/synthetic-still.png 2>&1 | tee -a build/fixtures.log
 ffprobe -v error -show_entries format=duration:stream=codec_name,codec_type \

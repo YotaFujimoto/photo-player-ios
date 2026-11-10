@@ -42,6 +42,10 @@
 
 `0352c4f0e3ffc8e46e77280cb9d3593edc3fda91` / [run 42746926173](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42746926173) は単体61・UI26・IPA検査4の91件が成功。新UI4件、既存15秒シーク、バー／横スワイプ6件、値12保持、一覧の混在セル等を通過した。個別失敗・ホスト再起動はなく、14セッション完了後の40分全体上限で、長押し回帰の途中に打切りとなった。残りUI8件とIPA生成は未完了。OS activity抑制だけで過去の原因が解消したとは断定しない。全22セッション・冷間ビルド・証跡出力の時間を確保するため、ステップ60分・ジョブ70分へ変更する。個別試験の期限と合格条件は変更しない。証跡は `build/evidence-42746926173/` と `build/job-42746926173-clean.log`。時間制限による強制停止のためスクリーンショットのexportは未実行で、xcresult本体を保持した。
 
+`4db234caf5e626ea3d839083a7824a3ac86fb1c0` / [run 42752095840](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/42752095840) は単体61・新UI4・既存再生UI1・IPA検査4の70件成功。続く縦バー試験で7.5135→22.5135→15.0秒の要求が受付され、置換された2要求には取消通知が届いたが、最後の15.0秒の完了通知がなく15秒の状態待ちで失敗した。前回の全体時間切れとは異なる。表示位置は要求を先に表示するため、位置の表示だけを再生完了とは扱わない。既存の直列キュー・取消・MainActorへの配送を点検したが、根本原因は未確定。証跡は `build/evidence-42752095840/`、`build/job-42752095840-clean.log`、`build/diagnostics-42752095840-bar/`。配布アプリへ待ち時間・自動再シーク・精度緩和を追加しない。
+
+次の切り分けではCIの30秒合成動画のキーフレーム間隔を、未指定のエンコーダ既定値から明示的な2秒へ変更する。[Appleはsample-accurate seekに追加のデコード遅延があり得ると説明](https://developer.apple.com/documentation/avfoundation/avplayer/seek(to:tolerancebefore:toleranceafter:completionhandler:))している。[FFmpegのGOP設定](https://github.com/FFmpeg/FFmpeg/blob/master/doc/encoders.texi)を用い、旧形式も生成して両者の全300フレーム・キーフレーム時刻を `fixture-seek-info.json` に実測記録する。H.264のフレーム間圧縮・同じAAC音声・解像度・長さ・fpsを保持し、15秒をキーフレームにせず、途中位置の正確なシークを引き続き検証する。99件の精度・時間上限・アサーションは維持するが、素材の条件が変わることを明記する。これはUI試験のデコード負荷を明示する切り分けであり、過去の原因確定、長いGOPの解消、実機素材への合格拡張ではない。
+
 ### ビルド11の実機確認票（未実施）
 
 削除せず同じ署名設定で更新し、短い端末内動画で確認する。初回にDiagnosticsでBuild 11・値12を確認する。長時間・素材別の再試験や旧一覧症状の反復は依頼しない。
