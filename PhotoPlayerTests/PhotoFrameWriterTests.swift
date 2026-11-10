@@ -40,7 +40,7 @@ final class PhotoFrameWriterTests: XCTestCase {
             let options=PHImageRequestOptions()
             options.version = .current; options.deliveryMode = .highQualityFormat; options.isNetworkAccessAllowed=false
             let data: Data = try await withCheckedThrowingContinuation { continuation in
-                PHImageManager.default().requestImageDataAndOrientation(for:asset,options:options) { data,_,_,_ in
+                PHImageManager.default().requestImageDataAndOrientation(for:asset,options:options) { @Sendable data,_,_,_ in
                     if let data { continuation.resume(returning:data) }
                     else { continuation.resume(throwing:FrameExportError.saveFailed) }
                 }

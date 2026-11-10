@@ -22,7 +22,9 @@ struct PreparedPhoto: Sendable {
     func save(_ photos: [PreparedPhoto]) async throws {
         guard (1...10).contains(photos.count) else { throw FrameExportError.saveFailed }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            PHPhotoLibrary.shared().performChanges {
+            // Photos invokes both blocks on its own queues. Explicit Sendable
+            // blocks must not inherit the caller's MainActor executor.
+            PHPhotoLibrary.shared().performChanges { @Sendable in
                 for photo in photos {
                     let options = PHAssetResourceCreationOptions()
                     options.originalFilename = photo.filename
@@ -30,7 +32,7 @@ struct PreparedPhoto: Sendable {
                     let request = PHAssetCreationRequest.forAsset()
                     request.addResource(with: .photo, fileURL: photo.url, options: options)
                 }
-            } completionHandler: { success, error in
+            } completionHandler: { @Sendable success, error in
                 if success { continuation.resume() }
                 else if let error {
                     continuation.resume(throwing: Self.failure(for: error as NSError))
