@@ -70,15 +70,16 @@ final class SeekInteractionUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
         XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
         XCTAssertEqual(app.playerButton("rateMenu").value as? String, "0.25×")
-        let pauseFrame = app.playerButton("playPause").frame
-        let pausePoint = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: pauseFrame.midX, dy: pauseFrame.midY))
-        pausePoint.tap(); state(app, "Playing")
+        // Scope both taps to the control. App-root coordinates lazily resolve
+        // the entire hierarchy again while synthesizing input, which can spend
+        // the three-second fullscreen deadline after a successful seek.
+        let pauseButton = app.playerButton("playPause")
+        pauseButton.tap(); state(app, "Playing")
         setPosition(app, fraction: 0.25)
         let seekReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Playing")
         app.revealPlayerControls()
-        pausePoint.tap()
+        pauseButton.tap()
         let pauseReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Paused")
         // AX queries may take seconds while playback correctly advances.
