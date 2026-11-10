@@ -46,7 +46,7 @@ struct FrameSelection: Sendable {
 enum FrameExportError: String, Error, LocalizedError, Equatable {
     case adjusted, highFrameRateCapture, timelapse, videoComposition, assetComposition
     case multipleTracks, missingFormat, codec, invalidTiming, tooManyFrames, entryFrameMissing
-    case hdrRequiresNewerOS, colorProfile, colorConversion, readFailed, imageFailed
+    case hdrRequiresNewerOS, colorProfile, colorConversion, readFailed, imageFailed, imageEncoding
     case noFrames, mismatch, permission, storage, saveFailed, uncertain
     var errorDescription: String? {
         switch self {
@@ -66,6 +66,7 @@ enum FrameExportError: String, Error, LocalizedError, Equatable {
         case .colorConversion: "Could not convert this frame's colors."
         case .readFailed: "Could not read video frames. Try again."
         case .imageFailed: "Could not decode this frame. Try again."
+        case .imageEncoding: "Could not create the JPEG photo."
         case .noFrames: "Frames unavailable. Try another position."
         case .mismatch: "Cannot match this frame accurately."
         case .permission: "Allow adding photos in Settings."

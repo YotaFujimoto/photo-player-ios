@@ -63,6 +63,30 @@ ffmpeg -hide_banner -loglevel warning -y -i build/frame-fixtures/frames-hlg-vari
   -metadata creation_time=2026-03-01T00:00:00Z build/frame-fixtures/frames-hdr-ui.mov
 python3 - <<'PY'
 import json, subprocess
+from pathlib import Path
+def hevc_metadata(path):
+    data=Path(path).read_bytes()
+    position=data.index(b'hvcC')
+    size=int.from_bytes(data[position-4:position],'big')
+    config=data[position+4:position-4+size]
+    offset=23; types=[]; sei=[]
+    for _ in range(config[22]):
+        kind=config[offset]&63; count=int.from_bytes(config[offset+1:offset+3],'big'); offset+=3
+        types.append(kind)
+        for _ in range(count):
+            length=int.from_bytes(config[offset:offset+2],'big'); offset+=2
+            nal=config[offset:offset+length]; offset+=length
+            if kind==39:
+                rbsp=nal[2:].replace(b'\x00\x00\x03',b'\x00\x00'); cursor=0
+                while cursor<len(rbsp) and rbsp[cursor]!=128:
+                    payload_type=0
+                    while rbsp[cursor]==255: payload_type+=255; cursor+=1
+                    payload_type+=rbsp[cursor]; cursor+=1
+                    payload_size=0
+                    while rbsp[cursor]==255: payload_size+=255; cursor+=1
+                    payload_size+=rbsp[cursor]; cursor+=1
+                    sei.append(payload_type); cursor+=payload_size
+    return {'configurationNALTypes':types,'configurationSEITypes':sei,'mdcvAtom':b'mdcv' in data,'clliAtom':b'clli' in data}
 data=json.load(open('build/frame-fixtures/rotation.json'))
 assert abs(data['streams'][0]['side_data_list'][0]['rotation']) == 90
 report={}
@@ -83,6 +107,10 @@ for name in ('30','2997','rounded','hevc','hlg','pq','variable','hlg-variable','
         metadata=stream.get('side_data_list',[])+side_data
         assert any(d.get('side_data_type')=='Mastering display metadata' for d in metadata), metadata
         assert any(d.get('side_data_type')=='Content light level metadata' and d.get('max_content')==1000 and d.get('max_average')==439 for d in metadata), metadata
+        locations=hevc_metadata(f'build/frame-fixtures/frames-{name}.mov')
+        print('PQ metadata location',locations,flush=True)
+        report[name]['metadataLocation']=locations
+        assert (locations['mdcvAtom'] or 137 in locations['configurationSEITypes']) and (locations['clliAtom'] or 144 in locations['configurationSEITypes']), locations
 assert report['rounded']['stream']['time_base']=='1/600'
 for name in ('variable','hlg-variable','hdr-ui'):
     times=report[name]['times']

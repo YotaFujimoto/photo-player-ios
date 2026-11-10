@@ -47,6 +47,7 @@ final class PhotoFrameWriterTests: XCTestCase {
                 }
             }
             let imageSource=try XCTUnwrap(CGImageSourceCreateWithData(data as CFData,nil))
+            XCTAssertNotNil(data.range(of: Data("ICC_PROFILE\0".utf8)), "Saved Photos resource must retain its sRGB profile")
             let image=try XCTUnwrap(CGImageSourceCreateImageAtIndex(imageSource,0,nil))
             XCTAssertEqual(try FrameSourceTests.number(image),indices[ordinal])
         }

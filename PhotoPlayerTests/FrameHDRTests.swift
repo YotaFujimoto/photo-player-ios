@@ -5,6 +5,33 @@ import UIKit
 @testable import PhotoPlayer
 
 final class FrameHDRTests: XCTestCase {
+    private func probePQ(_ asset: AVAsset) async throws {
+        let tracks = try await asset.loadTracks(withMediaType: .video)
+        let formats = try await tracks[0].load(.formatDescriptions)
+        for format in formats { print("Synthetic PQ format", CMFormatDescriptionGetExtensions(format) as Any) }
+        if #available(iOS 18.0, *) {
+            for (name, policy) in [("SDR", AVAssetImageGenerator.DynamicRangePolicy.forceSDR), ("source", .matchSource)] {
+                let generator = AVAssetImageGenerator(asset: asset)
+                generator.dynamicRangePolicy = policy
+                generator.requestedTimeToleranceBefore = .zero; generator.requestedTimeToleranceAfter = .zero
+                do {
+                    let result = try await generator.image(at: .zero)
+                    print("Synthetic PQ policy", name, "success bits", result.image.bitsPerComponent, "space", result.image.colorSpace as Any)
+                } catch {
+                    let ns = error as NSError
+                    let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError
+                    print("Synthetic PQ policy", name, "error", ns.domain, ns.code, "underlying", underlying?.domain as Any, underlying?.code as Any)
+                }
+            }
+        }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: tracks[0], outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange])
+        reader.add(output)
+        let started = reader.startReading()
+        let sample = output.copyNextSampleBuffer()
+        print("Synthetic PQ decoded reader", started, "sample", sample != nil, "error", reader.error as Any)
+        reader.cancelReading()
+    }
     private func pixel(_ image: CGImage, x: Int, y: Int) throws -> [Int] {
         var bytes=[UInt8](repeating:0,count:image.width*image.height*4)
         try bytes.withUnsafeMutableBytes { buffer in
@@ -17,6 +44,7 @@ final class FrameHDRTests: XCTestCase {
     }
     func testHLGAndPQProduceMatchingSDRProfilesGradientsColorsAndJPEGFrames() async throws {
         for name in ["frames-hlg","frames-pq"] {
+            if name == "frames-pq" { try await probePQ(FrameSourceTests.asset(name)) }
             try await FrameSourceTests.probe(FrameSourceTests.asset(name))
             let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(name),entry:.zero,fileStem:"synthetic"))
             let times=try await source.catalogue()

@@ -77,6 +77,13 @@ actor FrameSource: FrameProviding {
         let domain = [AVFoundationErrorDomain, NSOSStatusErrorDomain, NSCocoaErrorDomain, NSURLErrorDomain].contains(ns.domain) ? ns.domain : "other"
         let reason = (error as? FrameExportError) ?? fallback
         lastResult = "stage=\(stage) reason=\(reason.rawValue) system=\(domain):\(ns.code)"
+        var underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError
+        for _ in 0..<3 {
+            guard let current = underlying else { break }
+            let safeDomain = [AVFoundationErrorDomain, NSOSStatusErrorDomain, NSCocoaErrorDomain, NSURLErrorDomain].contains(current.domain) ? current.domain : "other"
+            lastResult += " underlying=\(safeDomain):\(current.code)"
+            underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
         return error is CancellationError ? error : reason
     }
     private func colorTag(_ value: CFPropertyList?) -> String {
