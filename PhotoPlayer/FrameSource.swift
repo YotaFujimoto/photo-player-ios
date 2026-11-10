@@ -63,10 +63,21 @@ actor FrameSource: FrameProviding {
         var times: [CMTime] = []
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
-            guard CMSampleBufferGetNumSamples(sample) == 1 else { throw FrameExportError.unsupported }
-            let time = CMSampleBufferGetPresentationTimeStamp(sample)
-            if time.isNumeric, time.seconds >= lower, CMTimeCompare(time, duration) < 0, time.seconds <= upper {
-                times.append(time)
+            // A compressed buffer can contain several samples or a zero-sample
+            // marker. Query each sample's PTS; do not treat a buffer as a frame.
+            let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]]
+            for index in 0..<CMSampleBufferGetNumSamples(sample) {
+                try Task.checkCancellation()
+                if let attachments, index < attachments.count,
+                   attachments[index][kCMSampleAttachmentKey_DoNotDisplay] as? Bool == true { continue }
+                var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
+                guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr else {
+                    throw FrameExportError.unsupported
+                }
+                let time = timing.presentationTimeStamp
+                if time.isNumeric, time.seconds >= lower, CMTimeCompare(time, duration) < 0, time.seconds <= upper {
+                    times.append(time)
+                }
             }
         }
         guard reader.status == .completed else { throw FrameExportError.noFrames }

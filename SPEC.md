@@ -238,3 +238,5 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 この第9項の各要件について、実装済み／未実装／実機未確認を区別して管理する。文書へ記録しただけで実装完了扱いにしない。
 
 一時JPEGの異常終了後の清掃はアプリ内の専用UUIDフォルダーだけを対象とし、作成から7日以上のものを除去する。直近の結果未確定の保存操作には触れない。アプリ内ファイル時刻の参照はPrivacyInfo.xcprivacyにC617.1を宣言する（[Appleの定義](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons)）。時刻や素材情報を外部送信しない。
+
+実コマの時刻は[Core Mediaのサンプル別時刻API](https://developer.apple.com/documentation/coremedia/cmsamplebuffergetsampletiminginfo(_:at:timinginfoout:))で取得する。1バッファが1コマとは仮定せず、空のマーカーと非表示の依存サンプルを保存対象から除く。Photos固有の容量不足・権限拒否／制限と、JPEG作成時の容量不足を短い理由へ対応付ける。

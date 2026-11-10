@@ -6,6 +6,9 @@ import ImageIO
 
 final class PhotoFrameWriterTests: XCTestCase {
     @MainActor func testRealPhotoKitBatchPreservesNamesPixelsAndExistingAssets() async throws {
+        XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.notEnoughSpace.rawValue)), .storage)
+        XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.accessUserDenied.rawValue)), .permission)
+        XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)), .storage)
         let before = PHAsset.fetchAssets(with: .image, options: nil)
         let existing = (0..<before.count).map { before.object(at:$0).localIdentifier }
         let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset("frames-30"),entry:.zero,disallowed:false,fileStem:"synthetic"))

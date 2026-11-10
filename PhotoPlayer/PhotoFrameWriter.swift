@@ -33,12 +33,21 @@ struct PreparedPhoto: Sendable {
             } completionHandler: { success, error in
                 if success { continuation.resume() }
                 else if let error {
-                    let ns = error as NSError
-                    continuation.resume(throwing: ns.domain == NSCocoaErrorDomain && ns.code == NSFileWriteOutOfSpaceError
-                                        ? FrameExportError.storage : FrameExportError.saveFailed)
+                    continuation.resume(throwing: Self.failure(for: error as NSError))
                 } else { continuation.resume(throwing: FrameExportError.uncertain) }
             }
         }
+    }
+    nonisolated static func failure(for error: NSError) -> FrameExportError {
+        if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteOutOfSpaceError { return .storage }
+        if error.domain == PHPhotosErrorDomain {
+            switch PHPhotosError.Code(rawValue: error.code) {
+            case .notEnoughSpace: return .storage
+            case .accessUserDenied, .accessRestricted: return .permission
+            default: break
+            }
+        }
+        return .saveFailed
     }
 }
 
