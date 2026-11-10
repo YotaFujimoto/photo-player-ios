@@ -12,7 +12,7 @@ final class VideoSelectionTests: XCTestCase {
     @MainActor
     private func launch(delayed: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--selection-diagnostics"] + (delayed ? ["--delay-thumbnails"] : [])
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))

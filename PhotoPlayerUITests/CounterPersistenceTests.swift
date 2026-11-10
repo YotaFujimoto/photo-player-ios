@@ -4,7 +4,7 @@ final class CounterPersistenceTests: XCTestCase {
     @MainActor
     func testCounterSurvivesRelaunch() throws {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launch()
         app.tabBars.buttons["Diagnostics"].tap()
 

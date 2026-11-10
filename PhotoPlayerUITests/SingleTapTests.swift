@@ -8,7 +8,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     private func launch(_ arguments: [String] = []) -> XCUIApplication {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--selection-diagnostics"] + arguments
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))

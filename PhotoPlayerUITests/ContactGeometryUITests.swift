@@ -4,7 +4,7 @@ final class ContactGeometryUITests: XCTestCase {
     @MainActor
     func testLiveCellGeometryAfterScrollReturnReloadAndToggle() {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--selection-diagnostics", "--verify-diagnostic-copy", "--delay-thumbnails"]
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))
@@ -55,7 +55,7 @@ final class ContactGeometryUITests: XCTestCase {
     @MainActor
     func testCopyAndToggleHaveDistinctControlInputsAndNeverSelect() {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--verify-diagnostic-copy"]
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))

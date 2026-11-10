@@ -5,7 +5,7 @@ final class FullscreenUITests: XCTestCase {
     @MainActor private func openPaused() -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--playback-diagnostics"]
         app.launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch

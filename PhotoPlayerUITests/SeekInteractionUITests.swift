@@ -5,7 +5,7 @@ final class SeekInteractionUITests: XCTestCase {
     @MainActor private func open(held: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--playback-diagnostics"] + (held ? ["--hold-player-result"] : [])
         app.launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch

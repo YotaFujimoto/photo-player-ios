@@ -5,7 +5,7 @@ final class VideoPlaybackTests: XCTestCase {
     @MainActor
     func testPhotoKitVideoPlaybackRateAndSeek() {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--playback-diagnostics"]
         app.launch()
         let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.'"))

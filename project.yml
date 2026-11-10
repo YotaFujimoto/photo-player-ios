@@ -69,6 +69,8 @@ schemes:
       config: Release
       gatherCoverageData: false
       preferredScreenCaptureFormat: screenshots
+      environmentVariables:
+        OS_ACTIVITY_MODE: disable
       targets:
         - PhotoPlayerTests
         - PhotoPlayerUITests

@@ -7,7 +7,7 @@ final class InputLifecycleTests: XCTestCase {
     @MainActor
     private func checkSequence(monitor: Bool) {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--verify-diagnostic-copy"] + (monitor ? [] : ["--disable-input-monitor"])
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.4"].waitForExistence(timeout: 20))
@@ -46,7 +46,7 @@ final class InputLifecycleTests: XCTestCase {
     @MainActor
     func testBackgroundStopsPlaybackAndInputContinuesAfterReturn() {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--verify-diagnostic-copy"]
         app.launch()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 20))
