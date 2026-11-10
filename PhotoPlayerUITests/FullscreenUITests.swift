@@ -106,10 +106,19 @@ final class FullscreenUITests: XCTestCase {
         state(app, "Playing")
         surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         XCTAssertTrue(play(app).waitForExistence(timeout: 3))
+        play(app).tap()
+        let stopped = ProcessInfo.processInfo.systemUptime
+        state(app, "Paused")
         let reached = seconds(app)
-        let ordinary = (ProcessInfo.processInfo.systemUptime - began) * 0.25
+        let ordinary = (stopped - began) * 0.25
         XCTAssertEqual(Double(reached - origin) - ordinary, 10, accuracy: 2)
-        app.playerButton("rateMenu").press(forDuration: 4)
+        // Resolve the target while paused, then exercise the real playing
+        // deadline. Do not spend that deadline resolving a disappearing button.
+        let rateFrame = app.buttons.matching(identifier: "rateMenu").firstMatch.frame
+        let ratePoint = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: rateFrame.midX, dy: rateFrame.midY))
+        play(app).tap()
+        ratePoint.press(forDuration: 4)
         let half = app.buttons.matching(identifier: "0.5×").firstMatch
         XCTAssertTrue(half.waitForExistence(timeout: 3))
         observeForFourSeconds()
