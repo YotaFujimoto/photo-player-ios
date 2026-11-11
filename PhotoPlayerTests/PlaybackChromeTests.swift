@@ -8,7 +8,9 @@ final class PlaybackChromeTests: XCTestCase {
         state.layout(fullscreen: true)
         XCTAssertTrue(state.isVisible); XCTAssertNil(state.timeoutToken)
         state.singleTap()
-        XCTAssertTrue(state.isVisible)
+        XCTAssertFalse(state.isVisible, "Paused controls may be explicitly hidden")
+        XCTAssertNil(state.timeoutToken)
+        state.singleTap()
         state.playback(playing: true)
         let token = state.timeoutToken!
         state.playback(playing: false); state.expire(token: token)

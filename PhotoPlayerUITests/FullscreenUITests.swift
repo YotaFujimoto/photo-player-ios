@@ -79,7 +79,7 @@ final class FullscreenUITests: XCTestCase {
         let app = openPaused()
         defer { finish(app) }
         let portrait = surface(app).frame
-        XCTAssertLessThan(portrait.height, app.frame.height)
+        XCTAssertEqual(portrait.height, app.frame.height, accuracy: 1)
         capture("fullscreen-portrait-feedback-layout")
         for orientation in [UIDeviceOrientation.landscapeLeft, .landscapeRight] {
             XCUIDevice.shared.orientation = orientation
@@ -98,7 +98,9 @@ final class FullscreenUITests: XCTestCase {
             XCTAssertLessThanOrEqual(bar(app).frame.maxX, screen.maxX - 44)
             XCTAssertTrue(play(app).isHittable)
             surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            XCTAssertTrue(play(app).exists, "Paused controls remain visible")
+            expect(play(app), NSPredicate(format: "exists == false"))
+            surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+            app.waitForRevealedPlayerControls()
             XCTAssertEqual(surface(app).frame, canvas)
             capture("fullscreen-visible-\(orientation.rawValue)")
         }

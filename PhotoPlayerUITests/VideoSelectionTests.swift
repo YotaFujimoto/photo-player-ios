@@ -89,7 +89,7 @@ final class VideoSelectionTests: XCTestCase {
                 let rect = reveal(number, in: app).frame
                 app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
                     dx: rect.midX, dy: bottom ? rect.maxY - 3 : rect.minY + 3)).tap()
-                let selected = app.staticTexts["selectedVideo"]
+                let selected = app.otherElements["selectedVideo"]
                 XCTAssertTrue(selected.waitForExistence(timeout: 10))
                 XCTAssertEqual(selected.label, "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
@@ -122,7 +122,7 @@ final class VideoSelectionTests: XCTestCase {
 
     @MainActor
     private func verifySelection(_ number: Int, dimensions: String, in app: XCUIApplication) {
-        let selected = app.staticTexts["selectedVideo"]
+        let selected = app.otherElements["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "Tap must open a player")
         XCTAssertEqual(selected.label, "Video \(number)", "The tapped cell must select its own PHAsset")
         XCTAssertEqual(selected.value as? String, dimensions)

@@ -44,7 +44,7 @@ final class SeekInteractionUITests: XCTestCase {
     @MainActor private func setSlow(_ app: XCUIApplication) {
         app.playerButton("rateMenu").tap(); app.buttons.matching(identifier: "0.25×").firstMatch.tap()
     }
-    @MainActor private func drag(_ surface: XCUIElement, from x: CGFloat, to target: CGFloat, y: CGFloat = 0.5, endY: CGFloat = 0.5, hold: TimeInterval = 0.05, endHold: TimeInterval = 0) {
+    @MainActor private func drag(_ surface: XCUIElement, from x: CGFloat, to target: CGFloat, y: CGFloat = 0.35, endY: CGFloat = 0.35, hold: TimeInterval = 0.05, endHold: TimeInterval = 0) {
         surface.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y)).press(forDuration: hold,
             thenDragTo: surface.coordinate(withNormalizedOffset: CGVector(dx: target, dy: endY)),
             withVelocity: .slow, thenHoldForDuration: endHold)

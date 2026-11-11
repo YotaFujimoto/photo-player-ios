@@ -16,7 +16,7 @@ final class VideoPlaybackTests: XCTestCase {
     private func verifyPhotoKitVideoPlaybackRateAndSeek(expectedVideos: Int) {
         continueAfterFailure = false
         let app = XCUIApplication.photoPlayerForTesting()
-        app.launchArguments = ["--playback-diagnostics"]
+        app.launchArguments = ["--playback-diagnostics", "--player-detail-mode"]
         app.launch()
         let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.'"))
         let card = cards.matching(NSPredicate(format: "value == '320x180'")).firstMatch
@@ -26,7 +26,6 @@ final class VideoPlaybackTests: XCTestCase {
         screenshot("video-library")
         card.tap()
 
-        app.buttons["playerDiagnostics"].tap()
         let state = app.staticTexts["playerState"]
         XCTAssertTrue(state.waitForExistence(timeout: 20))
         waitForLabel(state, "Playing", timeout: 30)

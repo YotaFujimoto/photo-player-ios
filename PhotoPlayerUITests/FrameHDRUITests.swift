@@ -34,16 +34,17 @@ final class FrameHDRUITests: XCTestCase {
         XCTAssertTrue(success.waitForExistence(timeout:30)); XCTAssertEqual(success.label,"Saved 1 photo.")
         expect(surface,NSPredicate(format:"value == 'Paused'"))
         XCTAssertEqual(app.playerButton("rateMenu").value as? String,"0.25×")
-        app.playerButton("playerDiagnostics").tap()
-        let copy=app.buttons.matching(identifier:"copySelectionTrace.player").firstMatch
+        app.playerButton("closePlayer").tap()
+        XCTAssertTrue(card.waitForExistence(timeout:10))
+        app.buttons["selectionDiagnostics"].tap()
+        let copy=app.buttons.matching(identifier:"copySelectionTrace.library").firstMatch
         XCTAssertTrue(copy.waitForExistence(timeout:10)); copy.tap()
         let report=copy.value as? String ?? ""
         for value in ["[frame extraction:","transfer=HLG","cadence=variable","forceSDR","SDR-sRGB8","operationStage=saved"] {
             XCTAssertTrue(report.contains(value),"Missing \(value) in anonymous diagnostics")
         }
         XCTAssertFalse(report.contains("frames-hdr-ui")); XCTAssertFalse(report.contains("file:"))
-        app.playerButton("closePlayer").tap()
-        XCTAssertTrue(card.waitForExistence(timeout:10)); app.terminate()
+        app.terminate()
         XCTAssertEqual(app.state,.notRunning)
     }
 }

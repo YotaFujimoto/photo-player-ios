@@ -3,11 +3,11 @@ import UIKit
 
 final class PlaybackGestureTests: XCTestCase {
     @MainActor
-    private func open() -> XCUIApplication {
+    private func open(details: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication.photoPlayerForTesting()
-        app.launchArguments = ["--playback-diagnostics"]
+        app.launchArguments = ["--playback-diagnostics"] + (details ? ["--player-detail-mode"] : [])
         app.launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20))
@@ -16,7 +16,7 @@ final class PlaybackGestureTests: XCTestCase {
         XCTAssertFalse(card.label.contains("Video 1"))
         card.tap()
         state(app, "Playing")
-        XCTAssertFalse(app.staticTexts["selectionTrace.player"].exists)
+        XCTAssertEqual(app.staticTexts["selectionTrace.player"].exists, details)
         XCTAssertFalse(app.staticTexts["actualRate"].exists)
         return app
     }
@@ -72,7 +72,7 @@ final class PlaybackGestureTests: XCTestCase {
 
     @MainActor
     func testHeldDoubleSpeedRestoresRateAndNeverStartsPausedPlayback() {
-        let app = open()
+        let app = open(details: true)
         defer { XCUIDevice.shared.orientation = .portrait }
         app.playerButton("playPause").tap()
         state(app, "Paused")
@@ -81,7 +81,7 @@ final class PlaybackGestureTests: XCTestCase {
         let stoppedPosition = app.staticTexts["playbackPosition"].label
         setRate(app, "0.25×")
         let surface = app.otherElements["videoSurface"]
-        surface.press(forDuration: 2)
+        surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).press(forDuration: 2)
         position(app, [stoppedPosition])
         state(app, "Paused")
         app.playerButton("playPause").tap()
@@ -92,11 +92,9 @@ final class PlaybackGestureTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["temporaryRate"].exists)
         XCTAssertEqual(app.playerButton("rateMenu").value as? String, "0.25×")
         state(app, "Playing")
-        app.playerButton("playerDiagnostics").tap()
         app.buttons["Playback details"].tap()
         expect(app.staticTexts["actualRate"], "label CONTAINS '0.25'")
         attach("gesture-hold-restored")
-        app.playerButton("playerDiagnostics").tap()
         XCUIDevice.shared.orientation = .landscapeLeft
         verifyHeldAdvance(app, surface: surface)
         XCTAssertFalse(app.staticTexts["temporaryRate"].exists)
@@ -105,7 +103,7 @@ final class PlaybackGestureTests: XCTestCase {
         // In fullscreen the close control overlays the canvas. Use portrait
         // for the original leave-video-bounds cancellation check.
         XCUIDevice.shared.orientation = .portrait
-        let source = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let source = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         let outside = app.playerButton("closePlayer").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         source.press(forDuration: 0.8, thenDragTo: outside, withVelocity: .fast, thenHoldForDuration: 0.2)
         XCTAssertTrue(app.playerButton("closePlayer").exists)
@@ -129,7 +127,7 @@ final class PlaybackGestureTests: XCTestCase {
         app.revealPlayerControls()
         let start = readPosition(app)
         let started = ProcessInfo.processInfo.systemUptime
-        surface.press(forDuration: 3)
+        surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).press(forDuration: 3)
         let advanced = readPosition(app) - start
         let elapsed = ProcessInfo.processInfo.systemUptime - started
         let extra = Double(advanced) - elapsed * 0.25
@@ -140,6 +138,7 @@ final class PlaybackGestureTests: XCTestCase {
         expect(app.otherElements["videoSurface"], "value == '\(state)'")
     }
     @MainActor private func position(_ app: XCUIApplication, _ labels: [String]) {
+        app.revealPlayerControls()
         let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", labels), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 10), .completed)
     }

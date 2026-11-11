@@ -129,6 +129,10 @@ run_frame_ui() {
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testEntryPixelsFrameStepsSwipeAndNormalGestureRestoration" || frame_status=$?
   run_tests build/copy-results/FrameSaveLandscape.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || frame_status=$?
+  run_tests build/copy-results/FrameCropPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameCropUITests/testPortraitCropGesturesRelativeWindowResetAndCancel" || frame_status=$?
+  run_tests build/copy-results/FrameCropLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameCropUITests/testLandscapeCropEdgesRotationAndOnePhotoSave" || frame_status=$?
   xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-hdr-ui.mov
   expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/FrameHDR.xcresult \
@@ -195,6 +199,7 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/FullscreenUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameExtractionUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameHDRUITests" \
+  "-skip-testing:PhotoPlayerUITests/FrameCropUITests" \
   "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \

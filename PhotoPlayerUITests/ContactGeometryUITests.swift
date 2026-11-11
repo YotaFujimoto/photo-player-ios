@@ -68,7 +68,7 @@ final class ContactGeometryUITests: XCTestCase {
         XCTAssertFalse(report.contains("action.enter source=Button.action"), report)
         let counts = app.staticTexts["selectionTrace.library"].value as! String
         XCTAssertEqual(counts, "contacts=0;accepted=0;shown=0;requested=0;received=0;ready=0")
-        XCTAssertFalse(app.staticTexts["selectedVideo"].exists)
+        XCTAssertFalse(app.otherElements["selectedVideo"].exists)
         attach("geometry-control-inputs-copied")
     }
 
@@ -79,7 +79,7 @@ final class ContactGeometryUITests: XCTestCase {
         let dimensions = card.value as! String
         let point = CGPoint(x: frame.midX, y: bottom ? frame.maxY - 3 : frame.minY + 3)
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).press(forDuration: 0.03)
-        let selected = app.staticTexts["selectedVideo"]
+        let selected = app.otherElements["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "One physical contact must open the video")
         XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)

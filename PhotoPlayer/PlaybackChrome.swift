@@ -34,8 +34,8 @@ struct PlaybackChromeState {
     mutating func singleTap() {
         guard isFullscreen, isActive else { return }
         generation += 1
-        // Paused controls stay available; only active playback can be hidden.
-        isVisible = !isPlaying || !blockers.isEmpty ? true : !isVisible
+        // Paused controls never auto-hide; an explicit tap may hide them.
+        isVisible = !blockers.isEmpty ? true : !isVisible
     }
     mutating func setActive(_ active: Bool) {
         generation += 1

@@ -135,7 +135,8 @@ final class FrameExtractionUITests: XCTestCase {
         XCTAssertEqual(success.label,"Saved 10 photos.")
         let noticeFrame=success.frame
         XCTAssertGreaterThan(noticeFrame.height,0)
-        XCTAssertFalse(noticeFrame.intersects(element(app,"selectedVideo").frame))
+        XCTAssertFalse(noticeFrame.intersects(app.playerButton("closePlayer").frame))
+        XCTAssertFalse(noticeFrame.intersects(app.playerButton("extractFrames").frame))
         value(app,"videoSurface","Paused")
         XCTAssertEqual(app.playerButton("rateMenu").value as? String,"0.25×")
         XCTAssertFalse(element(app,"frameTimeline").exists)

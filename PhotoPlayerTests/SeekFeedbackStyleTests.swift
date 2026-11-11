@@ -16,7 +16,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
     @MainActor func testStableFeedbackSizeAndRenderOnBrightAndDarkFrames() throws {
         var sizes: [CGSize] = []
         for target in [1.0, 65, 3605, 36005] {
-            let content = SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 0, target: target), skip: nil)
+            let content = SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 0, target: target), skip: nil, pictureSize: CGSize(width:390,height:200))
             let host = UIHostingController(rootView: content)
             sizes.append(host.sizeThatFits(in: CGSize(width: 390, height: 200)))
         }
@@ -26,9 +26,9 @@ final class SeekFeedbackStyleTests: XCTestCase {
         }
         for bright in [false, true] {
             let content = VStack(spacing: 0) {
-                SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 63.5, target: 75.8), skip: nil)
+                SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 63.5, target: 75.8), skip: nil, pictureSize: CGSize(width:390,height:100))
                     .frame(width: 390, height: 100)
-                SeekFeedbackOverlay(preview: nil, skip: SkipFeedback(forward: true, origin: 10, target: 20, duration: 30))
+                SeekFeedbackOverlay(preview: nil, skip: SkipFeedback(forward: true, origin: 10, target: 20, duration: 30), pictureSize: CGSize(width:390,height:100))
                     .frame(width: 390, height: 100)
             }.background(bright ? Color.white : Color.black)
             let renderer = ImageRenderer(content: content)

@@ -151,7 +151,7 @@ final class SingleTapTests: XCTestCase {
         let frame = card.frame
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55)).press(forDuration: 0.03)
-        let header = app.staticTexts["selectedVideo"]
+        let header = app.otherElements["selectedVideo"]
         XCTAssertTrue(header.waitForExistence(timeout: 10))
         XCTAssertEqual(header.label, "Video 3")
         XCTAssertTrue(app.staticTexts["videoLoading"].waitForExistence(timeout: 10))
@@ -169,7 +169,7 @@ final class SingleTapTests: XCTestCase {
 
     @MainActor
     private func verifyOpened(_ app: XCUIApplication, number: Int, dimensions: String, diagnostics: Bool) {
-        let selected = app.staticTexts["selectedVideo"]
+        let selected = app.otherElements["selectedVideo"]
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "ONE tap must present the player. \(trace(app))")
         XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)

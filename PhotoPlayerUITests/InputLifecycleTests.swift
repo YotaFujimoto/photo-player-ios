@@ -23,7 +23,7 @@ final class InputLifecycleTests: XCTestCase {
             }
             for (number, x, y, dimensions) in targets {
                 app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).press(forDuration: 0.03)
-                let selected = app.staticTexts["selectedVideo"]
+                let selected = app.otherElements["selectedVideo"]
                 XCTAssertTrue(selected.waitForExistence(timeout: 10))
                 XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
@@ -62,7 +62,7 @@ final class InputLifecycleTests: XCTestCase {
         let dimensions = fifth.value as! String
         fifth.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.03)
         ready(app)
-        XCTAssertEqual(app.staticTexts["selectedVideo"].value as? String, dimensions)
+        XCTAssertEqual(app.otherElements["selectedVideo"].value as? String, dimensions)
         app.buttons["closePlayer"].tap()
         app.buttons["selectionDiagnostics"].tap()
         let report = copy(app)

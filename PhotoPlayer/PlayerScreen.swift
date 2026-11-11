@@ -21,7 +21,7 @@ struct PlayerScreen: View {
         self.selectionTrace = selectionTrace
         self.selectionOperation = selectionOperation
         _model = StateObject(wrappedValue: PlaybackModel(asset: video.asset))
-        _diagnostics = State(initialValue: selectionDiagnostics)
+        _diagnostics = State(initialValue: selectionDiagnostics || ProcessInfo.processInfo.arguments.contains("--player-detail-mode"))
     }
 
     var body: some View {
@@ -38,48 +38,34 @@ struct PlayerScreen: View {
                     if count > 0 { saveNotice = "Saved \(count) \(count == 1 ? "photo" : "photos")." }
                 }
             } else {
-            Group {
-                if fullscreen {
-                    ZStack {
-                        // Only the canvas ignores safe areas. Controls retain the
-                        // GeometryReader's safe bounds, including camera/home areas.
-                        picture(fullscreen: true).ignoresSafeArea()
-                        if chrome.isVisible {
-                            VStack(spacing: 0) {
-                                header
-                                    .background(LinearGradient(colors: [.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom))
-                                if diagnostics, let selectionTrace {
-                                    ScrollView { SelectionTracePanel(trace: selectionTrace, location: "player") }
-                                        .frame(maxHeight: min(90, geometry.size.height * 0.25))
-                                        .background(.black.opacity(0.65))
-                                }
-                                Spacer(minLength: 0)
-                                Group {
-                                    if diagnostics {
-                                        ScrollView { controls(fullscreen: true) }
-                                            .frame(maxHeight: geometry.size.height * 0.5)
-                                    } else { controls(fullscreen: true) }
-                                }.padding(12)
-                                    .background(LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .top, endPoint: .bottom))
-                            }
-                            .padding(.horizontal, 12).padding(.vertical, 4)
-                            .foregroundStyle(.white).tint(.white)
-                            .transition(.opacity)
-                        }
-                    }.background(.black)
-                        .animation(.easeOut(duration: 0.18), value: chrome.isVisible)
-                } else {
+            ZStack {
+                picture(fullscreen: true).ignoresSafeArea()
+                if chrome.isVisible {
+                    Button { chrome.activity(); model.togglePlayback() } label: {
+                        Image(systemName: model.showsPauseControl ? "pause.fill" : "play.fill")
+                            .font(.system(size: 34, weight: .semibold)).frame(width: 80, height: 80).mediaGlass()
+                    }.disabled(!model.isReady).accessibilityLabel(model.showsPauseControl ? "Pause" : "Play")
+                        .accessibilityIdentifier("playPause").accessibilityValue(model.stateText)
+                        .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("playPause"), active: $0) }))
                     VStack(spacing: 0) {
                         header
-                        if diagnostics, let selectionTrace { SelectionTracePanel(trace: selectionTrace, location: "player") }
-                        picture(fullscreen: false).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        if diagnostics, let selectionTrace {
+                            ScrollView { SelectionTracePanel(trace: selectionTrace, location: "player") }
+                                .frame(maxHeight: min(90, geometry.size.height * 0.20))
+                        }
+                        Spacer(minLength: 0)
                         if diagnostics {
-                            ScrollView { controls(fullscreen: false).padding() }
-                                .frame(maxHeight: geometry.size.height * 0.5)
-                        } else { controls(fullscreen: false).padding() }
-                    }
+                            ScrollView { controls(fullscreen: true) }.frame(maxHeight: min(210, geometry.size.height * 0.4))
+                        } else { controls(fullscreen: true) }
+                    }.padding(.horizontal, 12).padding(.vertical, 6)
+                        .transition(.opacity)
                 }
-            }
+            }.foregroundStyle(.white).tint(.white).background(.black)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("selectedVideo")
+                .accessibilityLabel(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback")
+                .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
+                .animation(.easeOut(duration: 0.18), value: chrome.isVisible)
             .statusBarHidden(fullscreen)
             .onAppear { configureLayout(fullscreen: fullscreen) }
             .onChange(of: geometry.size) { _, _ in configureLayout(fullscreen: fullscreen) }
@@ -126,7 +112,7 @@ struct PlayerScreen: View {
     private func configureLayout(fullscreen: Bool) {
         rateMenuVisible = false
         model.cancelInteractionForRotation()
-        chrome.layout(fullscreen: fullscreen)
+        chrome.layout(fullscreen: true)
         refreshChrome()
     }
     private func refreshChrome() {
@@ -147,7 +133,7 @@ struct PlayerScreen: View {
                 chrome.setActive(false); rateMenuVisible = false
                 model.close(); dismiss()
             } label: {
-                Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
+                Image(systemName: "xmark").frame(width: 48, height: 48).contentShape(Circle()).mediaGlass()
             }
             .accessibilityLabel("Close").accessibilityIdentifier("closePlayer")
             .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("closePlayer"), active: $0) }))
@@ -155,27 +141,16 @@ struct PlayerScreen: View {
                 if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.close").allowsHitTesting(false) }
             }
             Spacer()
-            VStack(spacing: 2) {
-                Text(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback").font(.headline)
-                    .accessibilityIdentifier("selectedVideo")
-                    .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
+            if diagnostics { VStack(spacing: 2) {
+                Text("Video \(video.diagnosticNumber)").font(.headline)
+                    .accessibilityIdentifier("playerVideoTitle")
                 if diagnostics {
                     Text("\(Int(model.pictureSize.width))x\(Int(model.pictureSize.height))")
                         .font(.caption.monospacedDigit()).accessibilityIdentifier("loadedVideoSize")
                 }
             }
+            }
             Spacer()
-            Button {
-                selectionTrace?.controlAction("player.diagnostics")
-                chrome.activity(); diagnostics.toggle()
-            } label: {
-                Image(systemName: "info.circle").frame(width: 44, height: 44).contentShape(Rectangle())
-            }
-            .accessibilityLabel("Playback diagnostics").accessibilityIdentifier("playerDiagnostics")
-            .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("playerDiagnostics"), active: $0) }))
-            .background {
-                if let selectionTrace { ContactProbe(number: 0, trace: selectionTrace, control: "player.diagnostics").allowsHitTesting(false) }
-            }
             Button {
                 guard let input = model.beginFrameExtraction() else { return }
                 rateMenuVisible = false; saveNotice = nil
@@ -187,18 +162,18 @@ struct PlayerScreen: View {
                 }
                 extraction = frameModel
             } label: {
-                Image(systemName: "photo.badge.plus").frame(width: 44, height: 44).contentShape(Rectangle())
+                Image(systemName: "photo.badge.plus").frame(width: 48, height: 48).contentShape(Circle()).mediaGlass()
             }
             .accessibilityLabel("Save frames").accessibilityIdentifier("extractFrames")
             .disabled(!model.isReady || model.isSeeking || model.seekPreview != nil)
             .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("extractFrames"), active: $0) }))
-        }.padding(.horizontal)
+        }
     }
 
     private func picture(fullscreen: Bool) -> some View {
         PlayerSurface(model: model, fullscreen: fullscreen, onSingleTap: chrome.singleTap,
                       onActivity: chrome.activity, onInteractionChanged: { chrome.block(.videoGesture, active: $0) })
-        .overlay { SeekFeedbackOverlay(preview: model.seekPreview, skip: model.skipFeedback) }
+        .overlay { SeekFeedbackOverlay(preview: model.seekPreview, skip: model.skipFeedback, pictureSize: model.pictureSize) }
         .overlay(alignment: .top) {
             if let saveNotice {
                 Text(saveNotice).font(.callout).padding(10)
