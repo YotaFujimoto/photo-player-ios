@@ -77,9 +77,22 @@ xcrun simctl get_app_container "$simulator_id" \
   io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests.xctrunner app \
   2>&1 | tee -a build/simulator.log
 
+test_hosts=0
 run_tests() {
   local result_bundle=$1
   shift
+  if (( test_hosts > 0 )); then
+    # Isolate simulator services as well as the XCTest host. Evidence showed
+    # delayed AX/termination messages and decoder completion stalls across
+    # hosts; a fresh test runner alone does not reset those shared services.
+    # Keep the same UDID, installed apps, Photos and UserDefaults. Never erase,
+    # retry a failed case, add an application delay or change its assertions.
+    record_resources "before-service-boundary:$result_bundle"
+    xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
+    xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
+    xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+  fi
+  test_hosts=$((test_hosts + 1))
   record_resources "$result_bundle"
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
@@ -147,16 +160,7 @@ run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlaye
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
 run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
-# The added fullscreen group leaves a longer-lived simulator service session
-# before the existing regressions. Evidence showed 31s accessibility queries
-# before the first card tap, plus growing compressed memory across the group.
-# Establish one clean service boundary, not a retry or an application delay.
-# Keep this same device, installed app, Photos fixtures and UserDefaults intact.
-record_resources before-regression-reboot
-xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
-xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
-xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
-record_resources after-regression-reboot
+# Every host now has the same service boundary, including this regression group.
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
