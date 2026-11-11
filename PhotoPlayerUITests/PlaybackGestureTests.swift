@@ -39,6 +39,10 @@ final class PlaybackGestureTests: XCTestCase {
             surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).doubleTap()
             position(app, ["0:00"])
             surface.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)).tap()
+            // Wait for this deliberate single tap's visibility change before
+            // the position helper reveals controls; event synthesis can return
+            // while UIKit is still excluding a possible second tap.
+            expect(app.buttons["playPause"], "exists == false")
             position(app, ["0:00"])
             let right = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
             right.doubleTap()

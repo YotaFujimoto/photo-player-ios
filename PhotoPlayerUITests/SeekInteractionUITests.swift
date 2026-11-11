@@ -188,6 +188,9 @@ final class SeekInteractionUITests: XCTestCase {
         // A below-threshold contact may be a single tap. Build 14 deliberately
         // permits that tap to hide paused controls too; reveal the time readout
         // before asserting the SAME exact position (no seek, no extra drag).
+        // Tap synthesis can return BEFORE the double-tap failure dependency
+        // settles. Observe its hide result before deciding whether to reveal.
+        expect(app.buttons.matching(identifier: "playPause").firstMatch, NSPredicate(format: "exists == false"))
         app.revealPlayerControls()
         position(app, near: before, tolerance: 0)
         // Holding first must retain hold ownership even after horizontal movement.

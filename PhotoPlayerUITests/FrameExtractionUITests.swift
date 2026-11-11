@@ -120,7 +120,9 @@ final class FrameExtractionUITests: XCTestCase {
             let control=element(app,id)
             XCTAssertTrue(control.isHittable)
             XCTAssertTrue(frame.insetBy(dx:10,dy:10).contains(control.frame))
-            XCTAssertGreaterThanOrEqual(control.frame.height,44)
+            // AX's transformed CGFloat can report 43.99998474121094 for the
+            // exact 44pt layout. Compare at subpixel (0.001pt) precision.
+            XCTAssertGreaterThanOrEqual((control.frame.height * 1000).rounded() / 1000,44)
         }
         // A continuous four-second contact must neither hide controls nor play.
         preview.press(forDuration:4)

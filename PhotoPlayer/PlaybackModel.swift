@@ -66,7 +66,7 @@ final class PlaybackModel: ObservableObject {
 
     private func trace(_ event: String) {
         guard ProcessInfo.processInfo.arguments.contains("--playback-diagnostics") else { return }
-        print("Playback: \(event), time=\(position), selected=\(selectedRate), actual=\(player.rate), state=\(stateText)")
+        print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) \(event), time=\(position), selected=\(selectedRate), actual=\(player.rate), state=\(stateText)")
     }
 
     func load() {
@@ -438,7 +438,7 @@ final class PlaybackModel: ObservableObject {
         let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: request.timescale), toleranceBefore: tolerance, toleranceAfter: tolerance) {
             @Sendable [weak self] finished in
-            if diagnostics { print("Playback: seek callback received finished=\(finished)") }
+            if diagnostics { print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) seek callback received finished=\(finished)") }
             Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
                 if let next = self.seekQueue.finish() { self.performSeek(next) }
