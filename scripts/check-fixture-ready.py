@@ -5,12 +5,10 @@ import sys
 import time
 import uuid
 
-simulator, bundle, expected = sys.argv[1:]
+simulator, bundle, expected, container = sys.argv[1:]
 assert expected.isdigit() and int(expected) >= 12
 token = str(uuid.uuid4())
-container = subprocess.check_output(
-    ["xcrun", "simctl", "get_app_container", simulator, bundle, "data"], text=True, timeout=30
-).strip()
+assert Path(container).is_dir(), "The installed fixture helper container must remain present"
 result = Path(container) / "Documents" / f"readiness-{token}.txt"
 assert not result.exists(), "Never accept a previous probe result"
 subprocess.run(

@@ -81,29 +81,23 @@ bash scripts/prepare-fixture-probe.sh
 fixture_probe='io.github.photoplayer.ci-fixture-readiness'
 xcrun simctl install "$simulator_id" build/FixtureReadiness.app
 xcrun simctl privacy "$simulator_id" grant photos "$fixture_probe"
+# This helper is installed once and never reinstalled during the suite. Resolve
+# its stable container once; querying the service again immediately after a
+# reboot stalled even though bootstatus had completed.
+fixture_container="$(xcrun simctl get_app_container "$simulator_id" "$fixture_probe" data)"
+test -d "$fixture_container"
 expected_videos=12
 test_hosts=0
 run_tests() {
   local result_bundle=$1
   shift
-  if (( test_hosts > 0 )); then
-    # Isolate simulator services as well as the XCTest host. Evidence showed
-    # delayed AX/termination messages and decoder completion stalls across
-    # hosts; a fresh test runner alone does not reset those shared services.
-    # Keep the same UDID, installed apps, Photos and UserDefaults. Never erase,
-    # retry a failed case, add an application delay or change its assertions.
-    record_resources "before-service-boundary:$result_bundle"
-    xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log || return $?
-    xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log || return $?
-    xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log || return $?
-  fi
   test_hosts=$((test_hosts + 1))
   # bootstatus does not guarantee that PhotoKit exposes every imported asset.
   # A failed run showed only two of twelve videos after a service restart.
   # Require the fixture before launching the app; never re-import or retry a
   # failed UI test. A separate process records counts only and changes no data.
   local readiness_log="build/fixture-ready-$test_hosts.log"
-  python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" \
+  python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" "$fixture_container" \
     2>&1 | tee "$readiness_log" || return $?
   record_resources "$result_bundle"
   xcodebuild test-without-building \
@@ -174,7 +168,15 @@ run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlaye
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
 run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
-# Every host now has the same service boundary, including this regression group.
+# Restore the established single service boundary. Rebooting before every host
+# added startup/service failures without proving that it fixes XCTest stalls.
+# The read-only fixture check remains before every host. No retry, erasure,
+# assertion removal, deadline extension or application change is involved.
+record_resources before-regression-reboot
+xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
+xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+record_resources after-regression-reboot
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
