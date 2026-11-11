@@ -80,6 +80,10 @@ final class FullscreenUITests: XCTestCase {
         defer { finish(app) }
         let portrait = surface(app).frame
         XCTAssertEqual(portrait.height, app.frame.height, accuracy: 1)
+        XCTAssertEqual(play(app).frame.midX,portrait.midX,accuracy:1)
+        XCTAssertEqual(play(app).frame.midY,portrait.midY,accuracy:1)
+        XCTAssertFalse(app.buttons["playerDiagnostics"].exists)
+        XCTAssertLessThan(app.buttons["rateMenu"].frame.maxY,bar(app).frame.minY)
         capture("fullscreen-portrait-feedback-layout")
         for orientation in [UIDeviceOrientation.landscapeLeft, .landscapeRight] {
             XCUIDevice.shared.orientation = orientation
@@ -97,6 +101,9 @@ final class FullscreenUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(bar(app).frame.minX, 44)
             XCTAssertLessThanOrEqual(bar(app).frame.maxX, screen.maxX - 44)
             XCTAssertTrue(play(app).isHittable)
+            XCTAssertEqual(play(app).frame.midX,canvas.midX,accuracy:1)
+            XCTAssertEqual(play(app).frame.midY,canvas.midY,accuracy:1)
+            XCTAssertLessThan(app.buttons["rateMenu"].frame.maxY,bar(app).frame.minY)
             surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
             expect(play(app), NSPredicate(format: "exists == false"))
             surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()

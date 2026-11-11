@@ -27,23 +27,24 @@ struct SeekFeedbackOverlay: View {
     var body: some View {
         GeometryReader { geometry in
             let video = VideoGeometry.fitted(pictureSize, in: CGRect(origin: .zero, size: geometry.size))
+            let scale = min(1, video.height / 80)
             ZStack(alignment: .topLeading) {
                 if let preview, preview.source == .horizontal, video.width > 0 {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 2 * scale) {
                         Text(SeekFeedbackStyle.clock(preview.target))
                         Text(SeekFeedbackStyle.difference(preview.target - preview.origin))
-                    }.font(.system(size: SeekFeedbackStyle.fontSize, weight: .regular).monospacedDigit())
+                    }.font(.system(size: SeekFeedbackStyle.fontSize * scale, weight: .regular).monospacedDigit())
                         .frame(width: min(SeekFeedbackStyle.columnWidth, video.width))
                         .lineLimit(1).minimumScaleFactor(0.5)
-                        .position(x: video.midX, y: video.minY + video.height * 0.25)
+                        .position(x: video.midX, y: video.minY + max(30 * scale, video.height * 0.25))
                         .accessibilityElement(children: .combine).accessibilityIdentifier("seekPreview")
                         .transition(.opacity)
                 }
                 if let skip, video.width > 0 {
-                    VStack(spacing: 3) {
+                    VStack(spacing: 3 * scale) {
                         Image(systemName: skip.forward ? "forward.fill" : "backward.fill")
-                            .font(.system(size: min(24, video.height / 4), weight: .medium)).accessibilityHidden(true)
-                        Text(skip.text).font(.system(size: SeekFeedbackStyle.fontSize, weight: .regular).monospacedDigit())
+                            .font(.system(size: 24 * scale, weight: .medium)).accessibilityHidden(true)
+                        Text(skip.text).font(.system(size: SeekFeedbackStyle.fontSize * scale, weight: .regular).monospacedDigit())
                             .lineLimit(1).minimumScaleFactor(0.35).accessibilityIdentifier("skipFeedback")
                     }.frame(width: video.width * 0.45, height: min(60, video.height))
                         .position(SeekFeedbackStyle.skipCenter(in: video, forward: skip.forward))

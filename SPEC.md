@@ -369,3 +369,11 @@ CIやシミュレーターでは保証できない、実機の画面端とシス
 一時JPEGの異常終了後の清掃はアプリ内の専用UUIDフォルダーだけを対象とし、作成から7日以上のものを除去する。直近の結果未確定の保存操作には触れない。アプリ内ファイル時刻の参照はPrivacyInfo.xcprivacyにC617.1を宣言する（[Appleの定義](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons)）。時刻や素材情報を外部送信しない。
 
 実コマの時刻は[Core Mediaのサンプル別時刻API](https://developer.apple.com/documentation/coremedia/cmsamplebuffergetsampletiminginfo(_:at:timinginfoout:))で取得する。1バッファが1コマとは仮定せず、空のマーカーと非表示の依存サンプルを保存対象から除く。Photos固有の容量不足・権限拒否／制限と、JPEG作成時の容量不足を短い理由へ対応付ける。
+
+### ビルド14の実装上の判断
+
+[AppleのMaterialsガイド](https://developer.apple.com/design/human-interface-guidelines/materials)に従い、メディア上の小さな操作群にclear Liquid Glassとその形状内だけの35%黒背景を使用する。Reduce Transparency／Increase Contrastでは局所コントラストを上げ、Reduce Motionでは独自フェードを止める。iOS 26未満は同じ形状の透過背景へフォールバックする。親子ガラス、全幅グラデーションは作らない。
+
+[defersSystemGestures](https://developer.apple.com/documentation/swiftui/view/deferssystemgestures(on:))はfullScreenCover内の写真モード全体へ適用し、横画面・クロップ中・activeの3条件だけ.allを返す。UIKitの[preferredScreenEdgesDeferringSystemGestures](https://developer.apple.com/documentation/uikit/uiviewcontroller/preferredscreenedgesdeferringsystemgestures)を読み取るCI専用計測で、実際のpresented controllerとchild参照先の値を照合する。独自UIKit上書きを重ねて強制禁止とはしない。背景で調整を終了し、回転・取消では進行中ドラッグを開始時の枠へ戻す。
+
+クロップは向き補正後の画像左上基準0…1。辺／角の22pt以内を標準許容範囲とし、小さい枠では範囲を縮めて重複を避ける。ドラッグ開始時の対象と矩形を固定し、60pt相当（小さな映像は幅・高さの35%）を最小辺として反転・ゼロを防ぐ。フル選択は既存JPEG経路へそのまま渡す。部分選択は既存SDR/sRGB生成後の元解像度CGImageから画素境界を一度だけ丸めて切り出し、既存品質0.95／実ICCでJPEG化する。

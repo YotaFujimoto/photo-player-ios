@@ -88,6 +88,12 @@ final class FrameCropUITests: XCTestCase {
         expect(preview,"value CONTAINS %@","edges=0"); XCTAssertTrue((preview.value as! String).contains(crop)); checkHidden(app)
         XCUIDevice.shared.orientation = .landscapeRight
         expect(preview,"value CONTAINS %@","edges=15"); XCTAssertTrue((preview.value as! String).contains(crop))
+        XCUIDevice.shared.press(.home); app.activate()
+        expect(preview,"value CONTAINS %@","edges=0")
+        XCTAssertTrue(app.buttons["saveFrames"].waitForExistence(timeout:5))
+        XCTAssertTrue((preview.value as! String).contains(crop))
+        preview.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+        expect(preview,"value CONTAINS %@","edges=15")
         preview.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
         expect(preview,"value CONTAINS %@","edges=0")
         XCTAssertTrue(app.buttons["setFrameEnd"].waitForExistence(timeout:5)); app.buttons["setFrameEnd"].tap()

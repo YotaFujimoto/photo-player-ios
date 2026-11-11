@@ -209,7 +209,10 @@ struct FrameExtractionScreen: View {
         }
         .onAppear { lastOrientation = UIDevice.current.orientation; model.prepare() }
         .onChange(of: model.savedCount) { _, count in if count > 0 { onClose(count) } }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { model.backgrounded() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { model.backgrounded() }
+            else if phase != .active { model.interruptCrop() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
             let orientation = UIDevice.current.orientation
             guard [.portrait, .landscapeLeft, .landscapeRight].contains(orientation), orientation != lastOrientation else { return }

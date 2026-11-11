@@ -134,6 +134,7 @@ import CoreMedia
     func finishCrop() { cropDrag = nil; isInteracting = false }
     func resetCrop() { if phase == .ready && !isCropping && !isInteracting { crop = .full } }
     func cancelGestures() { gestureCancellationID += 1; cancelInteraction() }
+    func interruptCrop() { cancelGestures(); isCropping = false }
 
     func save() {
         guard canSave, let snapshot = selection else { return }
@@ -185,7 +186,7 @@ import CoreMedia
         }
     }
     func backgrounded() {
-        cancelGestures(); isCropping = false
+        interruptCrop()
         if phase == .preparing { saveTask?.cancel() }
     }
     func retryPreview() {
