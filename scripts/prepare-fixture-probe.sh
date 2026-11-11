@@ -17,6 +17,8 @@ cat > build/FixtureReadiness.app/Info.plist <<'PLIST'
 <key>LSRequiresIPhoneOS</key><true/>
 <key>UIDeviceFamily</key><array><integer>1</integer></array>
 <key>UILaunchScreen</key><dict/>
+<key>UIApplicationSceneManifest</key>
+<dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
 <key>NSPhotoLibraryUsageDescription</key><string>Read synthetic CI fixtures.</string>
 </dict></plist>
 PLIST

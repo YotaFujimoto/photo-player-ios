@@ -5,9 +5,9 @@ import Darwin
 
 @main
 @MainActor final class FixtureReadiness: UIResponder, UIApplicationDelegate {
-    var window: UIWindow?
     private var resultURL: URL?
     private var observations: [String] = []
+    private var expectedVideos = 0
 
     static func main() {
         let arguments = CommandLine.arguments
@@ -35,11 +35,20 @@ import Darwin
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         resultURL = documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt")
         record("FIXTURE_STARTED")
-        window = UIWindow(frame: UIScreen.main.bounds)
-        window?.rootViewController = UIViewController()
-        window?.makeKeyAndVisible()
-        Task { await inspect(expected: expected) }
+        expectedVideos = expected
         return true
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: "Fixture readiness", sessionRole: session.role)
+        configuration.delegateClass = FixtureScene.self
+        return configuration
+    }
+
+    func inspectFromActiveScene() {
+        record("FIXTURE_SCENE_ACTIVE")
+        Task { await inspect(expected: expectedVideos) }
     }
 
     private func inspect(expected: Int) async {
@@ -81,5 +90,22 @@ import Darwin
             do { try (observations.joined(separator: "\n") + "\n").write(to: resultURL, atomically: true, encoding: .utf8) }
             catch { print("FIXTURE_REPORT_WRITE_FAILED"); fflush(nil); exit(74) }
         }
+    }
+}
+
+@MainActor final class FixtureScene: UIResponder, UIWindowSceneDelegate {
+    var window: UIWindow?
+    private var started = false
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
+        guard let scene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIViewController()
+        self.window = window
+        window.makeKeyAndVisible()
+    }
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        guard !started, let app = UIApplication.shared.delegate as? FixtureReadiness else { return }
+        started = true
+        app.inspectFromActiveScene()
     }
 }
