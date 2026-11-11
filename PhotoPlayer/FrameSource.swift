@@ -37,11 +37,22 @@ protocol FrameProviding: Sendable {
     func catalogue() async throws -> [CMTime]
     func image(at time: CMTime, fullSize: Bool) async throws -> FrameImage
     func writeJPEG(at time: CMTime, to url: URL) async throws -> CMTime
+    func writeJPEG(at time: CMTime, crop: FrameCrop, to url: URL) async throws -> CMTime
     func cancel() async
     func diagnosticReport() async -> String
 }
 extension FrameProviding {
     func diagnosticReport() async -> String { "source=unavailable" }
+    func writeJPEG(at time: CMTime, crop: FrameCrop, to url: URL) async throws -> CMTime {
+        if crop.isFull { return try await writeJPEG(at: time, to: url) }
+        let frame = try await image(at: time, fullSize: true)
+        try Task.checkCancellation()
+        // image() already applies orientation, HDR tone mapping and sRGB conversion.
+        let cropped = try crop.apply(to: frame.image)
+        let data = try FrameJPEG.encode(cropped)
+        try data.write(to: url, options: .atomic)
+        return frame.time
+    }
 }
 
 enum FrameColor {

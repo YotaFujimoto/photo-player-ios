@@ -92,5 +92,19 @@ final class FrameHDRTests: XCTestCase {
             let p=try pixel(preview.image,x:point.0,y:point.1), j=try pixel(jpeg,x:point.0,y:point.1)
             for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(p[channel]-j[channel]),8) }
         }
+        // Crop the already oriented, tone-mapped full-resolution image.
+        let crop=FrameCrop(rect:CGRect(x:0.5,y:0,width:0.5,height:0.5))
+        let croppedURL=folder.appendingPathComponent("rotated-crop.jpg")
+        let actual=try await source.writeJPEG(at:times[21],crop:crop,to:croppedURL)
+        XCTAssertEqual(CMTimeCompare(actual,times[21]),0)
+        let croppedData=try Data(contentsOf:croppedURL)
+        XCTAssertNotNil(croppedData.range(of:Data("ICC_PROFILE".utf8)))
+        let croppedSource=try XCTUnwrap(CGImageSourceCreateWithData(croppedData as CFData,nil))
+        let cropped=try XCTUnwrap(CGImageSourceCreateImageAtIndex(croppedSource,0,nil))
+        XCTAssertEqual(cropped.width,48); XCTAssertEqual(cropped.height,80)
+        for point in [(8,10),(24,40),(40,60)] {
+            let original=try pixel(full.image,x:point.0+48,y:point.1), saved=try pixel(cropped,x:point.0,y:point.1)
+            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(original[channel]-saved[channel]),8) }
+        }
     }
 }

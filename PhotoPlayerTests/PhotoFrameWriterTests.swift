@@ -9,26 +9,28 @@ final class PhotoFrameWriterTests: XCTestCase {
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.notEnoughSpace.rawValue)), .storage)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: PHPhotosErrorDomain, code: PHPhotosError.Code.accessUserDenied.rawValue)), .permission)
         XCTAssertEqual(PhotoFrameWriter.failure(for: NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)), .storage)
-        for fixture in ["frames-30","frames-hlg","frames-pq","frames-variable"] {
+        for sample in ["frames-30","frames-hlg","frames-pq","frames-variable","frames-30-crop","frames-hlg-crop-one"] {
+        let fixture=sample.components(separatedBy:"-crop")[0]
+        let crop=sample.contains("crop") ? FrameCrop(rect:CGRect(x:0,y:0,width:1,height:0.5)) : .full
         let before = PHAsset.fetchAssets(with: .image, options: nil)
         let existing = (0..<before.count).map { before.object(at:$0).localIdentifier }
         let source=FrameSource(input:FrameAsset(asset:try FrameSourceTests.asset(fixture),entry:.zero,flags:.init(),fileStem:"synthetic"))
         let times=try await source.catalogue()
-        let indices=FrameSelection(times:times).indices
+        let indices=sample.hasSuffix("one") ? [21] : FrameSelection(times:times).indices
         let operation=UUID(), folder=try FrameWorkspace.create(id:UUID())
         defer { FrameWorkspace.remove(folder) }
         var photos: [PreparedPhoto]=[]
         for (offset,index) in indices.enumerated() {
             let name=FrameFileName.make(stem:"synthetic",start:times[0],operation:operation,ordinal:offset+1,actual:times[index])
             let url=folder.appendingPathComponent(name)
-            _=try await source.writeJPEG(at:times[index],to:url)
+            _=try await source.writeJPEG(at:times[index],crop:crop,to:url)
             photos.append(PreparedPhoto(url:url,filename:name))
         }
         let writer=PhotoFrameWriter()
         try await writer.authorize()
         try await writer.save(photos)
         let after=PHAsset.fetchAssets(with:.image,options:nil)
-        XCTAssertEqual(after.count,before.count+10)
+        XCTAssertEqual(after.count,before.count+indices.count)
         let retained=PHAsset.fetchAssets(withLocalIdentifiers:existing,options:nil)
         XCTAssertEqual(retained.count,existing.count)
         var found=Set<String>()
@@ -38,7 +40,7 @@ final class PhotoFrameWriterTests: XCTestCase {
             let name=resource.originalFilename
             guard let ordinal=photos.firstIndex(where: { $0.filename == name }) else { continue }
             XCTAssertTrue(found.insert(name).inserted)
-            XCTAssertEqual(asset.pixelWidth,160); XCTAssertEqual(asset.pixelHeight,96)
+            XCTAssertEqual(asset.pixelWidth,160); XCTAssertEqual(asset.pixelHeight,crop.isFull ? 96 : 48)
             // requestImageData(.current) can return a Photos-rendered rendition.
             // Validate the registered ORIGINAL resource's bytes/profile too.
             let restored = folder.appendingPathComponent("registered-\(ordinal).jpg")
@@ -63,7 +65,7 @@ final class PhotoFrameWriterTests: XCTestCase {
             let image=try XCTUnwrap(CGImageSourceCreateImageAtIndex(imageSource,0,nil))
             XCTAssertEqual(try FrameSourceTests.number(image),indices[ordinal])
         }
-        XCTAssertEqual(found.count,10)
+        XCTAssertEqual(found.count,indices.count)
         }
     }
 }

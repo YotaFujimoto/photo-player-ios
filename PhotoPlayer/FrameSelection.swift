@@ -101,3 +101,14 @@ enum FrameFileName {
         "\(stem)__clip-\(time(start))__set-\(operation.uuidString.lowercased())__\(String(format: "%02d", ordinal))__t-\(time(actual)).jpg"
     }
 }
+
+/// Display only. Frame selection and filenames always retain original rational PTS.
+enum FrameRelativeTime {
+    static func text(_ time: CMTime, origin: CMTime) -> String {
+        let value = max(0, CMTimeSubtract(time, origin).seconds)
+        let milliseconds = Int((value * 1000).rounded())
+        let seconds = milliseconds / 1000
+        let base = String(format: "%d:%02d", seconds / 60, seconds % 60)
+        return milliseconds % 1000 == 0 ? base : base + String(format: ".%03d", milliseconds % 1000)
+    }
+}

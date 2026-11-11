@@ -9,6 +9,7 @@ actor StubFrameSource: FrameProviding {
     var holdsWrites = false
     var imageCalls: [Int] = []
     var written: [URL] = []
+    var writtenCrops: [FrameCrop] = []
     private var imageWaiter: CheckedContinuation<Void, Never>?
     private var writeWaiter: CheckedContinuation<Void, Never>?
     func configure(images: Bool = false, writes: Bool = false) { holdsImages = images; holdsWrites = writes }
@@ -31,6 +32,10 @@ actor StubFrameSource: FrameProviding {
         try Data([1,2,3]).write(to:url)
         return time
     }
+    func writeJPEG(at time: CMTime, crop: FrameCrop, to url: URL) async throws -> CMTime {
+        writtenCrops.append(crop)
+        return try await writeJPEG(at: time, to: url)
+    }
     func cancel() async {}
 }
 
@@ -50,6 +55,50 @@ actor StubFrameSource: FrameProviding {
 }
 
 final class FrameExtractionModelTests: XCTestCase {
+    @MainActor func testCropPersistsAcrossFramesAndResetDoesNotMoveEndpoints() async throws {
+        let source=StubFrameSource(), writer=StubFrameWriter()
+        let model=try await ready(source,writer)
+        defer { model.close() }
+        model.request(index:30); try await wait { model.canSetEndpoints }; model.setStart()
+        let video=CGRect(x:0,y:0,width:400,height:300)
+        model.toggleCrop(); XCTAssertTrue(model.isCropping); XCTAssertFalse(model.canSave)
+        XCTAssertFalse(model.beginInteraction(),"Crop cannot start a time swipe")
+        XCTAssertTrue(model.beginCrop(at:.zero,video:video))
+        model.moveCrop(CGPoint(x:80,y:60)); model.finishCrop()
+        let crop=model.crop
+        XCTAssertEqual(crop.rect,CGRect(x:0.2,y:0.2,width:0.8,height:0.8))
+        XCTAssertTrue(model.isCropping,"Releasing a drag does not exit")
+        model.step(forward:true); try await wait { !model.isPreviewing }
+        XCTAssertEqual(model.selection?.position,31); XCTAssertEqual(model.selection?.start,30)
+        XCTAssertEqual(model.selection?.end,90); XCTAssertEqual(model.crop,crop); XCTAssertTrue(model.isCropping)
+        model.toggleCrop(); model.resetCrop()
+        XCTAssertEqual(model.crop,.full); XCTAssertEqual(model.selection?.position,31); XCTAssertEqual(model.selection?.start,30)
+        model.toggleCrop(); XCTAssertTrue(model.beginCrop(at:.zero,video:video)); model.moveCrop(CGPoint(x:70,y:50))
+        model.backgrounded()
+        XCTAssertEqual(model.crop,.full); XCTAssertFalse(model.isCropping); XCTAssertFalse(model.isInteracting)
+    }
+    @MainActor func testDoneFreezesOneCropForAllFramesAndCancelRestoresDragOrigin() async throws {
+        let source=StubFrameSource(), writer=StubFrameWriter()
+        let model=try await ready(source,writer)
+        defer { model.close() }
+        let video=CGRect(x:0,y:0,width:400,height:300)
+        model.toggleCrop(); XCTAssertTrue(model.beginCrop(at:.zero,video:video))
+        model.moveCrop(CGPoint(x:100,y:60)); model.finishCrop()
+        let crop=model.crop
+        XCTAssertTrue(model.beginCrop(at:CGPoint(x:250,y:180),video:video))
+        model.moveCrop(CGPoint(x:-30,y:-30)); model.cancelGestures()
+        XCTAssertEqual(model.crop,crop); XCTAssertTrue(model.isCropping)
+        model.toggleCrop(); await source.configure(writes:true)
+        model.save(); try await wait { await source.waitingWrite }
+        model.resetCrop(); model.toggleCrop(); model.request(index:70); model.save()
+        XCTAssertEqual(model.crop,crop); XCTAssertFalse(model.isCropping); XCTAssertEqual(model.selection?.position,0)
+        await source.configure(writes:false); await source.releaseWrite()
+        try await wait { model.phase == .saved }
+        let crops=await source.writtenCrops
+        XCTAssertEqual(crops,Array(repeating:crop,count:10)); XCTAssertEqual(writer.batches.count,1)
+        XCTAssertEqual(model.savedCount,10)
+        XCTAssertTrue(writer.batches[0].allSatisfy { !FileManager.default.fileExists(atPath:$0.url.path) })
+    }
     @MainActor private func wait(_ predicate: () async -> Bool) async throws {
         let deadline=ContinuousClock.now.advanced(by:.seconds(5))
         while !(await predicate()) {
