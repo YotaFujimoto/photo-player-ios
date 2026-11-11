@@ -88,9 +88,9 @@ run_tests() {
     # Keep the same UDID, installed apps, Photos and UserDefaults. Never erase,
     # retry a failed case, add an application delay or change its assertions.
     record_resources "before-service-boundary:$result_bundle"
-    xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
-    xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
-    xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+    xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log || return $?
+    xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log || return $?
+    xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log || return $?
   fi
   test_hosts=$((test_hosts + 1))
   record_resources "$result_bundle"
