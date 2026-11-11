@@ -103,9 +103,8 @@ run_tests() {
   # Require the fixture before launching the app; never re-import or retry a
   # failed UI test. A separate process records counts only and changes no data.
   local readiness_log="build/fixture-ready-$test_hosts.log"
-  xcrun simctl launch --console --terminate-running-process "$simulator_id" \
-    "$fixture_probe" "$expected_videos" 2>&1 | tee "$readiness_log" || return $?
-  grep -Fx "FIXTURE_READY videos=$expected_videos" "$readiness_log" >/dev/null || return 1
+  python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" \
+    2>&1 | tee "$readiness_log" || return $?
   record_resources "$result_bundle"
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \

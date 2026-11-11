@@ -6,15 +6,24 @@ import Darwin
 @main
 @MainActor final class FixtureReadiness: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
+    private var resultURL: URL?
+    private var observations: [String] = []
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.rootViewController = UIViewController()
         window?.makeKeyAndVisible()
-        guard let argument = CommandLine.arguments.last, let expected = Int(argument), expected >= 12 else {
+        let arguments = CommandLine.arguments
+        guard let countIndex = arguments.firstIndex(of: "--expected-videos"), countIndex + 1 < arguments.count,
+              let expected = Int(arguments[countIndex + 1]), expected >= 12,
+              let tokenIndex = arguments.firstIndex(of: "--result-token"), tokenIndex + 1 < arguments.count,
+              let token = UUID(uuidString: arguments[tokenIndex + 1]) else {
             finish("FIXTURE_ARGUMENT_ERROR", code: 64)
         }
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        resultURL = documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt")
+        record("FIXTURE_STARTED")
         Task { await inspect(expected: expected) }
         return true
     }
@@ -27,8 +36,7 @@ import Darwin
             guard access == .authorized else { finish("FIXTURE_ACCESS_ERROR status=\(access.rawValue)", code: 1) }
             let videos = PHAsset.fetchAssets(with: .video, options: nil)
             if videos.count != lastCount {
-                print("FIXTURE_AVAILABLE videos=\(videos.count) expected=\(expected)")
-                fflush(nil)
+                record("FIXTURE_AVAILABLE videos=\(videos.count) expected=\(expected)")
                 lastCount = videos.count
             }
             let hasPlaybackFixture = (0..<videos.count).contains {
@@ -47,8 +55,17 @@ import Darwin
     }
 
     private func finish(_ message: String, code: Int32) -> Never {
+        record(message)
+        exit(code)
+    }
+
+    private func record(_ message: String) {
         print(message)
         fflush(nil)
-        exit(code)
+        observations.append(message)
+        if let resultURL {
+            do { try (observations.joined(separator: "\n") + "\n").write(to: resultURL, atomically: true, encoding: .utf8) }
+            catch { print("FIXTURE_REPORT_WRITE_FAILED"); fflush(nil); exit(74) }
+        }
     }
 }
