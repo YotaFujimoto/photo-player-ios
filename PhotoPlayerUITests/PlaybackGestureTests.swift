@@ -25,7 +25,7 @@ final class PlaybackGestureTests: XCTestCase {
     func testDoubleTapBoundsSingleTapAndControlsInBothOrientations() {
         let app = open()
         defer { XCUIDevice.shared.orientation = .portrait }
-        app.playerButton("playPause").tap()
+        app.pauseAfterInitialControlsHide()
         state(app, "Paused")
         setRate(app, "0.25×")
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {

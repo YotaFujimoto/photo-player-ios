@@ -15,7 +15,7 @@ final class FrameHDRUITests: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout:20)); card.tap()
         let surface=app.otherElements.matching(identifier:"videoSurface").firstMatch
         expect(surface,NSPredicate(format:"value == 'Playing'"))
-        app.playerButton("playPause").tap(); expect(surface,NSPredicate(format:"value == 'Paused'"))
+        app.pauseAfterInitialControlsHide(); expect(surface,NSPredicate(format:"value == 'Paused'"))
         app.playerButton("rateMenu").tap(); app.buttons.matching(identifier:"0.25×").firstMatch.tap()
         app.otherElements.matching(identifier:"seekSlider").firstMatch.coordinate(withNormalizedOffset:CGVector(dx:0,dy:0.5)).tap()
         expect(app.staticTexts.matching(identifier:"playbackPosition").firstMatch,NSPredicate(format:"label == '0:00'"))

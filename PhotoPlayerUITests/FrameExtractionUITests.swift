@@ -19,7 +19,7 @@ final class FrameExtractionUITests: XCTestCase {
         let card=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'videoCard.' AND value == '160x96'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout:20)); card.tap()
         value(app,"videoSurface","Playing")
-        app.playerButton("playPause").tap(); value(app,"videoSurface","Paused")
+        app.pauseAfterInitialControlsHide(); value(app,"videoSurface","Paused")
         app.playerButton("rateMenu").tap(); app.buttons.matching(identifier:"0.25×").firstMatch.tap()
         element(app,"seekSlider").coordinate(withNormalizedOffset:CGVector(dx:0.01,dy:0.5)).tap()
         value(app,"videoSurface","Paused")

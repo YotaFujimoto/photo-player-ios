@@ -11,7 +11,7 @@ final class FullscreenUITests: XCTestCase {
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20)); card.tap()
         state(app, "Playing")
-        app.buttons.matching(identifier: "playPause").firstMatch.tap(); state(app, "Paused")
+        app.pauseAfterInitialControlsHide(); state(app, "Paused")
         app.buttons.matching(identifier: "rateMenu").firstMatch.tap()
         app.buttons.matching(identifier: "0.25×").firstMatch.tap()
         return app

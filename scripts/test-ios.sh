@@ -87,18 +87,22 @@ xcrun simctl privacy "$simulator_id" grant photos "$fixture_probe"
 fixture_container="$(xcrun simctl get_app_container "$simulator_id" "$fixture_probe" data)"
 test -d "$fixture_container"
 expected_videos=12
+fixture_dirty=true
 test_hosts=0
 run_tests() {
   local result_bundle=$1
   shift
   test_hosts=$((test_hosts + 1))
-  # bootstatus does not guarantee that PhotoKit exposes every imported asset.
-  # A failed run showed only two of twelve videos after a service restart.
-  # Require the fixture before launching the app; never re-import or retry a
-  # failed UI test. A separate process records counts only and changes no data.
-  local readiness_log="build/fixture-ready-$test_hosts.log"
-  python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" "$fixture_container" \
-    2>&1 | tee "$readiness_log" || return $?
+  # Verify after every import or simulator restart. Between these explicit
+  # boundaries the video library is unchanged (tests only add still photos).
+  # Relaunching an extra foreground app before each host added independent
+  # FrontBoard launch failures before otherwise unchanged test inputs.
+  if [[ "$fixture_dirty" == true ]]; then
+    local readiness_log="build/fixture-ready-$test_hosts.log"
+    python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" "$fixture_container" \
+      2>&1 | tee "$readiness_log" || return $?
+    fixture_dirty=false
+  fi
   record_resources "$result_bundle"
   local host_status=0
   xcodebuild test-without-building \
@@ -127,6 +131,7 @@ run_tests() {
 run_frame_ui() {
   local frame_status=0
   xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov
+  fixture_dirty=true
   expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/FrameEndpoints.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testFixedWindowIndependentCursorAndEndpointButtons" || frame_status=$?
@@ -139,6 +144,7 @@ run_frame_ui() {
   run_tests build/copy-results/FrameCropLandscape.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameCropUITests/testLandscapeCropEdgesRotationAndOnePhotoSave" || frame_status=$?
   xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-hdr-ui.mov
+  fixture_dirty=true
   expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/FrameHDR.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameHDRUITests" || frame_status=$?
@@ -174,6 +180,7 @@ if [[ "${PLAYBACK_CHECK_ONLY:-false}" == true ]]; then
   run_tests build/copy-results/SeekHorizontalPortrait.xcresult \
     "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait" || playback_status=$?
   xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
+  fixture_dirty=true
   expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
     "-only-testing:PhotoPlayerTests/LongGOPFixtureTests" || playback_status=$?
@@ -200,12 +207,13 @@ run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerU
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?
 # Restore the established single service boundary. Rebooting before every host
 # added startup/service failures without proving that it fixes XCTest stalls.
-# The read-only fixture check remains before every host. No retry, erasure,
+# The read-only fixture check repeats after this boundary. No retry, erasure,
 # assertion removal, deadline extension or application change is involved.
 record_resources before-regression-reboot
 xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+fixture_dirty=true
 record_resources after-regression-reboot
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek" || test_status=$?
 # Isolate each new interaction case too. A combined host showed multi-second
@@ -250,6 +258,7 @@ run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_back
 # case. Preserve the former 25-second-GOP decoding coverage alongside bounded UI
 # material. The import is last so all twelve-card selection assertions stay intact.
 xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
+fixture_dirty=true
 expected_videos=$((expected_videos + 1))
 run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
   "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"

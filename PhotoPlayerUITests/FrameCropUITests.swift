@@ -13,7 +13,7 @@ final class FrameCropUITests: XCTestCase {
         let card=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'videoCard.' AND value == '160x96'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout:20)); card.tap()
         expect(item(app,"videoSurface"),"value == %@","Playing")
-        app.playerButton("playPause").tap(); expect(item(app,"videoSurface"),"value == %@","Paused")
+        app.pauseAfterInitialControlsHide(); expect(item(app,"videoSurface"),"value == %@","Paused")
         app.playerButton("extractFrames").tap()
         XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"enabled == true"),object:app.buttons["saveFrames"])],timeout:15),.completed)
         return app

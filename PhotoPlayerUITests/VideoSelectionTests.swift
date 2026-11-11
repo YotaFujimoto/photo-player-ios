@@ -22,6 +22,7 @@ final class VideoSelectionTests: XCTestCase {
     @MainActor
     private func checkRow(_ row: Int) {
         let app = launch()
+        defer { app.finishTestApplication() }
         for number in (row * 2 - 1)...(row * 2) {
             let card = reveal(number, in: app)
             let dimensions = card.value as! String
@@ -52,6 +53,7 @@ final class VideoSelectionTests: XCTestCase {
     @MainActor
     func testScrollReloadAndPendingThumbnailsKeepAssetIdentity() {
         let app = launch(delayed: true)
+        defer { app.finishTestApplication() }
         let scroll = app.scrollViews.firstMatch
         scroll.swipeUp(velocity: .fast)
         scroll.swipeDown(velocity: .fast)
@@ -79,6 +81,7 @@ final class VideoSelectionTests: XCTestCase {
     @MainActor
     func testSelectionBoundsWithDiagnosticsOff() {
         let app = launch()
+        defer { app.finishTestApplication() }
         app.buttons["selectionDiagnostics"].tap()
         for number in 2...4 {
             let card = reveal(number, in: app)

@@ -12,14 +12,7 @@ final class SeekInteractionUITests: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 20)); card.tap()
         if !held {
             state(app, "Playing")
-            // AX startup can consume almost all of the initial 3-second
-            // presentation. An existence query followed by tap then races its
-            // expiry. Observe auto-hide, then use ONE explicit reveal and pause
-            // with a fresh presentation. Never retry an input or disable the
-            // real timer. Early-pause seeking also has a native-player test.
-            expect(app.buttons.matching(identifier: "playPause").firstMatch, NSPredicate(format: "exists == false"))
-            app.revealPlayerControls()
-            app.buttons.matching(identifier: "playPause").firstMatch.tap()
+            app.pauseAfterInitialControlsHide()
             state(app, "Paused")
         }
         return app

@@ -1,6 +1,17 @@
 import XCTest
 
 extension XCUIApplication {
+    /// Begin test setup from an observed visibility cycle, rather than racing
+    /// a partially spent initial timer after slow accessibility startup.
+    /// Call only after asserting Playing in a non-diagnostic player.
+    @MainActor func pauseAfterInitialControlsHide(file: StaticString = #filePath, line: UInt = #line) {
+        let play = buttons.matching(identifier: "playPause").firstMatch
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: play)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 15), .completed, file: file, line: line)
+        revealPlayerControls()
+        play.tap()
+    }
+
     /// Poll from now, within the original three-second assertion deadline.
     /// A tap can return before UIKit's double-tap failure dependency resolves;
     /// XCTest's waitForExistence first polls about a second later. Neither an
