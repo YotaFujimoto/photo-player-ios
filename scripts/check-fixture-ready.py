@@ -33,4 +33,12 @@ while time.monotonic() < deadline:
             sys.exit(1)
     time.sleep(0.1)
 print(text, end="", flush=True)
+print(f"PROBE_DOCUMENTS_EXISTS={(Path(container) / 'Documents').is_dir()}", flush=True)
+try:
+    subprocess.run(["xcrun", "simctl", "spawn", simulator, "log", "show", "--style", "compact", "--last", "3m",
+                    "--predicate", 'process == "FixtureReadiness" OR eventMessage CONTAINS "ci-fixture-readiness"'], timeout=30)
+except (OSError, subprocess.TimeoutExpired) as error:
+    print(f"Probe system log unavailable: {type(error).__name__}", flush=True)
+for crash in sorted((Path.home() / "Library/Logs/DiagnosticReports").glob("FixtureReadiness*.ips"))[-2:]:
+    print(crash.read_text(errors="replace")[:40_000], flush=True)
 sys.exit("FIXTURE_RESULT_TIMEOUT")

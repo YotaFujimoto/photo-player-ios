@@ -9,11 +9,22 @@ import Darwin
     private var resultURL: URL?
     private var observations: [String] = []
 
+    static func main() {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "--result-token"), index + 1 < arguments.count,
+              let token = UUID(uuidString: arguments[index + 1]) else { exit(64) }
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        do {
+            try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+            try "FIXTURE_PROCESS_STARTED\n".write(
+                to: documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt"),
+                atomically: true, encoding: .utf8)
+        } catch { print("FIXTURE_PROCESS_REPORT_ERROR"); fflush(nil); exit(74) }
+        exit(UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil, NSStringFromClass(FixtureReadiness.self)))
+    }
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        window = UIWindow(frame: UIScreen.main.bounds)
-        window?.rootViewController = UIViewController()
-        window?.makeKeyAndVisible()
         let arguments = CommandLine.arguments
         guard let countIndex = arguments.firstIndex(of: "--expected-videos"), countIndex + 1 < arguments.count,
               let expected = Int(arguments[countIndex + 1]), expected >= 12,
@@ -24,6 +35,9 @@ import Darwin
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         resultURL = documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt")
         record("FIXTURE_STARTED")
+        window = UIWindow(frame: UIScreen.main.bounds)
+        window?.rootViewController = UIViewController()
+        window?.makeKeyAndVisible()
         Task { await inspect(expected: expected) }
         return true
     }
