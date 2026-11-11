@@ -168,10 +168,13 @@ if [[ "${FRAME_CHECK_ONLY:-false}" == true ]]; then
   run_frame_ui
   exit 0
 fi
-run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved"
-run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls"
-run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection"
-run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup"
+# Collect independent UI failures in one run; keep every case, deadline and
+# nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
+test_status=0
+run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?
+run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls" || test_status=$?
+run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection" || test_status=$?
+run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?
 # Restore the established single service boundary. Rebooting before every host
 # added startup/service failures without proving that it fixes XCTest stalls.
 # The read-only fixture check remains before every host. No retry, erasure,
@@ -181,17 +184,17 @@ xcrun simctl shutdown "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 record_resources after-regression-reboot
-run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek"
+run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek" || test_status=$?
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
 # Keep every case and deadline, and run each once on the same simulator.
-run_tests build/copy-results/SeekBarPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait"
-run_tests build/copy-results/SeekBarLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape"
-run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait"
-run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape"
-run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls"
-run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput"
-test_status=0
+run_tests build/copy-results/SeekBarPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait" || test_status=$?
+run_tests build/copy-results/SeekBarLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape" || test_status=$?
+run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait" || test_status=$?
+run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape" || test_status=$?
+run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls" || test_status=$?
+run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
+
 run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \

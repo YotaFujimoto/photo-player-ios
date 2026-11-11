@@ -185,6 +185,10 @@ final class SeekInteractionUITests: XCTestCase {
         drag(surface, from: 0.5, to: 0.5, y: 0.4, endY: 0.7)
         position(app, near: before, tolerance: 0)
         drag(surface, from: 0.5, to: 0.5 + 5 / surface.frame.width)
+        // A below-threshold contact may be a single tap. Build 14 deliberately
+        // permits that tap to hide paused controls too; reveal the time readout
+        // before asserting the SAME exact position (no seek, no extra drag).
+        app.revealPlayerControls()
         position(app, near: before, tolerance: 0)
         // Holding first must retain hold ownership even after horizontal movement.
         app.playerButton("playPause").tap(); state(app, "Playing")
