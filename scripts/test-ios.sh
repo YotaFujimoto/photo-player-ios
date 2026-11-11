@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+# Each CI group starts on a fresh standard runner. Never run two simulators at
+# once or retry a case; the workflow requires every group before archiving.
+test_group="${TEST_GROUP:-full}"
+case "$test_group" in full|core|playback|library|frames|original) ;; *) exit 2 ;; esac
+
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
 simulator_id="$(python3 -c '
@@ -169,8 +174,10 @@ playback_seek='PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRa
 mkdir -p build/copy-results
 # Validate the input under investigation first. On failure retain its evidence
 # immediately; a successful candidate still runs every test exactly once.
-run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
-  "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
+if [[ "$test_group" == full || "$test_group" == core ]]; then
+  run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
+    "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
+fi
 if [[ "${PLAYBACK_CHECK_ONLY:-false}" == true ]]; then
   # Evidence-only diagnosis of startup/termination and the original encoding.
   # The full path below still runs every test once before any IPA is produced.
@@ -201,10 +208,13 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == full || "$test_group" == core ]]; then
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls" || test_status=$?
 run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection" || test_status=$?
 run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?
+fi
+if [[ "$test_group" == full ]]; then
 # Restore the established single service boundary. Rebooting before every host
 # added startup/service failures without proving that it fixes XCTest stalls.
 # The read-only fixture check repeats after this boundary. No retry, erasure,
@@ -215,6 +225,8 @@ xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 fixture_dirty=true
 record_resources after-regression-reboot
+fi
+if [[ "$test_group" == full || "$test_group" == playback ]]; then
 run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:$playback_seek" || test_status=$?
 # Isolate each new interaction case too. A combined host showed multi-second
 # accessibility snapshots and timed out before a swipe could be synthesized.
@@ -225,7 +237,11 @@ run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:Phot
 run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape" || test_status=$?
 run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls" || test_status=$?
 run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
+run_tests build/copy-results/GestureSkip.xcresult "-only-testing:$gesture_skip" || test_status=$?
+run_tests build/copy-results/GestureHold.xcresult "-only-testing:$gesture_hold" || test_status=$?
+fi
 
+if [[ "$test_group" == full || "$test_group" == library ]]; then
 run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
@@ -241,8 +257,6 @@ run_tests build/TestResults.xcresult \
 # The combined gesture session observed a 5.74s accessibility snapshot and a
 # stale Loading value while the fresh query already showed Playing. Isolate each
 # gesture case in a fresh host, keeping every assertion and deadline unchanged.
-run_tests build/copy-results/GestureSkip.xcresult "-only-testing:$gesture_skip" || test_status=$?
-run_tests build/copy-results/GestureHold.xcresult "-only-testing:$gesture_hold" || test_status=$?
 run_tests build/copy-results/CopyContact.xcresult \
   "-only-testing:$copy_contact" || test_status=$?
 run_tests build/copy-results/CopyReopen.xcresult \
@@ -254,6 +268,8 @@ run_tests build/copy-results/GeometryControls.xcresult \
 run_tests build/copy-results/InputOn.xcresult "-only-testing:$input_on" || test_status=$?
 run_tests build/copy-results/InputOff.xcresult "-only-testing:$input_off" || test_status=$?
 run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_background" || test_status=$?
+fi
+if [[ "$test_group" == full || "$test_group" == frames || "$test_group" == original ]]; then
 # A second, explicitly identified fixture condition, never a retry of a failed
 # case. Preserve the former 25-second-GOP decoding coverage alongside bounded UI
 # material. The import is last so all twelve-card selection assertions stay intact.
@@ -268,7 +284,10 @@ run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
   "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentPortrait" || test_status=$?
 run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
   "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || test_status=$?
+fi
 # Import numbered frame material only after the original twelve/thirteen-video
 # selection regressions. Each frame UI case gets a fresh host on this same phone.
-run_frame_ui || test_status=$?
+if [[ "$test_group" == full || "$test_group" == frames ]]; then
+  run_frame_ui || test_status=$?
+fi
 exit "$test_status"

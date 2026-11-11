@@ -25,24 +25,34 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+  EXPECTED_XCODE_VERSION: '27.1'
+  EXPECTED_XCODE_BUILD: '27A9275'
+  XCODEGEN_VERSION: '2.46.0'
+  XCODEGEN_ASSET_ID: '478866069'
+  XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+  SIMULATOR_MODEL: iPhone 17
+  SIMULATOR_OS: '27.0'
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  build:
+  verify:
+    # Fresh VM/service state per functional group; one free standard runner and
+    # one simulator at a time. No retries, selective pass aggregation, or looser
+    # deadlines. Full verification includes every case exactly once.
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        group: ${{ fromJSON(inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","playback","library","frames"]') }}
     runs-on: xcode-27
-    timeout-minutes: 90
+    timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
-      EXPECTED_XCODE_VERSION: '27.1'
-      EXPECTED_XCODE_BUILD: '27A9275'
-      XCODEGEN_VERSION: '2.46.0'
-      XCODEGEN_ASSET_ID: '478866069'
-      XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
-      SIMULATOR_MODEL: iPhone 17
-      SIMULATOR_OS: '27.0'
-      FRAME_CHECK_ONLY: ${{ inputs.verification == 'frames' && 'true' || 'false' }}
-      PLAYBACK_CHECK_ONLY: ${{ inputs.verification == 'playback' && 'true' || 'false' }}
-    defaults:
-      run:
-        shell: bash
+      TEST_GROUP: ${{ matrix.group }}
     steps:
       - name: Require public repository for free standard runner use
         env:
@@ -60,6 +70,7 @@ jobs:
         run: bash scripts/prepare-ci.sh
 
       - name: Test IPA validator
+        if: matrix.group == 'core'
         run: |
           python3 -m unittest discover -s scripts -p 'test_*.py' -v
           python3 scripts/check_media_policy.py
@@ -71,24 +82,18 @@ jobs:
           bash scripts/generate-frame-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        # Includes a cold Release build, serial hosts, fixture checks, the
-        # established single service boundary and evidence export.
-        # Individual 120/180-second deadlines and every assertion remain unchanged.
-        timeout-minutes: 80
+        # Individual 120/180-second deadlines and all assertions are unchanged.
+        timeout-minutes: 40
         run: bash scripts/test-ios.sh
 
-      - name: Archive and verify unsigned device Release IPA
-        if: inputs.verification != 'frames' && inputs.verification != 'playback'
-        run: bash scripts/archive-ios.sh
+      - name: Stage complete group test log
+        run: cp build/test.log "build/results-${TEST_GROUP}.log"
 
-      - name: Upload verified device IPA
-        if: inputs.verification != 'frames' && inputs.verification != 'playback'
+      - name: Upload group test log for archive gate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: PhotoPlayer-device-ipa
-          path: |
-            dist/PhotoPlayer.ipa
-            dist/build-info.json
+          name: ci-test-log-${{ matrix.group }}
+          path: build/results-${{ matrix.group }}.log
           if-no-files-found: error
           retention-days: 3
 
@@ -96,7 +101,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ci-evidence
+          name: ci-evidence-${{ matrix.group }}
           path: |
             build/*.log
             build/toolchain.txt
@@ -107,5 +112,63 @@ jobs:
             build/TestResults.xcresult
             build/copy-results/
             build/screenshots/
+          if-no-files-found: warn
+          retention-days: 3
+
+  build:
+    needs: verify
+    if: inputs.verification != 'frames' && inputs.verification != 'playback'
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - name: Require public repository for free standard runner use
+        env:
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: test "$REPOSITORY_VISIBILITY" = public
+
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Select and verify pinned tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prepare-ci.sh
+
+      - name: Check release media policy
+        run: python3 scripts/check_media_policy.py
+
+      - name: Download this run's complete test logs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: ci-test-log-*
+          path: build/verified-tests
+          merge-multiple: true
+
+      - name: Require every XCTest exactly once
+        run: node scripts/verify-test-results.mjs build/verified-tests | tee build/test-coverage.log
+
+      - name: Archive and verify unsigned device Release IPA
+        run: bash scripts/archive-ios.sh
+
+      - name: Upload verified device IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PhotoPlayer-device-ipa
+          path: |
+            dist/PhotoPlayer.ipa
+            dist/build-info.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload archive evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-evidence-archive
+          path: |
+            build/*.log
+            build/toolchain.txt
           if-no-files-found: warn
           retention-days: 3
