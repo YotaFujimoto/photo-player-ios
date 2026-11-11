@@ -146,6 +146,9 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertEqual(Double(reached - origin) - ordinary, 10, accuracy: 2)
         observeForFourSeconds()
         XCTAssertTrue(play(app).exists)
+        // This existing paused-retention check also gives a settled glass
+        // image; the reveal test intentionally captures during its short fade.
+        capture("fullscreen-paused-visible-glass")
     }
 
     @MainActor func testSpeedMenuPinsControlsThroughPressAndSelection() {
