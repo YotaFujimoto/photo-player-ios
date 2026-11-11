@@ -28,7 +28,7 @@ final class InputLifecycleTests: XCTestCase {
                 XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
                 ready(app)
-                app.buttons["closePlayer"].tap()
+                app.playerButton("closePlayer").tap()
             }
         }
         let report = copy(app)
@@ -57,13 +57,13 @@ final class InputLifecycleTests: XCTestCase {
         XCUIDevice.shared.press(.home)
         app.activate()
         expect(state, "value == %@", "Paused")
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         let fifth = app.buttons["videoCard.5"]
         let dimensions = fifth.value as! String
         fifth.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.03)
         ready(app)
         XCTAssertEqual(app.otherElements["selectedVideo"].value as? String, dimensions)
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         app.buttons["selectionDiagnostics"].tap()
         let report = copy(app)
         XCTAssertTrue(report.contains("lifecycle.scene.background"))

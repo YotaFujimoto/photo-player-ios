@@ -59,6 +59,7 @@ struct CropDrag {
         minimum = CGSize(width: min(0.35, 60 / video.width), height: min(0.35, 60 / video.height))
     }
     func applying(_ delta: CGPoint) -> FrameCrop {
+        if delta == .zero { return original }
         let dx = delta.x / video.width, dy = delta.y / video.height
         let r = original.rect
         switch target {
@@ -70,7 +71,8 @@ struct CropDrag {
             let x1 = right ? (r.maxX + dx).clamped(r.minX + min(r.width, minimum.width), 1) : r.maxX
             let y0 = top ? (r.minY + dy).clamped(0, r.maxY - min(r.height, minimum.height)) : r.minY
             let y1 = bottom ? (r.maxY + dy).clamped(r.minY + min(r.height, minimum.height), 1) : r.maxY
-            return FrameCrop(rect: CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
+            return FrameCrop(rect: CGRect(x: x0, y: y0, width: left || right ? x1 - x0 : r.width,
+                                          height: top || bottom ? y1 - y0 : r.height))
         }
     }
 }

@@ -42,7 +42,7 @@ final class VideoSelectionTests: XCTestCase {
                     origin.withOffset(CGVector(dx: rect.midX, dy: rect.minY + y)).tap()
                     verifySelection(number, dimensions: dimensions, in: app)
                     if point == "image-bottom" { attach("selected-\(number)-image-bottom") }
-                    app.buttons["closePlayer"].tap()
+                    app.playerButton("closePlayer").tap()
                     XCTAssertTrue(visible.waitForExistence(timeout: 10))
                 }
             }
@@ -64,7 +64,7 @@ final class VideoSelectionTests: XCTestCase {
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: rect.midX, dy: rect.minY + 107)).tap()
         verifySelection(12, dimensions: dimensions, in: app)
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         XCTAssertTrue(last.images["videoThumbnail"].waitForExistence(timeout: 15))
         verifyThumbnail(last, dimensions: dimensions)
         let first = reveal(1, in: app)
@@ -72,7 +72,7 @@ final class VideoSelectionTests: XCTestCase {
         let firstDimensions = first.value as! String
         first.tap()
         verifySelection(1, dimensions: firstDimensions, in: app)
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         attach("selection-after-scroll-reload")
     }
 
@@ -97,7 +97,7 @@ final class VideoSelectionTests: XCTestCase {
                 let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"),
                                                      object: app.buttons["playPause"])
                 XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
-                app.buttons["closePlayer"].tap()
+                app.playerButton("closePlayer").tap()
             }
         }
         attach("selection-diagnostics-off")

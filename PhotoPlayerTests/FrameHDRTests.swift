@@ -102,9 +102,17 @@ final class FrameHDRTests: XCTestCase {
         let croppedSource=try XCTUnwrap(CGImageSourceCreateWithData(croppedData as CFData,nil))
         let cropped=try XCTUnwrap(CGImageSourceCreateImageAtIndex(croppedSource,0,nil))
         XCTAssertEqual(cropped.width,48); XCTAssertEqual(cropped.height,80)
+        let rawCrop=try crop.apply(to:full.image)
+        for (name,image) in [("oriented-HLG-full",full.image),("oriented-HLG-raw-crop",rawCrop),("oriented-HLG-JPEG-crop",cropped)] {
+            let attachment=XCTAttachment(image:UIImage(cgImage:image)); attachment.name=name; attachment.lifetime = .keepAlways; add(attachment)
+        }
         for point in [(8,10),(24,40),(40,60)] {
             let original=try pixel(full.image,x:point.0+48,y:point.1), saved=try pixel(cropped,x:point.0,y:point.1)
-            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(original[channel]-saved[channel]),8) }
+            let raw=try pixel(rawCrop,x:point.0,y:point.1), baseline=try pixel(jpeg,x:point.0+48,y:point.1)
+            let neighbors=try (-2...2).map { try pixel(full.image,x:point.0+48,y:point.1+$0) }
+            print("ROTATED_CROP_SAMPLE point=\(point) full=\(original) raw=\(raw) originalJPEG=\(baseline) cropJPEG=\(saved) neighbors=\(neighbors)")
+            XCTAssertEqual(raw,original,"Lossless oriented crop coordinates")
+            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(original[channel]-saved[channel]),8,"\(point), channel \(channel)") }
         }
     }
 }

@@ -13,17 +13,17 @@ final class ContactGeometryUITests: XCTestCase {
         let last = reveal(12, in: app)
         var expected: [(Int, CGRect, CGPoint)] = []
         expected.append(openOnce(12, card: last, in: app, bottom: false, diagnostics: true))
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         app.buttons["selectionDiagnostics"].tap()
         scroll.swipeDown(velocity: .fast)
         expected.append(openOnce(3, card: reveal(3, in: app), in: app, bottom: true, diagnostics: false))
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         app.buttons["selectionDiagnostics"].tap()
         let fourth = reveal(4, in: app)
         app.buttons["refreshLibrary"].tap()
         XCTAssertTrue(fourth.images["thumbnailPlaceholder"].waitForExistence(timeout: 3))
         expected.append(openOnce(4, card: fourth, in: app, bottom: false, diagnostics: true))
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         let report = copy(app)
         for (number, frame, point) in expected {
             let line = report.components(separatedBy: "\n").first {

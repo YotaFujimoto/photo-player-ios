@@ -80,7 +80,7 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
         let rect = crop.displayed(in: videoRect)
         guides.path = UIBezierPath(rect: rect).cgPath
         guides.lineWidth = cropping ? 1.5 : 0.75
-        guides.isHidden = image == nil || (!cropping && crop.isFull)
+        guides.isHidden = image == nil
         let path = UIBezierPath()
         if cropping {
             for ratio in [CGFloat(1.0 / 3), CGFloat(2.0 / 3)] {

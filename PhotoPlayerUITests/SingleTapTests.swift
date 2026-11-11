@@ -23,7 +23,7 @@ final class SingleTapTests: XCTestCase {
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
         start.press(forDuration: 0.03)
         verifyOpened(app, number: 3, dimensions: "202x202", diagnostics: true)
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
         // A deliberate scroll is a real contact with no selection action.
         // It must get its own record after the previous player's close history.
         start.press(forDuration: 0.03, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -140)),
@@ -55,7 +55,7 @@ final class SingleTapTests: XCTestCase {
         for _ in 0..<3 {
             target.press(forDuration: 0.03)
             verifyOpened(app, number: 3, dimensions: "202x202", diagnostics: true)
-            app.buttons["closePlayer"].tap()
+            app.playerButton("closePlayer").tap()
         }
         verifyCounts(app, accepted: 3, shown: 3, requested: 3, received: 3, ready: 3, inPlayer: false)
         let copy = app.buttons["copySelectionTrace.library"]
@@ -86,7 +86,7 @@ final class SingleTapTests: XCTestCase {
             app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
                 .press(forDuration: 0.03)
             verifyOpened(app, number: number, dimensions: dimensions, diagnostics: diagnostics)
-            app.buttons["closePlayer"].tap()
+            app.playerButton("closePlayer").tap()
         }
         if !diagnostics { app.buttons["selectionDiagnostics"].tap() }
         verifyCounts(app, accepted: 4, shown: 4, requested: 4, received: 4, ready: 4, inPlayer: false)
@@ -107,7 +107,7 @@ final class SingleTapTests: XCTestCase {
             // A single finger contact with 4.2pt of movement, not a second tap.
             start.press(forDuration: 0.03, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
             verifyOpened(app, number: number, dimensions: dimensions, diagnostics: true)
-            app.buttons["closePlayer"].tap()
+            app.playerButton("closePlayer").tap()
         }
         verifyCounts(app, accepted: 4, shown: 4, requested: 4, received: 4, ready: 4, inPlayer: false)
         XCTAssertTrue(trace(app).contains("contacts=4;"), trace(app))
@@ -132,7 +132,7 @@ final class SingleTapTests: XCTestCase {
         verifyOpened(app, number: 12, dimensions: dimensions, diagnostics: true)
         verifyCounts(app, accepted: 1, shown: 1, requested: 1, received: 1, ready: 1)
         XCTAssertNotEqual(trace(app), before)
-        app.buttons["closePlayer"].tap()
+        app.playerButton("closePlayer").tap()
 
         app.buttons["refreshLibrary"].tap()
         XCTAssertTrue(last.images["thumbnailPlaceholder"].waitForExistence(timeout: 3))
