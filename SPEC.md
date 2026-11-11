@@ -4,18 +4,18 @@
 
 ビルド12は通常撮影の30fps素材が写真抽出入口で拒否され、B方式・写真保存は実機未確認。旧「HDR／可変fpsは対象外」の条件を撤回し、未編集の通常撮影素材への対応をデザイン変更より優先する。固定最大3秒、独立P/S/E、実コマ±1、最大10枚、k=floor((N−1)/9)と保存名の実時刻は維持する。実機で失敗した素材の拒否理由は現時点で未確定。
 
-- HDRはAVAssetImageGeneratorのforceSDRでPQ/HLGをSDR化し、返された色プロファイルからsRGBへ別途色変換する。プレビューと保存で同じ経路を使用し、高品質JPEGへプロファイルを含める。iOS 18以上で公式の明示的なSDRポリシーを使い、iOS 17のHDR抽出は理由を表示する。元動画へ変換・書き戻しをしない。
-- fps表示やnominalFrameRateをコマの格子とせず、限定区間の表示PTSを列挙する。固定fpsとの一致を入口条件にしない。重複PTSは一意化し、実フレームを指定して画像のactualTimeを照合する。時刻精度内の丸めを隣接フレームへ誤対応させない。
+- HDRはApple公式APIでSDR化する。HLGはAVAssetImageGenerator.forceSDR、PQはmatchSourceで得たHDR画像へCore ImageのtoneMapHDRtoSDRを適用する。検証環境でPQのforceSDR変換だけが失敗し、元のHDR画像生成は成功したことに基づく経路分離である。SDR化とは別に、色管理されたsRGBの8bit画像へ変換する。プレビューと保存で同じ経路を使用し、高品質JPEGへ変換先ICCの実データをAPP2として含める（ImageIOがEXIFのsRGB指定だけに省略する場合にも保持）。圧縮画像は再符号化しない。iOS 18以上で明示的な画像生成ポリシーを使い、iOS 17のHDR抽出は理由を表示する。元動画へ変換・書き戻しをしない。
+- fps表示やnominalFrameRateをコマの格子とせず、限定区間の表示PTSを列挙する。圧縮媒体PTSと出力PTSを同一視せず、CMSampleBufferGetOutputSampleTimingInfoArrayで表示用時刻を読む。固定fpsとの一致を入口条件にしない。重複PTSは一意化し、実フレームを指定して画像のactualTimeを照合する。時刻精度内の丸めを隣接フレームへ誤対応させない。
 - 保存対象のフレーム数間隔は従来どおり。対象区間で可変間隔を検出した場合、選択した最初・最後の実PTS差を枚数−1で割り、`≈0.100 s · 10`のように表示する。1枚は`1 frame`。表示の丸め値を抽出計算へ戻さない。量子化精度内の揺れと実間隔の変動は区別し、全編の固定fps認定とは扱わない。
 - 編集情報（adjustmentData/adjustmentBaseVideo）、high-frame-rate/timelapse subtype、AVPlayerItem.videoComposition、非URLの合成assetは根拠を区別して未対応を表示する。これらは通常撮影HDRとは別の制限。原本へ黙って切り替えない。
 - 拒否・失敗理由、検出fps、色の伝達特性／色域／マトリクス、時刻の精度と間隔統計、入力の調整フラグ、SDR化／sRGB化の経路を匿名診断へ含める。既存の一括コピーへ直近の限定履歴を追加するだけとし、入力監視を作り直さない。ファイル名・URL・Photos識別子・位置情報・画像・実動画・エラーの自由文を診断へ含めず、外部送信しない。
 - HDR/HEVC/29.97fps/丸め/実VFRの生成素材で実画素・向き・保存名とプロファイルを照合する。HDRは生成成功だけで色品質の合格にせず、階調・色の数値検査と合成画像の目視を分け、実素材の見え方は実機未確認として残す。2時間動画の全編デコード・動画の永続複製は行わない。
 
-参照: [Apple forceSDR](https://developer.apple.com/documentation/avfoundation/avassetimagegenerator/dynamicrangepolicy-swift.struct/forcesdr)、[Quartzによる色空間変換](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CocoaDrawingGuide/Images/Images.html)。以下のビルド12仕様・対応外条件は旧版の履歴であり、ビルド13では本節を優先する。
+参照: [Apple forceSDR](https://developer.apple.com/documentation/avfoundation/avassetimagegenerator/dynamicrangepolicy-swift.struct/forcesdr)、[Core ImageのHDR→SDR変換](https://developer.apple.com/videos/play/wwdc2023/10181/)、[Quartzによる色空間変換](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CocoaDrawingGuide/Images/Images.html)。以下のビルド12仕様・対応外条件は旧版の履歴であり、ビルド13では本節を優先する。
 
-## ビルド12: フレーム写真保存（実装済み・実機未確認）
+## 旧ビルド12: フレーム写真保存（配布時点の仕様）
 
-ビルド11の提示4機能項目は2026-11-10に実機合格報告を受領。今回の候補は0.4.0 / ビルド12。CI123件と実機IPAの検査が成功し、実機の品質確認を待つ。通常再生・固定Bundle ID・manualCounter.v1・従来の値12・診断コピーを維持する。音量／明るさ操作は凍結。一覧タップ無反応は原因未確定・本人判断で調査保留。
+ビルド11の提示4機能項目は2026-11-10に実機合格報告を受領。0.4.0 / ビルド12はCI123件と実機IPAの検査後に配布したが、実機では抽出入口が拒否され、B方式・保存は未完了となった。以下は当時の仕様であり、HDR・可変間隔の制限はビルド13で撤回する。通常再生・固定Bundle ID・manualCounter.v1・従来の値12・診断コピーを維持する。音量／明るさ操作は凍結。一覧タップ無反応は原因未確定・本人判断で調査保留。
 
 - B方式: 通常プレイヤー右上の写真アイコンから停止して入る。つまみ1つ、Set Start／Set End、選択帯と端線、保存予定位置の非操作マーク。ドラッグ端点は設けない。上左Cancel、上右Done、上中央に間隔と枚数。英語・常時表示・安全領域内のoverlayとし、進捗で動画フレームを動かさない。
 - W0は入口の表示コマの実時刻、W1はそこから元動画時間で最大3秒以内の最後の実フレーム。duration自体をフレームと仮定しない。P=S=W0、E=W1で開始。W0≤P≤W1、W0≤S≤E≤W1。Pは[S,E]外にも移動でき、端点・固定区間・縮尺を変えない。吸着、連動、自動拡張なし。
