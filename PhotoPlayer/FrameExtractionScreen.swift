@@ -9,6 +9,10 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
     var cropping = false { didSet { if oldValue != cropping { cancelFrameGesture(); swipe.isEnabled = !cropping; cropPan.isEnabled = cropping; updateGuides() } } }
     var cancellationID = 0
     private let single = UITapGestureRecognizer()
+    // UIKit's tap recognizer can accept a stationary press on release when
+    // there is no long-press competitor. Recognize that distinct input without
+    // assigning it a frame-mode action; moving a crop still owns its pan.
+    private let stationaryPress = UILongPressGestureRecognizer()
     private let cropPan = CropGestureRecognizer()
     private let guides = CAShapeLayer()
     private let thirds = CAShapeLayer()
@@ -39,8 +43,10 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
         tap.require(toFail: swipe); tap.require(toFail: cropPan)
         single.addTarget(self, action: #selector(toggled(_:)))
         single.require(toFail: tap); single.require(toFail: swipe); single.require(toFail: cropPan)
+        single.require(toFail: stationaryPress); tap.require(toFail: stationaryPress)
+        stationaryPress.cancelsTouchesInView = false
         cropPan.addTarget(self, action: #selector(cropped(_:))); cropPan.isEnabled = false
-        for recognizer in [single, tap, swipe, cropPan] { recognizer.delegate = self; addGestureRecognizer(recognizer) }
+        for recognizer in [single, tap, swipe, cropPan, stationaryPress] { recognizer.delegate = self; addGestureRecognizer(recognizer) }
         guides.fillColor = UIColor.clear.cgColor; guides.strokeColor = UIColor.white.cgColor
         guides.shadowColor = UIColor.black.cgColor; guides.shadowOpacity = 0.8; guides.shadowRadius = 1
         thirds.fillColor = UIColor.clear.cgColor; thirds.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor; thirds.lineWidth = 0.5
@@ -55,6 +61,10 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         // Touch slop is permitted at the real edge. Black bars are not crop coordinates.
         videoRect.insetBy(dx: -22, dy: -22).contains(touch.location(in: self))
+    }
+    func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        (recognizer === stationaryPress && (other === cropPan || other === swipe)) ||
+        (other === stationaryPress && (recognizer === cropPan || recognizer === swipe))
     }
     @objc private func accessibleCrop() -> Bool { onToggleCrop?(); return true }
     @objc private func previousFrame() -> Bool { onStep?(false); return true }
@@ -119,6 +129,7 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
         cropPan.isEnabled = false; cropPan.isEnabled = cropping
         single.isEnabled = false; single.isEnabled = true
         tap.isEnabled = false; tap.isEnabled = true
+        stationaryPress.isEnabled = false; stationaryPress.isEnabled = true
     }
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -186,7 +197,7 @@ struct FrameExtractionScreen: View {
                         header
                         Spacer(minLength: 0)
                         footer
-                    }.padding(.horizontal, 12).padding(.vertical, 6)
+                    }.padding(.horizontal, 12).padding(.vertical, 12)
                 }
                 if model.phase == .loading || (model.preview == nil && model.isPreviewing) {
                     ProgressView().tint(.white).allowsHitTesting(false)

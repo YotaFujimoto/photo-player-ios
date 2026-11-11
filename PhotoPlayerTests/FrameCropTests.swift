@@ -99,6 +99,41 @@ final class FrameCropTests: XCTestCase {
         }
         return data
     }
+    @MainActor func testRenderedCropCanvasKeepsColoredCornersAndGeometryAcrossAspectRatios() throws {
+        let format=UIGraphicsImageRendererFormat(); format.scale=1
+        let crop=FrameCrop(rect:CGRect(x:0.25,y:0.25,width:0.5,height:0.5))
+        for size in [CGSize(width:160,height:96),CGSize(width:96,height:160),CGSize(width:120,height:120)] {
+            let original=UIGraphicsImageRenderer(size:size,format:format).image { _ in
+                for (color,rect) in [(UIColor.red,CGRect(x:0,y:0,width:size.width/2,height:size.height/2)),
+                                     (.green,CGRect(x:size.width/2,y:0,width:size.width/2,height:size.height/2)),
+                                     (.blue,CGRect(x:0,y:size.height/2,width:size.width/2,height:size.height/2)),
+                                     (.yellow,CGRect(x:size.width/2,y:size.height/2,width:size.width/2,height:size.height/2))] {
+                    color.setFill(); UIRectFill(rect)
+                }
+            }
+            let view=FramePreviewView(frame:.zero); view.image=original; view.crop=crop
+            for canvas in [CGSize(width:320,height:600),CGSize(width:600,height:320)] {
+                view.frame=CGRect(origin:.zero,size:canvas); view.layoutIfNeeded()
+                let before=view.frame
+                view.cropping=true; view.layoutIfNeeded()
+                XCTAssertEqual(view.frame,before); XCTAssertEqual(view.crop,crop)
+                let rendered=UIGraphicsImageRenderer(size:canvas,format:format).image { context in view.layer.render(in:context.cgContext) }
+                let image=try XCTUnwrap(rendered.cgImage), data=pixels(image)
+                // Independently locate the four colored interiors in the centered fitted image.
+                let factor=min(canvas.width/size.width,canvas.height/size.height)
+                for (nx,ny,color) in [(0.125,0.125,[255,0,0]),(0.875,0.125,[0,255,0]),(0.125,0.875,[0,0,255]),(0.875,0.875,[255,255,0])] {
+                    let x=Int((canvas.width-size.width*factor)/2 + size.width*factor*nx)
+                    let y=Int((canvas.height-size.height*factor)/2 + size.height*factor*ny)
+                    let offset=(y*image.width+x)*4
+                    for c in 0..<3 { XCTAssertLessThanOrEqual(abs(Int(data[offset+c])-color[c]),2) }
+                }
+                view.cropping=false; view.layoutIfNeeded()
+                XCTAssertEqual(view.frame,before); XCTAssertEqual(view.crop,crop)
+                let attachment=XCTAttachment(image:rendered)
+                attachment.name="crop-canvas-\(Int(size.width))x\(Int(size.height))-\(Int(canvas.width))"; attachment.lifetime = .keepAlways; add(attachment)
+            }
+        }
+    }
     func testRelativeTimeUsesFixedOriginAndDoesNotModifyRationalTimes() {
         let origin=CMTime(value: 300300, timescale:30000)
         XCTAssertEqual(FrameRelativeTime.text(origin,origin:origin),"0:00")

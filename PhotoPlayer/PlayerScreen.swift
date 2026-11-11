@@ -60,7 +60,7 @@ struct PlayerScreen: View {
                         if diagnostics {
                             ScrollView { controls(fullscreen: true) }.frame(maxHeight: min(210, max(110, geometry.size.height / 2 - 52)))
                         } else { controls(fullscreen: true) }
-                    }.padding(.horizontal, 12).padding(.vertical, 6)
+                    }.padding(.horizontal, 12).padding(.vertical, 12)
                         .transition(.opacity)
                 }
                 loadingOverlay
