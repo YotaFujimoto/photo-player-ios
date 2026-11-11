@@ -160,6 +160,24 @@ mkdir -p build/copy-results
 # immediately; a successful candidate still runs every test exactly once.
 run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
+if [[ "${PLAYBACK_CHECK_ONLY:-false}" == true ]]; then
+  # Evidence-only diagnosis of startup/termination and the original encoding.
+  # The full path below still runs every test once before any IPA is produced.
+  playback_status=0
+  run_tests build/copy-results/SeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape" || playback_status=$?
+  run_tests build/copy-results/SeekHorizontalPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait" || playback_status=$?
+  xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
+  expected_videos=$((expected_videos + 1))
+  run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
+    "-only-testing:PhotoPlayerTests/LongGOPFixtureTests" || playback_status=$?
+  run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentPortrait" || playback_status=$?
+  run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || playback_status=$?
+  exit "$playback_status"
+fi
 if [[ "${FRAME_CHECK_ONLY:-false}" == true ]]; then
   # An explicitly requested diagnostic CI scope, never a distributable build.
   # The workflow skips both archive and IPA upload in this mode.

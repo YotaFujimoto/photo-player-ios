@@ -10,7 +10,18 @@ final class SeekInteractionUITests: XCTestCase {
         app.launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20)); card.tap()
-        if !held { state(app, "Playing"); app.playerButton("playPause").tap(); state(app, "Paused") }
+        if !held {
+            state(app, "Playing")
+            // AX startup can consume almost all of the initial 3-second
+            // presentation. An existence query followed by tap then races its
+            // expiry. Observe auto-hide, then use ONE explicit reveal and pause
+            // with a fresh presentation. Never retry an input or disable the
+            // real timer. Early-pause seeking also has a native-player test.
+            expect(app.buttons.matching(identifier: "playPause").firstMatch, NSPredicate(format: "exists == false"))
+            app.revealPlayerControls()
+            app.buttons.matching(identifier: "playPause").firstMatch.tap()
+            state(app, "Paused")
+        }
         return app
     }
     @MainActor private func bar(_ app: XCUIApplication) -> XCUIElement { app.revealPlayerControls(); return app.otherElements.matching(identifier: "seekSlider").firstMatch }
@@ -108,6 +119,12 @@ final class SeekInteractionUITests: XCTestCase {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
+        // Finish the foreground scene transition before asking XCTest to kill
+        // its process, as in the persistence test. Keep the termination check.
+        XCUIDevice.shared.press(.home)
+        expect(app, NSPredicate(format: "state == %d OR state == %d",
+                               Int(XCUIApplication.State.runningBackground.rawValue),
+                               Int(XCUIApplication.State.runningBackgroundSuspended.rawValue)))
         app.terminate()
         XCTAssertEqual(app.state, .notRunning)
     }

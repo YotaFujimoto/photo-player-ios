@@ -13,9 +13,9 @@ on:
   workflow_dispatch:
     inputs:
       verification:
-        description: 'Full verification produces an IPA; frames checks produce evidence only.'
+        description: 'Full verification produces an IPA; focused checks produce evidence only.'
         type: choice
-        options: [full, frames]
+        options: [full, frames, playback]
         default: full
 
 permissions:
@@ -39,6 +39,7 @@ jobs:
       SIMULATOR_MODEL: iPhone 17
       SIMULATOR_OS: '27.0'
       FRAME_CHECK_ONLY: ${{ inputs.verification == 'frames' && 'true' || 'false' }}
+      PLAYBACK_CHECK_ONLY: ${{ inputs.verification == 'playback' && 'true' || 'false' }}
     defaults:
       run:
         shell: bash
@@ -70,18 +71,18 @@ jobs:
           bash scripts/generate-frame-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        # Includes a cold Release build, 30 serial hosts, fixture checks, the
+        # Includes a cold Release build, serial hosts, fixture checks, the
         # established single service boundary and evidence export.
         # Individual 120/180-second deadlines and every assertion remain unchanged.
         timeout-minutes: 80
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
-        if: inputs.verification != 'frames'
+        if: inputs.verification != 'frames' && inputs.verification != 'playback'
         run: bash scripts/archive-ios.sh
 
       - name: Upload verified device IPA
-        if: inputs.verification != 'frames'
+        if: inputs.verification != 'frames' && inputs.verification != 'playback'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: PhotoPlayer-device-ipa
