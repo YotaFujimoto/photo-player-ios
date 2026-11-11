@@ -163,7 +163,7 @@ enum CropEdgePolicy {
     }
     /// Read-only evidence of the actual presented hosting/container hierarchy.
     /// Never installs a second override or changes system gesture dispatch.
-    static func resolvedEdges(window: UIWindow?) -> UIRectEdge {
+    @MainActor static func resolvedEdges(window: UIWindow?) -> UIRectEdge {
         guard var controller = window?.rootViewController else { return [] }
         while let presented = controller.presentedViewController { controller = presented }
         while let child = controller.childForScreenEdgesDeferringSystemGestures, child !== controller { controller = child }
@@ -175,6 +175,7 @@ struct FrameExtractionScreen: View {
     @ObservedObject var model: FrameExtractionModel
     let onClose: (Int) -> Void
     @Environment(\.scenePhase) private var scenePhase
+    @State private var lastOrientation = UIDeviceOrientation.unknown
     var body: some View {
         GeometryReader { geometry in
             let landscape = geometry.size.width > geometry.size.height
@@ -206,10 +207,14 @@ struct FrameExtractionScreen: View {
             .defersSystemGestures(on: CropEdgePolicy.edges(landscape: landscape, cropping: model.isCropping, active: scenePhase == .active))
             .onChange(of: geometry.size) { _, _ in model.cancelGestures() }
         }
-        .onAppear { model.prepare() }
+        .onAppear { lastOrientation = UIDevice.current.orientation; model.prepare() }
         .onChange(of: model.savedCount) { _, count in if count > 0 { onClose(count) } }
         .onChange(of: scenePhase) { _, phase in if phase != .active { model.backgrounded() } }
-        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in model.cancelGestures() }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            let orientation = UIDevice.current.orientation
+            guard [.portrait, .landscapeLeft, .landscapeRight].contains(orientation), orientation != lastOrientation else { return }
+            lastOrientation = orientation; model.cancelGestures()
+        }
     }
     private var header: some View {
         HStack(spacing: 12) {

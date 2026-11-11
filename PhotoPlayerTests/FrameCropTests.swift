@@ -4,6 +4,11 @@ import CoreMedia
 import ImageIO
 @testable import PhotoPlayer
 
+private final class CropStateFixture: CropGestureRecognizer {
+    private var suppliedState: UIGestureRecognizer.State = .possible
+    override var state: UIGestureRecognizer.State { get { suppliedState } set { suppliedState = newValue } }
+}
+
 final class FrameCropTests: XCTestCase {
     func testAspectFitAndFeedbackStayInsideTallWideSquareImagesAcrossRotation() {
         for canvas in [CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
@@ -107,7 +112,7 @@ final class FrameCropTests: XCTestCase {
         } } }
     }
     @MainActor func testCropRecognizerRequiresMovementAndNeverStartsFromSmallJitter() {
-        let recognizer=CropGestureRecognizer()
+        let recognizer=CropStateFixture()
         let view=UIView(); view.addGestureRecognizer(recognizer)
         recognizer.start(at:CGPoint(x:100,y:100)); recognizer.move(to:CGPoint(x:102,y:103))
         XCTAssertEqual(recognizer.state,.possible)

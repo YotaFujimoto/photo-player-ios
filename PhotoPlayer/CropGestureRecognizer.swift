@@ -3,7 +3,7 @@ import UIKit.UIGestureRecognizerSubclass
 
 /// Any-direction drag, enabled only in crop mode. A failed tap stays available
 /// to the exclusive single/double recognizers. No press timer or synthetic tap.
-final class CropGestureRecognizer: UIGestureRecognizer {
+class CropGestureRecognizer: UIGestureRecognizer {
     private var touch: UITouch?
     private(set) var origin = CGPoint.zero
     private(set) var translation = CGPoint.zero

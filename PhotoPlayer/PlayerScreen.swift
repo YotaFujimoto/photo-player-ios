@@ -15,6 +15,7 @@ struct PlayerScreen: View {
     @State private var lastDeviceOrientation = UIDeviceOrientation.unknown
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(video: LibraryVideo, selectionDiagnostics: Bool = false, selectionTrace: SelectionTrace? = nil, selectionOperation: Int? = nil) {
         self.video = video
@@ -55,17 +56,18 @@ struct PlayerScreen: View {
                         }
                         Spacer(minLength: 0)
                         if diagnostics {
-                            ScrollView { controls(fullscreen: true) }.frame(maxHeight: min(210, geometry.size.height * 0.4))
+                            ScrollView { controls(fullscreen: true) }.frame(maxHeight: min(210, max(110, geometry.size.height / 2 - 52)))
                         } else { controls(fullscreen: true) }
                     }.padding(.horizontal, 12).padding(.vertical, 6)
                         .transition(.opacity)
                 }
+                loadingOverlay
             }.foregroundStyle(.white).tint(.white).background(.black)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("selectedVideo")
                 .accessibilityLabel(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback")
                 .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
-                .animation(.easeOut(duration: 0.18), value: chrome.isVisible)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chrome.isVisible)
             .statusBarHidden(fullscreen)
             .onAppear { configureLayout(fullscreen: fullscreen) }
             .onChange(of: geometry.size) { _, _ in configureLayout(fullscreen: fullscreen) }
@@ -186,14 +188,24 @@ struct PlayerScreen: View {
                     }
             }
         }
-        .overlay {
+        .overlay(alignment: .top) {
             if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)
                     .background(.regularMaterial, in: Capsule()).allowsHitTesting(false)
-                    .accessibilityIdentifier("temporaryRate")
+                    .padding(.top, 72).accessibilityIdentifier("temporaryRate")
             }
         }
-        .overlay {
+        .overlay(alignment: .bottom) {
+            if model.isReady && !model.canPlaySlow {
+                Text("Slow playback unavailable.").font(.caption).padding(8)
+                    .background(.regularMaterial, in: Capsule()).padding(8).allowsHitTesting(false)
+            }
+        }
+        .background(.black)
+    }
+
+    private var loadingOverlay: some View {
+        Group {
             if model.isLoading {
                 VStack(spacing: 12) {
                     ProgressView(value: model.hasDownloadProgress ? model.progress : nil)
@@ -212,13 +224,6 @@ struct PlayerScreen: View {
                 }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
             } else if !model.isReady { ProgressView().tint(.white) }
         }
-        .overlay(alignment: .bottom) {
-            if model.isReady && !model.canPlaySlow {
-                Text("Slow playback unavailable.").font(.caption).padding(8)
-                    .background(.regularMaterial, in: Capsule()).padding(8).allowsHitTesting(false)
-            }
-        }
-        .background(.black)
     }
 
     private func controls(fullscreen: Bool) -> some View {

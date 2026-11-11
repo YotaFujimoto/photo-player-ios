@@ -76,5 +76,5 @@ struct CropDrag {
 }
 
 private extension CGFloat {
-    func clamped(_ lower: CGFloat, _ upper: CGFloat) -> CGFloat { min(max(self, lower), upper) }
+    func clamped(_ lower: CGFloat, _ upper: CGFloat) -> CGFloat { Swift.min(Swift.max(self, lower), upper) }
 }
