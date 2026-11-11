@@ -112,7 +112,15 @@ final class FrameHDRTests: XCTestCase {
             let neighbors=try (-2...2).map { try pixel(full.image,x:point.0+48,y:point.1+$0) }
             print("ROTATED_CROP_SAMPLE point=\(point) full=\(original) raw=\(raw) originalJPEG=\(baseline) cropJPEG=\(saved) neighbors=\(neighbors)")
             XCTAssertEqual(raw,original,"Lossless oriented crop coordinates")
-            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(original[channel]-saved[channel]),8,"\(point), channel \(channel)") }
+            // The sharp blue boundary at (24,40) already differs by 51 in the
+            // legacy JPEG. Compare equal-quality JPEGs there, not lossy JPEG
+            // against lossless RGB. Keep this boundary in the regression.
+            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(baseline[channel]-saved[channel]),8,"\(point), channel \(channel)") }
+        }
+        // Uniform patch interiors still have the original strict RGB tolerance.
+        for point in [(8,10),(24,48),(40,60)] {
+            let original=try pixel(full.image,x:point.0+48,y:point.1), saved=try pixel(cropped,x:point.0,y:point.1)
+            for channel in 0..<3 { XCTAssertLessThanOrEqual(abs(original[channel]-saved[channel]),8,"Interior \(point), channel \(channel)") }
         }
     }
 }
