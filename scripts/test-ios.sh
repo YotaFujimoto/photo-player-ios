@@ -77,6 +77,11 @@ xcrun simctl get_app_container "$simulator_id" \
   io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests.xctrunner app \
   2>&1 | tee -a build/simulator.log
 
+bash scripts/prepare-fixture-probe.sh
+fixture_probe='io.github.photoplayer.ci-fixture-readiness'
+xcrun simctl install "$simulator_id" build/FixtureReadiness.app
+xcrun simctl privacy "$simulator_id" grant photos "$fixture_probe"
+expected_videos=12
 test_hosts=0
 run_tests() {
   local result_bundle=$1
@@ -93,6 +98,14 @@ run_tests() {
     xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log || return $?
   fi
   test_hosts=$((test_hosts + 1))
+  # bootstatus does not guarantee that PhotoKit exposes every imported asset.
+  # A failed run showed only two of twelve videos after a service restart.
+  # Require the fixture before launching the app; never re-import or retry a
+  # failed UI test. A separate process records counts only and changes no data.
+  local readiness_log="build/fixture-ready-$test_hosts.log"
+  xcrun simctl launch --console --terminate-running-process "$simulator_id" \
+    "$fixture_probe" "$expected_videos" 2>&1 | tee "$readiness_log" || return $?
+  grep -Fx "FIXTURE_READY videos=$expected_videos" "$readiness_log" >/dev/null || return 1
   record_resources "$result_bundle"
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
@@ -116,6 +129,7 @@ run_tests() {
 run_frame_ui() {
   local frame_status=0
   xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov
+  expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/FrameEndpoints.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testFixedWindowIndependentCursorAndEndpointButtons" || frame_status=$?
   run_tests build/copy-results/FramePixelsGestures.xcresult \
@@ -123,6 +137,7 @@ run_frame_ui() {
   run_tests build/copy-results/FrameSaveLandscape.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || frame_status=$?
   xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-hdr-ui.mov
+  expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/FrameHDR.xcresult \
     "-only-testing:PhotoPlayerUITests/FrameHDRUITests" || frame_status=$?
   return "$frame_status"
@@ -203,6 +218,7 @@ run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_back
 # case. Preserve the former 25-second-GOP decoding coverage alongside bounded UI
 # material. The import is last so all twelve-card selection assertions stay intact.
 xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
+expected_videos=$((expected_videos + 1))
 run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
   "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"
 run_tests build/copy-results/OriginalPlaybackSeek.xcresult \
