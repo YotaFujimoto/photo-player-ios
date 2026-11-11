@@ -11,10 +11,15 @@ token = str(uuid.uuid4())
 assert Path(container).is_dir(), "The installed fixture helper container must remain present"
 result = Path(container) / "Documents" / f"readiness-{token}.txt"
 assert not result.exists(), "Never accept a previous probe result"
-subprocess.run(
-    ["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle,
-     "--expected-videos", expected, "--result-token", token], check=True, timeout=45
-)
+try:
+    subprocess.run(
+        ["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle,
+         "--expected-videos", expected, "--result-token", token], check=True, timeout=45
+    )
+except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    if result.exists():
+        print(result.read_text(), end="", flush=True)
+    raise
 # Console attachment can miss output from an app that exits during launch.
 # Observe the atomic result instead, with one launch and a bounded condition.
 deadline = time.monotonic() + 45
@@ -25,6 +30,7 @@ while time.monotonic() < deadline:
         lines = text.splitlines()
         if f"FIXTURE_READY videos={expected}" in lines:
             print(text, end="", flush=True)
+            subprocess.run(["xcrun", "simctl", "terminate", simulator, bundle], check=True, timeout=30)
             sys.exit(0)
         if any(line.startswith(("FIXTURE_NOT_READY", "FIXTURE_ACCESS_ERROR", "FIXTURE_UNEXPECTED")) for line in lines):
             print(text, end="", flush=True)

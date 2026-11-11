@@ -66,7 +66,7 @@ final class PlaybackModel: ObservableObject {
 
     private func trace(_ event: String) {
         guard ProcessInfo.processInfo.arguments.contains("--playback-diagnostics") else { return }
-        print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) \(event), time=\(position), selected=\(selectedRate), actual=\(player.rate), state=\(stateText)")
+        print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) \(event), time=\(position), measured=\(player.currentTime().seconds), selected=\(selectedRate), actual=\(player.rate), state=\(stateText), control=\(player.timeControlStatus.rawValue), waiting=\(player.reasonForWaitingToPlay?.rawValue ?? "none"), intent=\(wantsPlayback)")
     }
 
     func load() {
@@ -249,7 +249,10 @@ final class PlaybackModel: ObservableObject {
             @unknown default: newState = "Waiting…"
             }
         }
-        assign(\.stateText, newState)
+        if stateText != newState {
+            assign(\.stateText, newState)
+            trace("state changed")
+        }
         if firstReady && wantsPlayback { resumeIfNeeded() }
     }
 

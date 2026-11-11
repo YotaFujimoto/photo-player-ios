@@ -100,6 +100,7 @@ run_tests() {
   python3 scripts/check-fixture-ready.py "$simulator_id" "$fixture_probe" "$expected_videos" "$fixture_container" \
     2>&1 | tee "$readiness_log" || return $?
   record_resources "$result_bundle"
+  local host_status=0
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
@@ -116,7 +117,11 @@ run_tests() {
   -resultBundlePath "$result_bundle" \
   "$@" \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  2>&1 | tee -a build/test.log
+  2>&1 | tee -a build/test.log || host_status=$?
+  if [[ "$host_status" -ne 0 ]]; then
+    python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
+  fi
+  return "$host_status"
 }
 
 run_frame_ui() {

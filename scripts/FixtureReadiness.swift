@@ -30,7 +30,8 @@ import Darwin
               let expected = Int(arguments[countIndex + 1]), expected >= 12,
               let tokenIndex = arguments.firstIndex(of: "--result-token"), tokenIndex + 1 < arguments.count,
               let token = UUID(uuidString: arguments[tokenIndex + 1]) else {
-            finish("FIXTURE_ARGUMENT_ERROR", code: 64)
+            record("FIXTURE_ARGUMENT_ERROR")
+            return false
         }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         resultURL = documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt")
@@ -56,7 +57,7 @@ import Darwin
         var lastCount = -1
         repeat {
             let access = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-            guard access == .authorized else { finish("FIXTURE_ACCESS_ERROR status=\(access.rawValue)", code: 1) }
+            guard access == .authorized else { record("FIXTURE_ACCESS_ERROR status=\(access.rawValue)"); return }
             let videos = PHAsset.fetchAssets(with: .video, options: nil)
             if videos.count != lastCount {
                 record("FIXTURE_AVAILABLE videos=\(videos.count) expected=\(expected)")
@@ -67,20 +68,20 @@ import Darwin
                 return video.pixelWidth == 320 && video.pixelHeight == 180 && abs(video.duration - 30) < 0.1
             }
             if videos.count == expected && hasPlaybackFixture {
-                finish("FIXTURE_READY videos=\(expected)", code: 0)
+                record("FIXTURE_READY videos=\(expected)")
+                return
             }
-            if videos.count > expected { finish("FIXTURE_UNEXPECTED_EXTRA_VIDEOS", code: 1) }
+            if videos.count > expected { record("FIXTURE_UNEXPECTED_EXTRA_VIDEOS"); return }
             // Observe the condition, without touching the library or exercising
             // playback/decoding. UI test deadlines begin after setup, unchanged.
             try? await Task.sleep(nanoseconds: 100_000_000)
         } while ContinuousClock.now < deadline
-        finish("FIXTURE_NOT_READY videos=\(lastCount) expected=\(expected)", code: 1)
+        record("FIXTURE_NOT_READY videos=\(lastCount) expected=\(expected)")
     }
 
-    private func finish(_ message: String, code: Int32) -> Never {
-        record(message)
-        exit(code)
-    }
+    // Remain alive after the atomic result. Exiting from scene activation can
+    // race FrontBoard's launch acknowledgement. The host terminates this
+    // process only after simctl launch has returned AND it has read this token.
 
     private func record(_ message: String) {
         print(message)
