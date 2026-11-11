@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build:
     runs-on: xcode-27
-    timeout-minutes: 80
+    timeout-minutes: 170
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       EXPECTED_XCODE_VERSION: '27.1'
@@ -70,11 +70,11 @@ jobs:
           bash scripts/generate-frame-fixtures.sh
 
       - name: Test persistence and PhotoKit playback on one iPhone simulator
-        # Includes a cold Release build, 30 serial test hosts and evidence export.
-        # The 60-minute step stopped after 130 passing tests as the last HDR UI
-        # host started. Reserve time for the complete suite and evidence export.
+        # Includes a cold Release build, 30 serial hosts, service isolation and
+        # evidence export. Observed simulator service reboot: 61-161 seconds;
+        # reserve that setup time for all 29 boundaries, not extra test time.
         # Individual 120/180-second deadlines and every assertion remain unchanged.
-        timeout-minutes: 70
+        timeout-minutes: 160
         run: bash scripts/test-ios.sh
 
       - name: Archive and verify unsigned device Release IPA
