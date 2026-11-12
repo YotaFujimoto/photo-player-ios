@@ -2,6 +2,7 @@ name: iOS Release verification
 
 on:
   push:
+    branches: [main]
     paths:
       - 'PhotoPlayer/**'
       - 'PhotoPlayerUITests/**'
@@ -15,7 +16,7 @@ on:
       verification:
         description: 'Full verification produces an IPA; focused checks produce evidence only.'
         type: choice
-        options: [full, frames, playback]
+        options: [full, frames, playback, original]
         default: full
 
 permissions:
@@ -48,7 +49,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        group: ${{ fromJSON(inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","playback","library","frames"]') }}
+        group: ${{ fromJSON(inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","playback","library","frames"]') }}
     runs-on: xcode-27
     timeout-minutes: 45
     env:
@@ -117,7 +118,7 @@ jobs:
 
   build:
     needs: verify
-    if: inputs.verification != 'frames' && inputs.verification != 'playback'
+    if: inputs.verification == '' || inputs.verification == 'full'
     runs-on: xcode-27
     timeout-minutes: 20
     steps:

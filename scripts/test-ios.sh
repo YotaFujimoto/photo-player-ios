@@ -110,6 +110,9 @@ run_tests() {
   fi
   record_resources "$result_bundle"
   local host_status=0
+  touch build/test.log
+  python3 scripts/watch-seek-wait.py build/test.log "$(wc -c < build/test.log)" "$result_bundle" &
+  local evidence_watcher=$!
   xcodebuild test-without-building \
   -project PhotoPlayer.xcodeproj \
   -scheme PhotoPlayer \
@@ -127,6 +130,8 @@ run_tests() {
   "$@" \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee -a build/test.log || host_status=$?
+  kill "$evidence_watcher" 2>/dev/null || true
+  wait "$evidence_watcher" 2>/dev/null || true
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi

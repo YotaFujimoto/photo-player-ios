@@ -27,7 +27,13 @@ final class SeekInteractionUITests: XCTestCase {
         // Observe immediately. XCTest's predicate wait first polled about a
         // second later, spending the fullscreen control lifetime unnecessarily.
         // Keep the same state condition and total fifteen-second deadline.
-        if surface.value as? String == value { return }
+        let observed = surface.value as? String
+        if observed == value { return }
+        if value == "Paused", observed == "Seeking…" {
+            // Host-side read-only stack capture while the process is alive.
+            // No extra input, retry, application delay or longer assertion.
+            print("CI_CAPTURE_SEEK_WAIT")
+        }
         let remaining = max(0, 15 - (ProcessInfo.processInfo.systemUptime - started))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: surface)], timeout: remaining), .completed)
     }
