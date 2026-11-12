@@ -2,7 +2,7 @@
 
 ## ビルド14（0.5.0）: 実装済み・並列CIの失敗を限定検証中
 
-現在の限定検証ソースは9bcc6f718685ed904eefb0851efca38c0b10b9d0、[CI 43210074384](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43210074384) attempt 1。selection 3件とoriginal 6件を独立した標準2台で実行中。成功時も全件成功へ読み替えず、最終fullを同じコミットで別途実行する。
+現在の限定検証ソースはdac9ef902fe688b9a107eccd76593fb0eb6aa515、[CI 43213179992](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43213179992) attempt 1。selection 3件とoriginal 6件を独立した標準2台で実行中。直前43210074384は補助アプリの終了待ちでselection未実行、originalは5/6成功・横シーク完了待ち失敗。取消を除いても通知不着が再現し、原因解消とは扱わない。準備終了のack方式と描画View／生存中スタックの追加計測で切り分ける。成功時も全件成功へ読み替えず、最終fullを同じコミットで別途実行する。
 
 CI 43204157612 attempt 1は4台並列で35分16秒後に不合格。core 102 XCTest＋IPA検査器4件、playback 9件は成功。frames 11/12、library 20/21成功で、長GOP縦シークの完了通知待ちとRow3のケース全体120秒超過を区別した。写真／クロップの6 UIケースは成功したが、全体成功の代わりにしない。IPAは未作成、配布先は13のまま。
 

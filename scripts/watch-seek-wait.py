@@ -44,11 +44,11 @@ with open(source) as stream:
                         # seconds on the standard VM. This collector's budget
                         # does not change the application's/test's deadlines.
                         try:
-                            # Unprivileged sample produced a header/images but
-                            # zero thread samples in two live iOS captures.
-                            # Use the runner's existing passwordless sudo for
-                            # read-only task sampling, never process control.
-                            subprocess.run(["sudo", "-n", "sample", pid, "1", "10", "-mayDie"], stdout=log,
+                            # sample returned zero thread samples even as root.
+                            # Switch to spindump's kernel stack capture; retain
+                            # its separate output in the same evidence artifact.
+                            stack = destination.with_name(destination.stem + f"-{pid}-spindump.log")
+                            subprocess.run(["sudo", "-n", "spindump", pid, "1", "10", "-onlyTarget", "-file", str(stack)], stdout=log,
                                            stderr=subprocess.STDOUT, timeout=45, check=False)
                         except subprocess.TimeoutExpired:
                             print("Symbolication timed out", file=log, flush=True)

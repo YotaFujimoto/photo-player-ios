@@ -2,6 +2,7 @@ import XCTest
 import Photos
 import AVFoundation
 import UIKit
+import SwiftUI
 @testable import PhotoPlayer
 
 /// Run only after CI imports the original encoding, following the 12-video suite.
@@ -72,25 +73,28 @@ final class LongGOPFixtureTests: XCTestCase {
         let previous = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
-        let controller = UIViewController()
-        let view = VideoGestureView()
-        view.playerLayer.player = model.player
-        controller.view = view
+        // The plain UIKit layer test above remains as a comparison. This
+        // second case includes the production SwiftUI bridge, glass overlays,
+        // and seek control, which were absent from the prior native test.
+        let controller = UIHostingController(rootView: LongGOPPlayerHarness(model: model))
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
-        defer { model.close(); view.playerLayer.player = nil; window.isHidden = true; previous?.makeKey() }
+        defer { model.close(); window.isHidden = true; previous?.makeKey() }
         model.load()
         // Reproduce the observed UI condition: actual playback has advanced
         // beyond four seconds before pausing. This is a media-state condition,
         // not a delay added to seeking or a replacement for the early-pause test.
         try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
         model.pause(); model.setRate(0.25)
+        let bar = try XCTUnwrap(findBar(in: controller.view))
+        XCTAssertGreaterThan(bar.bounds.width, 0)
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
         // Also cover overlapping committed requests after actual playback,
         // rather than testing overlap only at the very beginning of the clip.
         for target in [7.5, 22.5, 15.0] {
-            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+            let x = bar.bounds.width * CGFloat(target / model.duration)
+            XCTAssertTrue(bar.start(at: x)); bar.finish(at: x)
         }
         try await ready { !model.isSeeking }
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
@@ -118,5 +122,27 @@ final class LongGOPFixtureTests: XCTestCase {
         XCTAssertEqual(first.pixelWidth, 320)
         XCTAssertEqual(first.pixelHeight, 180)
         XCTAssertEqual(first.duration, 30, accuracy: 0.1)
+    }
+
+    @MainActor private func findBar(in view: UIView) -> SeekBarControl? {
+        if let bar = view as? SeekBarControl { return bar }
+        return view.subviews.lazy.compactMap { findBar(in: $0) }.first
+    }
+}
+
+@MainActor private struct LongGOPPlayerHarness: View {
+    @ObservedObject var model: PlaybackModel
+    var body: some View {
+        ZStack {
+            PlayerSurface(model: model, fullscreen: true).ignoresSafeArea()
+            Image(systemName: "play.fill").font(.system(size: 34)).frame(width: 80, height: 80).mediaGlass()
+            VStack {
+                Spacer()
+                SeekBar(position: model.displayedPosition, duration: model.duration, enabled: model.isReady,
+                        cancellationID: model.gestureCancellationID, onBegin: model.beginScrubbing,
+                        onChange: model.scrub, onCommit: model.endScrubbing, onCancel: model.cancelScrubbing)
+                    .frame(height: 44).padding(12).mediaGlass()
+            }.padding(12)
+        }.foregroundStyle(.white).tint(.white).background(.black)
     }
 }
