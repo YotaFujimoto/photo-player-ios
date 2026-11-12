@@ -39,10 +39,21 @@ export_test_evidence() {
 }
 trap export_test_evidence EXIT
 
+# Compile both simulator executables before booting the device. Previously the
+# helper's separate cold Swift compilation overlapped the booted Photos/system
+# services; preparation had an unlabelled eleven-minute gap on one standard VM.
+# Keep phase timestamps so compilation, media import and installation remain
+# distinguishable instead of attributing every slow preparation to the tests.
+phase() { printf 'CI_PREP %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" | tee -a build/simulator.log; }
+phase helper-build-start
+bash scripts/prepare-fixture-probe.sh
+phase helper-build-finished
+
 # Do not overlap cold compilation with the simulator's first boot/media import.
 # A launch-time diagnostic on the standard 7 GB VM showed sustained compressor
 # work while the app's main thread was idle. Bound compiler concurrency instead
 # of extending UI test deadlines or changing application behavior.
+phase test-build-start
 xcodebuild build-for-testing \
   -jobs 2 \
   -project PhotoPlayer.xcodeproj \
@@ -53,6 +64,7 @@ xcodebuild build-for-testing \
   -derivedDataPath build/simulator \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee build/test-build.log
+phase test-build-finished
 
 record_resources() {
   {
@@ -65,9 +77,12 @@ record_resources() {
   } >> build/resources.log 2>&1 || true
 }
 record_resources after-build
+phase simulator-boot-start
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+phase media-import-start
 xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
+phase application-install-start
 
 # Grant read access on the synthetic simulator library before exercising the real PhotoKit path.
 xcrun simctl install "$simulator_id" build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayer.app
@@ -82,7 +97,7 @@ xcrun simctl get_app_container "$simulator_id" \
   io.github.photoplayer.p6a936d329b934a8ba532081564a51c07.uitests.xctrunner app \
   2>&1 | tee -a build/simulator.log
 
-bash scripts/prepare-fixture-probe.sh
+phase helper-install-start
 fixture_probe='io.github.photoplayer.ci-fixture-readiness'
 xcrun simctl install "$simulator_id" build/FixtureReadiness.app
 xcrun simctl privacy "$simulator_id" grant photos "$fixture_probe"
@@ -91,6 +106,7 @@ xcrun simctl privacy "$simulator_id" grant photos "$fixture_probe"
 # reboot stalled even though bootstatus had completed.
 fixture_container="$(xcrun simctl get_app_container "$simulator_id" "$fixture_probe" data)"
 test -d "$fixture_container"
+phase preparation-finished
 expected_videos=12
 fixture_dirty=true
 test_hosts=0
