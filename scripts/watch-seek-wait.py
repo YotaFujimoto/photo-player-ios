@@ -9,11 +9,16 @@ source, offset, result = sys.argv[1:]
 destination = Path("build") / (Path(result).stem + "-live-seek.log")
 with open(source) as stream:
     stream.seek(int(offset))
+    pending = ""
     while True:
         line = stream.readline()
         if not line:
             time.sleep(0.1)
             continue
+        pending += line
+        if not pending.endswith("\n"):
+            continue
+        line, pending = pending, ""
         if "CI_CAPTURE_SEEK_WAIT" not in line:
             continue
         with destination.open("w") as log:
