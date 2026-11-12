@@ -97,7 +97,7 @@ final class VideoSelectionTests: XCTestCase {
                 XCTAssertEqual(selected.label, "Playback")
                 XCTAssertEqual(selected.value as? String, dimensions)
                 XCTAssertTrue(app.buttons["playPause"].waitForExistence(timeout: 15))
-                let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"),
+                let ready = liveUIExpectation(predicate: NSPredicate(format: "enabled == YES"),
                                                      object: app.buttons["playPause"])
                 XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
                 app.playerButton("closePlayer").tap()
@@ -130,7 +130,7 @@ final class VideoSelectionTests: XCTestCase {
         XCTAssertEqual(selected.label, "Video \(number)", "The tapped cell must select its own PHAsset")
         XCTAssertEqual(selected.value as? String, dimensions)
         let loaded = app.staticTexts["loadedVideoSize"]
-        let decoded = XCTNSPredicateExpectation(
+        let decoded = liveUIExpectation(
             predicate: NSPredicate(format: "label == %@", dimensions), object: loaded)
         XCTAssertEqual(XCTWaiter.wait(for: [decoded], timeout: 15), .completed,
                        "The decoded AVPlayerItem must match the displayed video's dimensions")

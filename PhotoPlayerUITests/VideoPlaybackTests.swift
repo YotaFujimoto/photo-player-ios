@@ -38,19 +38,19 @@ final class VideoPlaybackTests: XCTestCase {
         app.buttons["playPause"].tap()
         waitForLabel(state, "Playing")
         let initialPosition = app.staticTexts["playbackPosition"].label
-        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", initialPosition), object: app.staticTexts["playbackPosition"])
+        let moved = liveUIExpectation(predicate: NSPredicate(format: "label != %@", initialPosition), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 12), .completed)
         app.buttons["Playback details"].tap()
         let actualRate = app.staticTexts["actualRate"]
         XCTAssertTrue(actualRate.waitForExistence(timeout: 5))
-        let slowRate = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
+        let slowRate = liveUIExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [slowRate], timeout: 10), .completed)
         screenshot("video-slow-playback")
         app.buttons["playPause"].tap()
         waitForLabel(state, "Paused")
 
         dragSlider(app, to: 0.5)
-        let middle = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", ["0:14", "0:15", "0:16"]), object: app.staticTexts["playbackPosition"])
+        let middle = liveUIExpectation(predicate: NSPredicate(format: "label IN %@", ["0:14", "0:15", "0:16"]), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [middle], timeout: 15), .completed)
         waitForLabel(state, "Paused")
         app.buttons["playPause"].tap()
@@ -58,7 +58,7 @@ final class VideoPlaybackTests: XCTestCase {
         let seekStarted = ProcessInfo.processInfo.systemUptime
         app.descendants(matching: .any)["seekSlider"].coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)).tap()
         waitForLabel(state, "Playing")
-        let resumedSlow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
+        let resumedSlow = liveUIExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [resumedSlow], timeout: 10), .completed)
         // Playback advances while the state/rate assertions query the UI.
         // Retain the prior 22...24-second window advanced at the verified rate.
@@ -69,7 +69,7 @@ final class VideoPlaybackTests: XCTestCase {
             }
             return NSPredicate(format: "label IN %@", expectedLabels).evaluate(with: candidate)
         }
-        let later = XCTNSPredicateExpectation(predicate: movingPosition, object: app.staticTexts["playbackPosition"])
+        let later = liveUIExpectation(predicate: movingPosition, object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [later], timeout: 15), .completed)
         app.buttons["playPause"].tap()
         waitForLabel(state, "Paused")
@@ -93,7 +93,7 @@ final class VideoPlaybackTests: XCTestCase {
 
     @MainActor
     private func waitForLabel(_ element: XCUIElement, _ label: String, timeout: TimeInterval = 10) {
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", label), object: element)
+        let expected = liveUIExpectation(predicate: NSPredicate(format: "label == %@", label), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: timeout), .completed)
     }
 

@@ -6,7 +6,7 @@ final class FrameExtractionUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: id).firstMatch
     }
     @MainActor private func expect(_ element: XCUIElement, _ predicate: NSPredicate) {
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: 15), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: predicate, object: element)], timeout: 15), .completed)
     }
     @MainActor private func value(_ app: XCUIApplication, _ id: String, _ expected: String) {
         expect(element(app,id), NSPredicate(format:"value == %@",expected))

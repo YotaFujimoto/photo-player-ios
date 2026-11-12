@@ -83,7 +83,7 @@ final class ContactGeometryUITests: XCTestCase {
         XCTAssertTrue(selected.waitForExistence(timeout: 10), "One physical contact must open the video")
         XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
+        let ready = liveUIExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
         return (number, frame, point)
     }
@@ -108,7 +108,7 @@ final class ContactGeometryUITests: XCTestCase {
     private func copy(_ app: XCUIApplication) -> String {
         let button = app.buttons["copySelectionTrace.library"]
         button.tap()
-        let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "control.action name=copy.library"), object: button)
+        let copied = liveUIExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "control.action name=copy.library"), object: button)
         XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 10), .completed)
         return button.value as! String
     }

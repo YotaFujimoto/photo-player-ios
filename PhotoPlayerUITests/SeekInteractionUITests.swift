@@ -35,10 +35,11 @@ final class SeekInteractionUITests: XCTestCase {
             print("CI_CAPTURE_SEEK_WAIT")
         }
         let remaining = max(0, 15 - (ProcessInfo.processInfo.systemUptime - started))
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: surface)], timeout: remaining), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: NSPredicate(format: "value == %@", value), object: surface)], timeout: remaining), .completed,
+                       "Expected playback state: \(value)")
     }
     @MainActor private func expect(_ element: XCUIElement, _ predicate: NSPredicate) {
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: 15), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: predicate, object: element)], timeout: 15), .completed)
     }
     @MainActor private func position(_ app: XCUIApplication, near seconds: Int, tolerance: Int = 1) {
         expect(app.staticTexts.matching(identifier: "playbackPosition").firstMatch, NSPredicate { candidate, _ in

@@ -3,7 +3,7 @@ import UIKit
 
 final class FrameHDRUITests: XCTestCase {
     @MainActor private func expect(_ element: XCUIElement, _ predicate: NSPredicate) {
-        XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:predicate,object:element)],timeout:15),.completed)
+        XCTAssertEqual(XCTWaiter.wait(for:[liveUIExpectation(predicate:predicate,object:element)],timeout:15),.completed)
     }
     @MainActor func testPhotoKitHDRVariableCaptureOpensSavesAndCopiesReasons() {
         continueAfterFailure=false

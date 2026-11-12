@@ -143,7 +143,7 @@ final class PlaybackGestureTests: XCTestCase {
     }
     @MainActor private func position(_ app: XCUIApplication, _ labels: [String]) {
         app.revealPlayerControls()
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label IN %@", labels), object: app.staticTexts["playbackPosition"])
+        let expected = liveUIExpectation(predicate: NSPredicate(format: "label IN %@", labels), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 10), .completed)
     }
     @MainActor private func readPosition(_ app: XCUIApplication) -> Int {
@@ -151,7 +151,7 @@ final class PlaybackGestureTests: XCTestCase {
         return app.staticTexts["playbackPosition"].label.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
     }
     @MainActor private func expect(_ element: XCUIElement, _ format: String) {
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: format), object: element)
+        let expected = liveUIExpectation(predicate: NSPredicate(format: format), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 15), .completed)
     }
     @MainActor private func attach(_ name: String) {

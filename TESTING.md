@@ -1,6 +1,20 @@
 # 検証方法と結果
 
-## ビルド14: attempt 2の完了待ちを切り分け中
+## ビルド14: XCTestの待機中の階層収集を修正（2026-11-12）
+
+d1ee81f / CI 43135264362のcoreは全102 XCTestとIPA検査4件成功。playbackは9 UI中8成功・1失敗。横スワイプ試験の初回Playing待ちで失敗し、横向きへの回転／スワイプ操作は未到達。入力後のアプリはPlaying（実速度1.0）へ移り、OSも02:04:53.966にMediaPlaybackを記録。ところがXCTestの一度目のLoading観測が「Capturing element debug description」を02:04:53.705〜02:05:15.653の21.9479秒実行し、同じ添付のQuery chainにはPlaying／0:01が存在した。期待値の再照会前に15秒の判定期限を消費している。その後の終了も120秒上限となり、XCTestホスト再起動を含むため全体は不合格。画像階層の収集が待機を阻害した証拠であり、過去のAVPlayer seek完了未到達を同じ原因と確定しない。
+
+証跡はbuild/evidence-43135264362/playback/、展開したアプリ／XCTest出力はbuild/decoded-43135264362-horizontal/。SpindumpはNo samplesで内部スタックの証拠はない。初期Loadingの全期間、以前のseek待ち、実機の一覧タップの原因を断定しない。
+
+修正はUI試験の共通liveUIExpectation。元のNSPredicateを同じlive XCUIElementに対して毎回評価するブロックを使い、XCTestへ説明用objectとして渡さない。[Apple公式APIのobjectは省略可能](https://developer.apple.com/documentation/xctest/xctnspredicateexpectation)。判定式・対象・入力・各待機期限・120/180秒の試験期限・失敗時のxcresult保存は維持する。条件がfalseのままなら引き続き失敗する。製品コード、再生処理、診断機構は変更しない。同じ形式のUI待機にも適用し、全143 XCTest＋IPA検査4件を同一runで再検証する。
+
+## 履歴: ビルド14の全体CI（43135264362）
+
+ソースd1ee81fe32e53f98edf6b2842123f07137e9c5c5 / [CI 43135264362 / attempt 1](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43135264362/attempts/1)。core群の単体98・全画面UI4件／5ホストとIPA検査4件は成功。playback群の失敗は上記のとおり。全体成功・IPA生成とは扱わない。
+
+このrunの縦横プレイヤー、操作部非表示、合成の部分JPEG・HLG切り出し・縦長素材のクロップキャンバスを目視確認。中央再生、速度／バーの配置、動画領域不変、白枠と実画像の対応を確認した。証跡はbuild/evidence-43135264362/core/。合成画像の確認を実素材の色品質・画面端の実機操作へ拡張しない。
+
+## 履歴: ビルド14 attempt 2の完了待ち調査
 
 47eae6c / CI 43026863079 attempt 2のframes群は11 XCTest中10成功・1失敗。写真／クロップ6件、元GOP単体2件と再生UI・横バーは成功。成功済み3群を合わせた最終集合は143 XCTest中142成功・UI1失敗、IPA検査4件成功。未実行・重複0、全体は不合格でIPA未生成。初回からの総実行回数には再実行した元GOP5件を含め148 XCTestとなる。両attemptの証跡を保存している。
 

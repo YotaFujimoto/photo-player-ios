@@ -29,7 +29,7 @@ final class FullscreenUITests: XCTestCase {
         let remaining = deadline - ProcessInfo.processInfo.systemUptime
         if matches && remaining >= 0 { return }
         guard remaining > 0 else { XCTFail("State query exceeded its assertion deadline"); return }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: remaining), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: predicate, object: element)], timeout: remaining), .completed)
     }
     @MainActor private func state(_ app: XCUIApplication, _ value: String) {
         expect(surface(app), NSPredicate(format: "value == %@", value), timeout: 20)

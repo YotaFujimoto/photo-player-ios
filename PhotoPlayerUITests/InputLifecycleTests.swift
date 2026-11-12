@@ -74,17 +74,17 @@ final class InputLifecycleTests: XCTestCase {
     }
 
     @MainActor private func ready(_ app: XCUIApplication) {
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
+        let expected = liveUIExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 15), .completed)
     }
     @MainActor private func expect(_ element: XCUIElement, _ format: String, _ text: String) {
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: format, text), object: element)
+        let expected = liveUIExpectation(predicate: NSPredicate(format: format, text), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 10), .completed)
     }
     @MainActor private func copy(_ app: XCUIApplication) -> String {
         let button = app.buttons["copySelectionTrace.library"]
         button.tap()
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS 'lifecycle.copy.snapshot'"), object: button)
+        let expected = liveUIExpectation(predicate: NSPredicate(format: "value CONTAINS 'lifecycle.copy.snapshot'"), object: button)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 10), .completed)
         return button.value as! String
     }

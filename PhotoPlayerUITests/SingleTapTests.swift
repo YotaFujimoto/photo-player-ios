@@ -29,7 +29,7 @@ final class SingleTapTests: XCTestCase {
         start.press(forDuration: 0.03, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -140)),
                     withVelocity: .slow, thenHoldForDuration: 0.2)
         let journal = app.staticTexts["selectionJournal.library"]
-        let latest = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "C2 動画3 選択処理の記録なし"), object: journal)
+        let latest = liveUIExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "C2 動画3 選択処理の記録なし"), object: journal)
         XCTAssertEqual(XCTWaiter.wait(for: [latest], timeout: 10), .completed)
         verifyCounts(app, accepted: 1, shown: 1, requested: 1, received: 1, ready: 1, inPlayer: false)
         let report = journal.value as! String
@@ -158,7 +158,7 @@ final class SingleTapTests: XCTestCase {
         verifyCounts(app, accepted: 1, shown: 1, requested: 1, received: 0, ready: 0)
         attach("single-tap-visible-loading")
         let release = app.buttons["releasePlayerResult"]
-        let held = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: release)
+        let held = liveUIExpectation(predicate: NSPredicate(format: "enabled == YES"), object: release)
         XCTAssertEqual(XCTWaiter.wait(for: [held], timeout: 15), .completed)
         release.tap()
         verifyOpened(app, number: 3, dimensions: "202x202", diagnostics: true)
@@ -174,11 +174,11 @@ final class SingleTapTests: XCTestCase {
         XCTAssertEqual(selected.label, diagnostics ? "Video \(number)" : "Playback")
         XCTAssertEqual(selected.value as? String, dimensions)
         if diagnostics {
-            let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", dimensions),
+            let loaded = liveUIExpectation(predicate: NSPredicate(format: "label == %@", dimensions),
                                                    object: app.staticTexts["loadedVideoSize"])
             XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 15), .completed)
         } else {
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
+            let ready = liveUIExpectation(predicate: NSPredicate(format: "enabled == YES"), object: app.buttons["playPause"])
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
         }
     }
@@ -194,7 +194,7 @@ final class SingleTapTests: XCTestCase {
     private func verifyCounts(_ app: XCUIApplication, accepted: Int, shown: Int, requested: Int, received: Int, ready: Int, inPlayer: Bool = true) {
         let expected = "accepted=\(accepted);shown=\(shown);requested=\(requested);received=\(received);ready=\(ready)"
         let predicate = NSPredicate(format: "value CONTAINS %@", expected)
-        let counts = XCTNSPredicateExpectation(predicate: predicate,
+        let counts = liveUIExpectation(predicate: predicate,
             object: app.staticTexts[inPlayer ? "selectionTrace.player" : "selectionTrace.library"])
         XCTAssertEqual(XCTWaiter.wait(for: [counts], timeout: 10), .completed, trace(app))
     }

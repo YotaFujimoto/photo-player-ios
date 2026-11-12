@@ -33,7 +33,7 @@ final class CounterPersistenceTests: XCTestCase {
             Int(XCUIApplication.State.runningBackground.rawValue),
             Int(XCUIApplication.State.runningBackgroundSuspended.rawValue)
         )
-        let backgrounded = XCTNSPredicateExpectation(predicate: backgroundState, object: app)
+        let backgrounded = liveUIExpectation(predicate: backgroundState, object: app)
         XCTAssertEqual(
             XCTWaiter.wait(for: [backgrounded], timeout: 10), .completed,
             "App must leave the foreground before relaunch; state=\(app.state.rawValue)"

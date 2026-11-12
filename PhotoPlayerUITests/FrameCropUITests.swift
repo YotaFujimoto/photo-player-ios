@@ -4,7 +4,7 @@ import UIKit
 final class FrameCropUITests: XCTestCase {
     @MainActor private func item(_ app:XCUIApplication,_ id:String)->XCUIElement { app.descendants(matching:.any).matching(identifier:id).firstMatch }
     @MainActor private func expect(_ element:XCUIElement,_ format:String,_ value:String) {
-        XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:format,value),object:element)],timeout:15),.completed)
+        XCTAssertEqual(XCTWaiter.wait(for:[liveUIExpectation(predicate:NSPredicate(format:format,value),object:element)],timeout:15),.completed)
     }
     @MainActor private func open()->XCUIApplication {
         continueAfterFailure=false
@@ -15,7 +15,7 @@ final class FrameCropUITests: XCTestCase {
         expect(item(app,"videoSurface"),"value == %@","Playing")
         app.pauseAfterInitialControlsHide(); expect(item(app,"videoSurface"),"value == %@","Paused")
         app.playerButton("extractFrames").tap()
-        XCTAssertEqual(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:NSPredicate(format:"enabled == true"),object:app.buttons["saveFrames"])],timeout:15),.completed)
+        XCTAssertEqual(XCTWaiter.wait(for:[liveUIExpectation(predicate:NSPredicate(format:"enabled == true"),object:app.buttons["saveFrames"])],timeout:15),.completed)
         return app
     }
     @MainActor private func picture(_ preview:XCUIElement)->CGRect {
