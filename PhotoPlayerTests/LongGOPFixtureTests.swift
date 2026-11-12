@@ -39,22 +39,30 @@ final class LongGOPFixtureTests: XCTestCase {
         for target in [7.5, 22.5, 15.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
         }
-        try await ready { !model.isSeeking }
+        try await ready(seeking: true) { !model.isSeeking }
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
         // Verify AVPlayer's measured destination after its completion too,
         // not only optimistic UI labels.
         for target in [7.5, 22.5, 15.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
-            try await ready { !model.isSeeking }
+            try await ready(seeking: true) { !model.isSeeking }
             XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
             XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
             XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
         }
     }
 
-    @MainActor private func ready(_ predicate: () -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+    @MainActor private func ready(seeking: Bool = false, _ predicate: () -> Bool) async throws {
+        let started = ContinuousClock.now
+        let deadline = started.advanced(by: .seconds(15))
+        var captured = false
         while !predicate() {
+            // Trigger read-only capture only for an unusually long native seek,
+            // not for the intentional playback-to-4.25s precondition below.
+            if seeking && !captured && ContinuousClock.now >= started.advanced(by: .seconds(2)) {
+                FileHandle.standardOutput.write(Data("CI_CAPTURE_SEEK_WAIT\n".utf8))
+                captured = true
+            }
             guard ContinuousClock.now < deadline else {
                 XCTFail("Native long-GOP player did not complete within 15 seconds")
                 throw NSError(domain: "LongGOPFixtureTests", code: 1)
@@ -96,13 +104,13 @@ final class LongGOPFixtureTests: XCTestCase {
             let x = bar.bounds.width * CGFloat(target / model.duration)
             XCTAssertTrue(bar.start(at: x)); bar.finish(at: x)
         }
-        try await ready { !model.isSeeking }
+        try await ready(seeking: true) { !model.isSeeking }
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
         for target in [7.5, 22.5, 15.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
-            try await ready { !model.isSeeking }
+            try await ready(seeking: true) { !model.isSeeking }
             print("LongGOP production view completed \(target) measured=\(model.player.currentTime().seconds)")
             XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
             XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
