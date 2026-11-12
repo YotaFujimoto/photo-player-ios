@@ -86,6 +86,15 @@ final class SingleTapTests: XCTestCase {
             app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
                 .press(forDuration: 0.03)
             verifyOpened(app, number: number, dimensions: dimensions, diagnostics: diagnostics)
+            // These four solid-color fixtures last three seconds. Establish a
+            // stable, ended player before Close: the initial auto-hide deadline
+            // can otherwise pass between XCTest's button lookup and touch-down.
+            // This is a state assertion, not a delay or a retry. The next library
+            // contact still follows Close immediately, exactly once. Playing
+            // chrome/pressed-button timing is covered by FullscreenUITests.
+            let ended = liveUIExpectation(predicate: NSPredicate(format: "value == %@", "Ended"),
+                                          object: app.buttons["playPause"])
+            XCTAssertEqual(XCTWaiter.wait(for: [ended], timeout: 15), .completed)
             app.playerButton("closePlayer").tap()
         }
         if !diagnostics { app.buttons["selectionDiagnostics"].tap() }
