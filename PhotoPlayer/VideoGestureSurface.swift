@@ -23,6 +23,11 @@ final class VideoGestureView: UIView {
     private var lastSize = CGSize.zero
     var cancellationID = 0
 
+    func traceSurface(_ event: String) {
+        guard ProcessInfo.processInfo.arguments.contains("--playback-diagnostics") else { return }
+        print("VideoSurface: tick=\(ProcessInfo.processInfo.systemUptime) event=\(event) view=\(ObjectIdentifier(self)) window=\(window != nil) hidden=\(isHidden) alpha=\(alpha) bounds=\(bounds) displayReady=\(playerLayer.isReadyForDisplay) player=\(playerLayer.player != nil) measured=\(playerLayer.player?.currentTime().seconds ?? -1)")
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
@@ -122,12 +127,13 @@ final class VideoGestureView: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        traceSurface("window")
         if window == nil { cancelGestures() }
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        if lastSize != bounds.size { cancelGestures(); lastSize = bounds.size }
+        if lastSize != bounds.size { cancelGestures(); lastSize = bounds.size; traceSurface("layout") }
     }
 
     @objc private func skipBack() -> Bool { onSkip?(false); return true }
@@ -166,8 +172,10 @@ struct PlayerSurface: UIViewRepresentable {
             view.cancellationID = model.gestureCancellationID
             view.cancelGestures()
         }
+        if model.isSeeking { view.traceSurface("update seeking") }
     }
     static func dismantleUIView(_ view: VideoGestureView, coordinator: ()) {
+        view.traceSurface("dismantle")
         view.cancelGestures()
         view.playerLayer.player = nil
         view.onSkip = nil; view.onHoldBegan = nil; view.onHoldEnded = nil

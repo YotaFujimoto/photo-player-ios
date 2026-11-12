@@ -33,6 +33,9 @@ with open(source) as stream:
             print(datetime.now(timezone.utc).isoformat(), line, file=log, flush=True)
             try:
                 processes = subprocess.check_output(["ps", "-axo", "pid=,comm="], text=True, timeout=5)
+                # Names only (no command arguments). New runtimes may move
+                # media work into differently named XPC processes.
+                print("PROCESS INVENTORY\n" + processes, file=log, flush=True)
                 for entry in processes.splitlines():
                     pid, executable = entry.strip().split(maxsplit=1)
                     if executable.endswith(("/PhotoPlayer.app/PhotoPlayer", "/mediaserverd", "/VTDecoderXPCService")):
@@ -41,7 +44,11 @@ with open(source) as stream:
                         # seconds on the standard VM. This collector's budget
                         # does not change the application's/test's deadlines.
                         try:
-                            subprocess.run(["sample", pid, "1", "10", "-mayDie"], stdout=log,
+                            # Unprivileged sample produced a header/images but
+                            # zero thread samples in two live iOS captures.
+                            # Use the runner's existing passwordless sudo for
+                            # read-only task sampling, never process control.
+                            subprocess.run(["sudo", "-n", "sample", pid, "1", "10", "-mayDie"], stdout=log,
                                            stderr=subprocess.STDOUT, timeout=45, check=False)
                         except subprocess.TimeoutExpired:
                             print("Symbolication timed out", file=log, flush=True)
