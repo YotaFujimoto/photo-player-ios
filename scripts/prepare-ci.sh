@@ -36,4 +36,19 @@ test "$("$xcodegen_bin" --version)" = "Version: $XCODEGEN_VERSION"
 mkdir -p build/frame-fixtures
 "$xcodegen_bin" generate --spec project.yml
 
+# XcodeGen exposes this diagnostic for Run but not Test. Keep the generated
+# Test action consistent for the controlled comparison, without a new plan or
+# changing targets, case filters, assertions, retries or timeouts.
+python3 - <<'PY'
+from pathlib import Path
+import xml.etree.ElementTree as ET
+scheme = Path("PhotoPlayer.xcodeproj/xcshareddata/xcschemes/PhotoPlayer.xcscheme")
+tree = ET.parse(scheme)
+action = tree.getroot().find("TestAction")
+assert action is not None
+action.set("disablePerformanceAntipatternChecker", "YES")
+tree.write(scheme, encoding="utf-8", xml_declaration=True)
+print("CI diagnostic comparison: Thread Performance Checker disabled for Run/Test")
+PY
+
 cat build/toolchain.txt >> "$GITHUB_STEP_SUMMARY"

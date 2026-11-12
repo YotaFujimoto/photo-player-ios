@@ -1,5 +1,14 @@
 # 検証方法と結果
 
+## 限定CI 43229618941: 速度メニューを含む直接試験で再現
+
+25bc1b7febc4df3bb7b1b6af4d5288dd256caa3a / [CI 43229618941](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43229618941) attempt 1は14分38秒で不合格。通常素材の縦42.460秒・横48.206秒、元GOP早期停止0.947秒・識別0.007秒は成功。製品の速度ポップオーバー表示／終了を含む直接試験は27.927秒でシーク15秒期限が失敗した。後続の元GOP UI3件は未実行。全8件成功とは扱わない。
+
+直接試験でも映像出力キューのHighWater待ちを生存中に取得できた。主スレッドは条件待ちのrun loopを処理し、AVPlayerの出力待ちが残る。メニュー表示を加えた再現条件を得たが、ポップオーバー単独やOSの根本原因が確定したとはしない。証跡はbuild/evidence-43229618941/original/、OriginalFixtureIdentity-live-seek-24531-spindump.log。
+
+次の限定比較ではUI・クロップ・シーク処理・試験入力を維持して、Run/Testに挿入されるThread Performance Checkerだけを無効化する。生存中スタックのデコーダ待ちにはlibRPACのsemaphore interposerが含まれた。[Appleの説明](https://developer.apple.com/documentation/xcode/diagnosing-performance-issues-early)に基づく診断オーバーヘッドの切り分けであり、ライブラリが原因との断定ではない。生成schemeのTestActionへ対応する診断設定を反映し、直接試験でlibRPACの実ロード有無も記録する。設定が効いたか未確認のまま比較結果を解釈しない。テスト計画・対象144ケース・入力・期限・精度・スクリーンショット設定は維持し、製品アサーションや失敗記録を抑制しない。配布アーカイブにこの開発時注入は含まれない。
+
+
 ## 限定CI 43225306307: 停止後の無操作だけでは再現せず
 
 89c735a28c56b881e2c1ec12bc3e567465f2d461 / attempt 1は21分16秒で7/8成功。通常素材の縦／横47.780／45.872秒、元GOP直接試験3件（早期1.020秒・識別0.008秒・停止後6秒無操作11.118秒）、元GOP縦／横45.200／49.517秒は成功。停止後の時間だけでは再現しなかった。元GOPの診断モード再生試験は43.165秒で、0.25倍確認後の停止→15秒シークのPaused待ち10秒が失敗。入口・選択やAXの存在待ちではない。証跡はbuild/evidence-43225306307/original/、build/decoded-43225306307-original-playback/diagnostic-6.txt。

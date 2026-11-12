@@ -3,6 +3,7 @@ import Photos
 import AVFoundation
 import UIKit
 import SwiftUI
+import MachO
 @testable import PhotoPlayer
 
 /// Run only after CI imports the original encoding, following the 12-video suite.
@@ -73,6 +74,10 @@ final class LongGOPFixtureTests: XCTestCase {
 
     @MainActor
     func testOriginalSeekAfterPlaybackWithProductionVideoView() async throws {
+        let performanceCheckerLoaded = (0..<_dyld_image_count()).contains { index in
+            _dyld_get_image_name(index).map { String(cString: $0).contains("/libRPAC.dylib") } ?? false
+        }
+        print("CI_PERFORMANCE_CHECKER loaded=\(performanceCheckerLoaded)")
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let asset = try XCTUnwrap(PHAsset.fetchAssets(with: .video, options: options).firstObject)

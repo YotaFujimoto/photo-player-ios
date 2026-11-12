@@ -68,6 +68,9 @@ schemes:
         PhotoPlayer: all
     run:
       config: Debug
+      # Compare media timing without the development-only semaphore interposer.
+      # Functional XCTest assertions, deadlines and the Release binary stay intact.
+      disableThreadPerformanceChecker: true
     test:
       config: Release
       gatherCoverageData: false
