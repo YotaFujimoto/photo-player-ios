@@ -87,6 +87,15 @@ final class LongGOPFixtureTests: XCTestCase {
         try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
         model.pause(); model.setRate(0.25)
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
+        // Also cover overlapping committed requests after actual playback,
+        // rather than testing overlap only at the very beginning of the clip.
+        for target in [7.5, 22.5, 15.0] {
+            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+        }
+        try await ready { !model.isSeeking }
+        XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
+        XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
+        XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
         for target in [7.5, 22.5, 15.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
             try await ready { !model.isSeeking }

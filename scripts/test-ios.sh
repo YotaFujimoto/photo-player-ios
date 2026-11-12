@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
@@ -213,6 +213,14 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == selection ]]; then
+  # Failed row plus adjacent rows, preserving the same combined test session.
+  run_tests build/copy-results/SelectionRegression.xcresult \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow2SelectionBounds" \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow3SelectionBounds" \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow4SelectionBounds"
+  exit 0
+fi
 if [[ "$test_group" == full || "$test_group" == core ]]; then
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?
 run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls" || test_status=$?

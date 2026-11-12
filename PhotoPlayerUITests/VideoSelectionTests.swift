@@ -31,20 +31,20 @@ final class VideoSelectionTests: XCTestCase {
             let other = app.buttons["videoCard.\(number % 2 == 0 ? number - 1 : number + 1)"]
             XCTAssertFalse(card.frame.intersects(other.frame), "Adjacent cells must not overlap")
             attach("selection-row-\(row)-cell-\(number)")
-            // The image bottom and caption bottom are distinct targets. Use physical
-            // screen coordinates, not Button.tap(), which can choose a safe hit point.
+            // Preserve the four physical targets. Anchor coordinates to the
+            // resolved cell, avoiding repeated app-root AX traversal per event.
+            // This is still a coordinate tap, never Button.tap's safe hit point.
             for point in ["top", "center", "image-bottom", "bottom"] {
                 XCTContext.runActivity(named: "Cell \(number), \(dimensions), \(point)") { _ in
                     let visible = reveal(number, in: app)
                     let rect = visible.frame
                     let y: CGFloat = point == "top" ? 3 : point == "center" ? rect.height / 2 :
                         point == "image-bottom" ? 107 : rect.height - 3
-                    let origin = app.coordinate(withNormalizedOffset: .zero)
-                    origin.withOffset(CGVector(dx: rect.midX, dy: rect.minY + y)).tap()
+                    visible.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y / rect.height)).tap()
                     verifySelection(number, dimensions: dimensions, in: app)
                     if point == "image-bottom" { attach("selected-\(number)-image-bottom") }
                     app.playerButton("closePlayer").tap()
-                    XCTAssertTrue(visible.waitForExistence(timeout: 10))
+                    XCTAssertTrue(exists(visible, within: 10))
                 }
             }
         }
@@ -125,15 +125,25 @@ final class VideoSelectionTests: XCTestCase {
 
     @MainActor
     private func verifySelection(_ number: Int, dimensions: String, in app: XCUIApplication) {
-        let selected = app.otherElements["selectedVideo"]
-        XCTAssertTrue(selected.waitForExistence(timeout: 10), "Tap must open a player")
+        let selected = app.otherElements.matching(identifier: "selectedVideo").firstMatch
+        XCTAssertTrue(exists(selected, within: 10), "Tap must open a player")
         XCTAssertEqual(selected.label, "Video \(number)", "The tapped cell must select its own PHAsset")
         XCTAssertEqual(selected.value as? String, dimensions)
-        let loaded = app.staticTexts["loadedVideoSize"]
+        let loaded = app.staticTexts.matching(identifier: "loadedVideoSize").firstMatch
+        let started = ProcessInfo.processInfo.systemUptime
+        if loaded.exists && loaded.label == dimensions { return }
         let decoded = liveUIExpectation(
             predicate: NSPredicate(format: "label == %@", dimensions), object: loaded)
-        XCTAssertEqual(XCTWaiter.wait(for: [decoded], timeout: 15), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [decoded], timeout: max(0, 15 - (ProcessInfo.processInfo.systemUptime - started))), .completed,
                        "The decoded AVPlayerItem must match the displayed video's dimensions")
+    }
+
+    @MainActor private func exists(_ element: XCUIElement, within seconds: TimeInterval) -> Bool {
+        let started = ProcessInfo.processInfo.systemUptime
+        // waitForExistence's first poll was a second late at every round trip.
+        // Observe now, retaining the same condition and total deadline.
+        if element.exists { return true }
+        return element.waitForExistence(timeout: max(0, seconds - (ProcessInfo.processInfo.systemUptime - started)))
     }
 
     @MainActor

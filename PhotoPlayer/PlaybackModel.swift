@@ -425,12 +425,11 @@ final class PlaybackModel: ObservableObject {
         isSeeking = true
         if let next = seekQueue.enqueue(request) { performSeek(next) }
         else {
-            // A newly committed position supersedes the in-flight destination.
-            // Do not make it wait for decoding an obsolete frame. Cancellation
-            // completes that request with finished=false; its completion then
-            // starts the latest queued request, still with only one in flight.
-            trace("new seek cancels superseded destination")
-            player.currentItem?.cancelPendingSeeks()
+            // Keep decoding the current request, then chase the latest target.
+            // Repeated cancellation discarded decoder work without producing a
+            // frame in the long-GOP UI failure. Follow Apple's QA1820 instead;
+            // close() still cancels when the player session actually ends.
+            trace("seek queued behind active destination")
         }
     }
 
