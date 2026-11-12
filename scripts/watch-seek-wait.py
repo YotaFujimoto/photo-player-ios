@@ -1,4 +1,4 @@
-"""Capture a live pending-seek stack once; never control or retry playback."""
+"""Capture one live stalled-operation stack; never control or retry playback."""
 from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
@@ -10,17 +10,25 @@ destination = Path("build") / (Path(result).stem + "-live-seek.log")
 with open(source) as stream:
     stream.seek(int(offset))
     pending = ""
+    stage = None
+    stage_since = None
     while True:
         line = stream.readline()
         if not line:
-            time.sleep(0.1)
-            continue
-        pending += line
-        if not pending.endswith("\n"):
-            continue
-        line, pending = pending, ""
-        if "CI_CAPTURE_SEEK_WAIT" not in line:
-            continue
+            if stage_since is None or time.monotonic() - stage_since < 20:
+                time.sleep(0.1)
+                continue
+            line = f"CI_CAPTURE_LIFECYCLE_WAIT last={stage}\n"
+        else:
+            pending += line
+            if not pending.endswith("\n"):
+                continue
+            line, pending = pending, ""
+            if "CI_LIFECYCLE_STAGE " in line:
+                stage = line.strip()
+                stage_since = None if "CI_LIFECYCLE_STAGE finished " in line else time.monotonic()
+            if "CI_CAPTURE_SEEK_WAIT" not in line:
+                continue
         with destination.open("w") as log:
             print(datetime.now(timezone.utc).isoformat(), line, file=log, flush=True)
             try:

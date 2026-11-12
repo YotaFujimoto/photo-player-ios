@@ -8,22 +8,42 @@ import AVFoundation
 final class PlaybackLifecycleTests: XCTestCase {
     @MainActor
     func testFrameModePausesAndReturnsAtMeasuredTimeWithSelectedSpeed() async throws {
+        // Unbuffered, test-only boundaries let the external CI observer sample
+        // a stalled operation before XCTest terminates the host. No retry,
+        // timeout extension or production playback behavior is introduced.
+        func stage(_ value: String) {
+            let line = "CI_LIFECYCLE_STAGE \(value) uptime=\(ProcessInfo.processInfo.systemUptime)\n"
+            FileHandle.standardOutput.write(Data(line.utf8))
+        }
+        stage("make-model")
+        defer { stage("finished") }
         let model = try makeModel()
-        defer { model.close() }
+        defer { stage("close"); model.close() }
+        stage("load")
         model.load()
+        stage("wait-playing")
         try await wait { model.player.timeControlStatus == .playing }
+        stage("set-rate")
         model.setRate(0.25)
+        stage("begin-frame-extraction")
         let input = try XCTUnwrap(model.beginFrameExtraction())
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.selectedRate,0.25)
         let source=FrameSource(input:input)
+        stage("catalogue")
         let times=try await source.catalogue()
+        stage("return-from-frames")
         let chosen=try XCTUnwrap(times.last)
         model.returnFromFrames(at:chosen)
+        stage("wait-seek")
         try await wait { !model.isSeeking }
+        stage("check-time")
         XCTAssertEqual(model.player.currentTime().seconds,chosen.seconds,accuracy:0.0001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.selectedRate,0.25)
+        stage("resume")
         model.togglePlayback()
+        stage("wait-resumed")
         try await wait { model.player.timeControlStatus == .playing }
+        stage("boost-and-restore")
         model.beginTemporaryDoubleRate(); XCTAssertEqual(model.player.rate,2)
         model.endTemporaryDoubleRate(); XCTAssertEqual(model.player.rate,0.25)
     }

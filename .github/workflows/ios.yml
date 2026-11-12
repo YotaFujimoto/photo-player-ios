@@ -49,7 +49,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        group: ${{ fromJSON(inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["library","core","playback","frames"]') }}
+        group: ${{ fromJSON(inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","library","playback","frames"]') }}
     runs-on: xcode-27
     timeout-minutes: 45
     env:
