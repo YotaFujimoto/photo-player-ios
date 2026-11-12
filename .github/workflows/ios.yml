@@ -16,13 +16,14 @@ on:
       verification:
         description: 'Full verification produces an IPA; focused checks produce evidence only.'
         type: choice
-        options: [full, frames, playback, original]
+        options: [full, core, library, frames, playback, original]
         default: full
 
 permissions:
   contents: read
 
 concurrency:
+  # Limit overlapping runs on this branch, not the four jobs within a run.
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
@@ -42,14 +43,14 @@ defaults:
 
 jobs:
   verify:
-    # Fresh VM/service state per functional group; one free standard runner and
-    # one simulator at a time. No retries, selective pass aggregation, or looser
-    # deadlines. Full verification includes every case exactly once.
+    # Four independent free standard VMs; one simulator within each VM.
+    # No automatic retries, selective pass aggregation, or looser deadlines.
+    # Full verification includes every case exactly once before archiving.
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 4
       matrix:
-        group: ${{ fromJSON(inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["library","core","playback","frames"]') }}
+        group: ${{ fromJSON(inputs.verification == 'core' && '["core"]' || inputs.verification == 'library' && '["library"]' || inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","library","playback","frames"]') }}
     runs-on: xcode-27
     timeout-minutes: 45
     env:

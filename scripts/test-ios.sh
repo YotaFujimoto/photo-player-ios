@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Each CI group starts on a fresh standard runner. Never run two simulators at
-# once or retry a case; the workflow requires every group before archiving.
+# Each CI group starts on a fresh standard runner, with one simulator per runner.
+# Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
 case "$test_group" in full|core|playback|library|frames|original) ;; *) exit 2 ;; esac
 
