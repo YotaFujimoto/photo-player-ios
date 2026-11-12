@@ -119,7 +119,7 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 - 移動中は移動先時刻と制限後の差分だけを重ね表示し、AVPlayerへ移動ごとのシークを出さない。解放時に1回確定し、取消・回転・画面終了・背景移行では未確定位置と表示を破棄する。
 - 横スワイプと長押しは先に成立した操作だけを採用する。横スワイプ成立後はダブルタップ／長押しを発動させず、長押し成立後の指ずれも横シークにしない。認識器は動画UIViewだけに付け、バー・ボタン・一覧へ付けない。
 - すべての確定シークは0〜動画長へ制限し、再生意図と選択速度を維持する。再生中に末尾へ移動するとその位置で停止し、戻すと元の速度で再開する。停止中の操作は停止したまま。自然な再生終了と区別する。
-- 新しい確定位置が進行中のシークを置き換える場合、最新位置をキューへ保存してから旧要求を取消す。取消完了通知で最新位置へ進め、不要になった位置のデコード待ちに依存させない。移動中の要求追加や時間ベースの再試行は行わない。
+- 新しい確定位置が進行中のシークを置き換える場合、最新位置だけをキューへ保存する。Build 14のCI修正ではApple QA1820に従い、実行中の復号を新要求のたびに取り消さず、完了後に最新位置へ進める。画面終了時は保留要求を取り消す。移動中の要求追加、固定待機や時間ベースの再試行は行わない。精度・停止／再生意図・選択速度の条件は維持する。
 
 ## 段階3・ビルド9で実装した範囲
 
@@ -152,6 +152,7 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 - [Apple: UIControlの接触追跡](https://developer.apple.com/documentation/uikit/uicontrol/begintracking(_:with:))
 - [Apple: カスタム認識器の状態遷移](https://developer.apple.com/documentation/uikit/uigesturerecognizer)
 - [Apple: 保留シークの取消と完了通知](https://developer.apple.com/documentation/avfoundation/avplayeritem/cancelpendingseeks())
+- [Apple QA1820: 完了通知を待って最新位置へシーク](https://developer.apple.com/library/archive/qa/qa1820/_index.html)
 - [Apple: ジェスチャー認識の排他関係](https://developer.apple.com/documentation/uikit/uigesturerecognizer/require(tofail:))
 - [Apple: 長押しの標準成立時間](https://developer.apple.com/documentation/uikit/uilongpressgesturerecognizer/minimumpressduration)
 
@@ -167,7 +168,7 @@ Bundle IDは個人名に依存しないランダム識別子を含む固定値�
 
 ## ビルド14: UIとクロップの最新仕様（2026-11-11）
 
-ビルド13の提示4項目実機合格後に着手する。旧第9項の下端中央再生案を中央配置へ置換する。Cropボタン、調整中の操作部表示、映像縮小・専用内側グリップ案は採用しない。以下は受け入れ条件であり、実装・自動試験・実機確認はSTATUS.mdとTESTING.mdで区別する。
+ビルド13の提示4項目実機合格後に実装した。旧第9項の下端中央再生案を中央配置へ置換した。Cropボタン、調整中の操作部表示、映像縮小・専用内側グリップ案は採用しない。以下は受け入れ条件であり、自動試験・実機確認の結果はSTATUS.mdとTESTING.mdで区別する。
 
 **2. 通常プレイヤーのUIをApple TV風の配置へ変更**
 

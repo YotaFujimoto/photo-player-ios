@@ -36,6 +36,7 @@ import Darwin
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         resultURL = documents.appendingPathComponent("readiness-\(token.uuidString.lowercased()).txt")
         record("FIXTURE_STARTED")
+        record("FIXTURE_PID=\(ProcessInfo.processInfo.processIdentifier)")
         expectedVideos = expected
         return true
     }
@@ -49,7 +50,10 @@ import Darwin
 
     func inspectFromActiveScene() {
         record("FIXTURE_SCENE_ACTIVE")
-        Task { await inspect(expected: expectedVideos) }
+        Task {
+            await inspect(expected: expectedVideos)
+            await finishAfterHostAcknowledgement()
+        }
     }
 
     private func inspect(expected: Int) async {
@@ -79,9 +83,20 @@ import Darwin
         record("FIXTURE_NOT_READY videos=\(lastCount) expected=\(expected)")
     }
 
-    // Remain alive after the atomic result. Exiting from scene activation can
-    // race FrontBoard's launch acknowledgement. The host terminates this
-    // process only after simctl launch has returned AND it has read this token.
+    // Do not exit until simctl launch has returned and the host has read this
+    // exact result. A token-specific acknowledgement avoids the earlier launch
+    // race without depending on another FrontBoard terminate transaction.
+    private func finishAfterHostAcknowledgement() async {
+        guard let resultURL else { exit(74) }
+        let acknowledgement = resultURL.deletingPathExtension().appendingPathExtension("ack")
+        let deadline = ContinuousClock.now.advanced(by: .seconds(45))
+        while !FileManager.default.fileExists(atPath: acknowledgement.path) {
+            guard ContinuousClock.now < deadline else { record("FIXTURE_ACK_TIMEOUT"); exit(75) }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        record("FIXTURE_EXIT_ACKNOWLEDGED")
+        exit(0)
+    }
 
     private func record(_ message: String) {
         print(message)

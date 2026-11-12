@@ -1,5 +1,6 @@
 """Read a unique, durable result from the simulator-only PhotoKit probe."""
 from pathlib import Path
+import os
 import subprocess
 import sys
 import time
@@ -11,6 +12,24 @@ token = str(uuid.uuid4())
 assert Path(container).is_dir(), "The installed fixture helper container must remain present"
 result = Path(container) / "Documents" / f"readiness-{token}.txt"
 assert not result.exists(), "Never accept a previous probe result"
+
+def finish_probe(lines):
+    pids = [int(line.removeprefix("FIXTURE_PID=")) for line in lines if line.startswith("FIXTURE_PID=")]
+    assert len(pids) == 1 and pids[0] > 1, "Require this probe's process identity"
+    # This occurs only after the launch command returned and a terminal result
+    # for our unique token was read. No extra launch, retry or arbitrary delay.
+    result.with_suffix(".ack").write_text(token)
+    stopped_by = time.monotonic() + 30
+    while time.monotonic() < stopped_by:
+        try:
+            os.kill(pids[0], 0)  # Observe existence only; never send a signal.
+        except ProcessLookupError:
+            assert "FIXTURE_EXIT_ACKNOWLEDGED" in result.read_text().splitlines()
+            print("FIXTURE_PROCESS_EXIT_CONFIRMED", flush=True)
+            return
+        time.sleep(0.1)
+    raise TimeoutError("Fixture helper did not exit after host acknowledgement")
+
 try:
     subprocess.run(
         ["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle,
@@ -30,10 +49,11 @@ while time.monotonic() < deadline:
         lines = text.splitlines()
         if f"FIXTURE_READY videos={expected}" in lines:
             print(text, end="", flush=True)
-            subprocess.run(["xcrun", "simctl", "terminate", simulator, bundle], check=True, timeout=30)
+            finish_probe(lines)
             sys.exit(0)
         if any(line.startswith(("FIXTURE_NOT_READY", "FIXTURE_ACCESS_ERROR", "FIXTURE_UNEXPECTED")) for line in lines):
             print(text, end="", flush=True)
+            finish_probe(lines)
             sys.exit(1)
     time.sleep(0.1)
 print(text, end="", flush=True)
