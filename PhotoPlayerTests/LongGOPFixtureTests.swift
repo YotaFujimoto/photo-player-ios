@@ -62,6 +62,41 @@ final class LongGOPFixtureTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testOriginalSeekAfterPlaybackWithProductionVideoView() async throws {
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let asset = try XCTUnwrap(PHAsset.fetchAssets(with: .video, options: options).firstObject)
+        let model = PlaybackModel(asset: asset)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        let controller = UIViewController()
+        let view = VideoGestureView()
+        view.playerLayer.player = model.player
+        controller.view = view
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.view.layoutIfNeeded()
+        defer { model.close(); view.playerLayer.player = nil; window.isHidden = true; previous?.makeKey() }
+        model.load()
+        // Reproduce the observed UI condition: actual playback has advanced
+        // beyond four seconds before pausing. This is a media-state condition,
+        // not a delay added to seeking or a replacement for the early-pause test.
+        try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
+        model.pause(); model.setRate(0.25)
+        print("LongGOP production view pause at \(model.player.currentTime().seconds)")
+        for target in [7.5, 22.5, 15.0] {
+            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+            try await ready { !model.isSeeking }
+            print("LongGOP production view completed \(target) measured=\(model.player.currentTime().seconds)")
+            XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
+            XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
+            XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
+        }
+    }
+
     func testOriginalFixtureIsNewestPhotoKitVideo() throws {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]

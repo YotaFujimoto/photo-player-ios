@@ -29,8 +29,14 @@ with open(source) as stream:
                     pid, executable = entry.strip().split(maxsplit=1)
                     if executable.endswith(("/PhotoPlayer.app/PhotoPlayer", "/mediaserverd", "/VTDecoderXPCService")):
                         print(f"\nSTACK {Path(executable).name} pid={pid}", file=log, flush=True)
-                        subprocess.run(["sample", pid, "1", "10"], stdout=log,
-                                       stderr=subprocess.STDOUT, timeout=10, check=False)
+                        # Sampling finished but symbolication exceeded ten
+                        # seconds on the standard VM. This collector's budget
+                        # does not change the application's/test's deadlines.
+                        try:
+                            subprocess.run(["sample", pid, "1", "10", "-mayDie"], stdout=log,
+                                           stderr=subprocess.STDOUT, timeout=45, check=False)
+                        except subprocess.TimeoutExpired:
+                            print("Symbolication timed out", file=log, flush=True)
             except (OSError, ValueError, subprocess.TimeoutExpired) as error:
                 print(type(error).__name__, file=log)
         break

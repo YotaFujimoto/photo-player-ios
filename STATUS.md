@@ -4,6 +4,10 @@
 
 通常プレイヤーの中央再生・浮いたLiquid Glass操作部、写真モードの独立した上部3ガラス・相対時刻、自由矩形クロップを実装済み。映像のaspect-fitと表示矩形を維持し、元解像度の向き補正済み画像から切り出す。HDR→SDR、sRGB/ICC、高品質JPEG、実PTSと最大10枚、固定Bundle ID・manualCounter.v1・一括コピーを維持する。横画面かつクロップ中だけシステム端の優先制御を設定し、縮小・端余白・専用内側グリップは追加していない。
 
+812f7adb76819edd32b0c8ff9e5874608d83065f / [CI 43141107093](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43141107093)は143 XCTest中142成功・1失敗、IPA検査4件成功。未実行・重複・予期しないケース・時間超過・ホスト再起動0、32ホスト中31成功。全体不合格でIPA未生成、dist/PhotoPlayer.ipaはビルド13。新しい写真／クロップ6 UIはすべて成功した。
+
+失敗は元GOP動画の縦画面バー試験。実測4.34秒で停止後、7.5→22.5→15秒の要求と前要求の取消通知は届くが、最終完了通知は15秒以内に届かない。前回のXCTest階層収集とは別で、アプリ・AVPlayer内部原因は未確定。実行中のsampleは採取後のシンボル解析が10秒で打ち切られ、スタックを得られなかった。次は実再生4.25秒以降の停止と製品VideoGestureViewを使う直接試験を追加してUI待機と媒体処理を分離する。既存の早期停止試験、全判定・期限・製品動作は維持し、収集側だけの解析予算を修正する。合格を混ぜず、最終的に全144 XCTest＋IPA検査4件の同一run成功を要求する。
+
 最新のd1ee81fe32e53f98edf6b2842123f07137e9c5c5 / [CI 43135264362](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43135264362)はcore102 XCTest＋IPA検査4件成功、playback8成功・1失敗で全体不合格。初回Playing待ちでXCTestの画面階層収集が21.9479秒かかり、アプリがPlayingへ進んだ後も15秒の判定期限を消費した証跡を確認した。元の判定・期限・入力を維持し、UI試験の待機から不要な自動階層収集を除く。製品コードは変更しない。修正後に全143 XCTestとIPA検査4件を同じrunで再検証する。dist/PhotoPlayer.ipaはビルド13のまま。
 
 直前の限定CIはe1576054bdfd4e1fbb45f8bae4dbaa4ceb029090 / [CI 43133251792](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43133251792)で元GOPの単体2・UI3／4ホストが成功。以前のAVPlayer seek完了待ちの内部原因は未確定であり、今回のXCTestの階層収集と同じ原因とは扱わない。詳細と失敗証跡はTESTING.mdに保持する。
