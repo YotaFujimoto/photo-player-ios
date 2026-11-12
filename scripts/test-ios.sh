@@ -238,12 +238,17 @@ if [[ "$test_group" == original ]]; then
     "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape" || test_status=$?
 fi
 if [[ "$test_group" == selection ]]; then
-  # Failed row plus adjacent rows, preserving the same combined test session.
+  # Failed row plus adjacent rows, followed by the failed fresh-host launch
+  # and its return-to-library neighbor. Full coverage below is unchanged.
   run_tests build/copy-results/SelectionRegression.xcresult \
     "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow2SelectionBounds" \
     "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow3SelectionBounds" \
-    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow4SelectionBounds"
-  exit 0
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow4SelectionBounds" || test_status=$?
+  run_tests build/copy-results/SingleTapLoading.xcresult \
+    "-only-testing:PhotoPlayerUITests/SingleTapTests/testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes" || test_status=$?
+  run_tests build/copy-results/SingleTapReturnOff.xcresult \
+    "-only-testing:PhotoPlayerUITests/SingleTapTests/testShortSingleTapsAfterReturningWithDiagnosticsOff" || test_status=$?
+  exit "$test_status"
 fi
 if [[ "$test_group" == full || "$test_group" == core ]]; then
 run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?

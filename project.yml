@@ -73,6 +73,9 @@ schemes:
       disableThreadPerformanceChecker: true
     test:
       config: Release
+      # CI uses assertions/xcresult plus external live stack capture, not LLDB.
+      # The failed launch waited inside Xcode before the app process existed.
+      debugEnabled: false
       gatherCoverageData: false
       preferredScreenCaptureFormat: screenshots
       environmentVariables:
