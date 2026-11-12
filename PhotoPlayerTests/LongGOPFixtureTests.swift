@@ -134,7 +134,7 @@ final class LongGOPFixtureTests: XCTestCase {
 
     @MainActor private func findBar(in view: UIView) -> SeekBarControl? {
         if let bar = view as? SeekBarControl { return bar }
-        return view.subviews.lazy.compactMap { findBar(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.findBar(in: $0) }.first
     }
 }
 
