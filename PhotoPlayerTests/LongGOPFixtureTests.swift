@@ -120,6 +120,10 @@ final class LongGOPFixtureTests: XCTestCase {
         try await ready { controller.presentedViewController == nil }
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
+        let surface = try XCTUnwrap(findSurface(in: controller.view))
+        XCTAssertTrue(surface.playerLayer.superlayer === surface.layer)
+        XCTAssertTrue(surface.playerLayer.player === model.player)
+        XCTAssertEqual(surface.playerLayer.frame, surface.bounds)
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
         // Also cover overlapping committed requests after actual playback,
         // rather than testing overlap only at the very beginning of the clip.
@@ -158,6 +162,11 @@ final class LongGOPFixtureTests: XCTestCase {
     @MainActor private func findBar(in view: UIView) -> SeekBarControl? {
         if let bar = view as? SeekBarControl { return bar }
         return view.subviews.lazy.compactMap { self.findBar(in: $0) }.first
+    }
+
+    @MainActor private func findSurface(in view: UIView) -> VideoGestureView? {
+        if let surface = view as? VideoGestureView { return surface }
+        return view.subviews.lazy.compactMap { self.findSurface(in: $0) }.first
     }
 }
 
