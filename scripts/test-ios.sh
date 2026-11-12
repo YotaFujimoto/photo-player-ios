@@ -229,6 +229,14 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == original ]]; then
+  # Focused regression: the latest failure also used the bounded-GOP fixture.
+  # Keep both bar cases before importing the distinct original encoding below.
+  run_tests build/copy-results/SeekBarPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait" || test_status=$?
+  run_tests build/copy-results/SeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape" || test_status=$?
+fi
 if [[ "$test_group" == selection ]]; then
   # Failed row plus adjacent rows, preserving the same combined test session.
   run_tests build/copy-results/SelectionRegression.xcresult \

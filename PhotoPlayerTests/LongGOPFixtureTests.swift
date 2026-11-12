@@ -60,7 +60,7 @@ final class LongGOPFixtureTests: XCTestCase {
             // Trigger read-only capture only for an unusually long native seek,
             // not for the intentional playback-to-4.25s precondition below.
             if seeking && !captured && ContinuousClock.now >= started.advanced(by: .seconds(2)) {
-                FileHandle.standardOutput.write(Data("CI_CAPTURE_SEEK_WAIT\n".utf8))
+                FileHandle.standardOutput.write(Data("CI_CAPTURE_SEEK_WAIT pid=\(ProcessInfo.processInfo.processIdentifier)\n".utf8))
                 captured = true
             }
             guard ContinuousClock.now < deadline else {
@@ -95,6 +95,13 @@ final class LongGOPFixtureTests: XCTestCase {
         // not a delay added to seeking or a replacement for the early-pause test.
         try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
         model.pause(); model.setRate(0.25)
+        // The UI failure paused for about six seconds while selecting speed
+        // and locating the bar. Exercise that idle-player condition here too.
+        // This is a test input, never a delay in the application's seek path.
+        let pausedPosition = model.player.currentTime().seconds
+        try await Task.sleep(for: .seconds(6))
+        XCTAssertEqual(model.player.currentTime().seconds, pausedPosition, accuracy: 0.001)
+        XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
