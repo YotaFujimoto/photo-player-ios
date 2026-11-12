@@ -18,6 +18,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     func testCopyDistinguishesNewUnacceptedContactFromPreviousPlayback() {
         let app = launch(["--verify-diagnostic-copy"])
+        defer { app.finishTestApplication() }
         let frame = app.buttons["videoCard.3"].frame
         let start = app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
@@ -49,6 +50,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     func testCopyKeepsDistinctOperationsWhenReopeningSameVideo() {
         let app = launch(["--verify-diagnostic-copy"])
+        defer { app.finishTestApplication() }
         let frame = app.buttons["videoCard.3"].frame
         let target = app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: frame.midX, dy: frame.minY + 55))
@@ -74,6 +76,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     private func checkReturning(diagnostics: Bool) {
         let app = launch()
+        defer { app.finishTestApplication() }
         if !diagnostics { app.buttons["selectionDiagnostics"].tap() }
         // Cache positions BEFORE opening. After Close there is no sleep, query,
         // second tap, or retry before the next single physical contact.
@@ -109,6 +112,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     func testSingleContactsWithSmallFingerMovement() {
         let app = launch()
+        defer { app.finishTestApplication() }
         for number in [3, 4, 1, 2] {
             let card = app.buttons["videoCard.\(number)"]
             let frame = card.frame
@@ -129,6 +133,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     func testSingleTapAfterScrollAndDuringThumbnailLoad() {
         let app = launch(["--delay-thumbnails"])
+        defer { app.finishTestApplication() }
         let scroll = app.scrollViews.firstMatch
         let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
         let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
@@ -159,6 +164,7 @@ final class SingleTapTests: XCTestCase {
     @MainActor
     func testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes() {
         let app = launch(["--hold-player-result"])
+        defer { app.finishTestApplication() }
         let card = app.buttons["videoCard.3"]
         let frame = card.frame
         app.coordinate(withNormalizedOffset: .zero)

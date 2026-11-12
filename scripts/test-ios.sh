@@ -255,10 +255,25 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/FrameExtractionUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameHDRUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameCropUITests" \
-  "-skip-testing:$copy_contact" "-skip-testing:$copy_reopen" \
+  "-skip-testing:PhotoPlayerUITests/SingleTapTests" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \
   "-skip-testing:PhotoPlayerUITests/PlaybackGestureTests" || test_status=$?
+# A combined host stalled in XCUIApplication._waitForValidPID before the next
+# test's first input. The app was already foreground, while the runner processed
+# delayed application/AX state. Give each SingleTap case a fresh XCTest session,
+# as for the existing copy/geometry/gesture cases; keep every input, assertion
+# and deadline. Each case now also backgrounds and terminates its app explicitly.
+run_tests build/copy-results/SingleTapLoading.xcresult \
+  "-only-testing:PhotoPlayerUITests/SingleTapTests/testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes" || test_status=$?
+run_tests build/copy-results/SingleTapReturnOff.xcresult \
+  "-only-testing:PhotoPlayerUITests/SingleTapTests/testShortSingleTapsAfterReturningWithDiagnosticsOff" || test_status=$?
+run_tests build/copy-results/SingleTapReturnOn.xcresult \
+  "-only-testing:PhotoPlayerUITests/SingleTapTests/testShortSingleTapsAfterReturningWithDiagnosticsOn" || test_status=$?
+run_tests build/copy-results/SingleTapMovement.xcresult \
+  "-only-testing:PhotoPlayerUITests/SingleTapTests/testSingleContactsWithSmallFingerMovement" || test_status=$?
+run_tests build/copy-results/SingleTapScroll.xcresult \
+  "-only-testing:PhotoPlayerUITests/SingleTapTests/testSingleTapAfterScrollAndDuringThumbnailLoad" || test_status=$?
 # The combined gesture session observed a 5.74s accessibility snapshot and a
 # stale Loading value while the fresh query already showed Playing. Isolate each
 # gesture case in a fresh host, keeping every assertion and deadline unchanged.
