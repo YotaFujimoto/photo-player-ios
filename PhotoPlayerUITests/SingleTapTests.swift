@@ -92,8 +92,11 @@ final class SingleTapTests: XCTestCase {
             // This is a state assertion, not a delay or a retry. The next library
             // contact still follows Close immediately, exactly once. Playing
             // chrome/pressed-button timing is covered by FullscreenUITests.
+            // Read the same PlaybackModel state from the persistent video
+            // surface. Looking up the auto-hidden button can block XCTest's
+            // predicate evaluation while playback is reaching its end.
             let ended = liveUIExpectation(predicate: NSPredicate(format: "value == %@", "Ended"),
-                                          object: app.buttons["playPause"])
+                                          object: app.otherElements.matching(identifier: "videoSurface").firstMatch)
             XCTAssertEqual(XCTWaiter.wait(for: [ended], timeout: 15), .completed)
             app.playerButton("closePlayer").tap()
         }
