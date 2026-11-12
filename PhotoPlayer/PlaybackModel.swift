@@ -66,7 +66,7 @@ final class PlaybackModel: ObservableObject {
 
     private func trace(_ event: String) {
         guard ProcessInfo.processInfo.arguments.contains("--playback-diagnostics") else { return }
-        print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) \(event), time=\(position), measured=\(player.currentTime().seconds), selected=\(selectedRate), actual=\(player.rate), state=\(stateText), control=\(player.timeControlStatus.rawValue), waiting=\(player.reasonForWaitingToPlay?.rawValue ?? "none"), intent=\(wantsPlayback)")
+        print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) \(event), time=\(position), measured=\(player.currentTime().seconds), selected=\(selectedRate), actual=\(player.rate), state=\(stateText), control=\(player.timeControlStatus.rawValue), waiting=\(player.reasonForWaitingToPlay?.rawValue ?? "none"), intent=\(wantsPlayback), audioActive=\(audioActive), audioActivating=\(audioActivating), appState=\(UIApplication.shared.applicationState.rawValue)")
     }
 
     func load() {

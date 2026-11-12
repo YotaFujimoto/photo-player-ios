@@ -93,7 +93,14 @@ final class VideoPlaybackTests: XCTestCase {
 
     @MainActor
     private func waitForLabel(_ element: XCUIElement, _ label: String, timeout: TimeInterval = 10) {
-        let expected = liveUIExpectation(predicate: NSPredicate(format: "label == %@", label), object: element)
+        // Preserve the same label equality, polling and deadline while making
+        // this diagnostic-mode seek path observable to the external collector.
+        let predicate = NSPredicate { candidate, _ in
+            let observed = (candidate as? XCUIElement)?.label
+            if observed == "Seeking…" { print("CI_CAPTURE_SEEK_WAIT") }
+            return observed == label
+        }
+        let expected = liveUIExpectation(predicate: predicate, object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: timeout), .completed)
     }
 

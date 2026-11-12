@@ -84,7 +84,8 @@ final class LongGOPFixtureTests: XCTestCase {
         // The plain UIKit layer test above remains as a comparison. This
         // second case includes the production SwiftUI bridge, glass overlays,
         // and seek control, which were absent from the prior native test.
-        let controller = UIHostingController(rootView: LongGOPPlayerHarness(model: model))
+        let ratePresentation = LongGOPRatePresentation()
+        let controller = UIHostingController(rootView: LongGOPPlayerHarness(model: model, ratePresentation: ratePresentation))
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
@@ -94,7 +95,7 @@ final class LongGOPFixtureTests: XCTestCase {
         // beyond four seconds before pausing. This is a media-state condition,
         // not a delay added to seeking or a replacement for the early-pause test.
         try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
-        model.pause(); model.setRate(0.25)
+        model.pause()
         // The UI failure paused for about six seconds while selecting speed
         // and locating the bar. Exercise that idle-player condition here too.
         // This is a test input, never a delay in the application's seek path.
@@ -102,6 +103,16 @@ final class LongGOPFixtureTests: XCTestCase {
         try await Task.sleep(for: .seconds(6))
         XCTAssertEqual(model.player.currentTime().seconds, pausedPosition, accuracy: 0.001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
+        // Every failing UI path selected speed through the production popover;
+        // directly setting a model property did not exercise its presentation.
+        ratePresentation.visible = true
+        try await ready {
+            guard let presented = controller.presentedViewController else { return false }
+            return !presented.isBeingPresented && presented.view.window != nil
+        }
+        model.setRate(0.25)
+        ratePresentation.visible = false
+        try await ready { controller.presentedViewController == nil }
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
@@ -145,18 +156,27 @@ final class LongGOPFixtureTests: XCTestCase {
     }
 }
 
+@MainActor private final class LongGOPRatePresentation: ObservableObject {
+    @Published var visible = false
+}
+
 @MainActor private struct LongGOPPlayerHarness: View {
     @ObservedObject var model: PlaybackModel
+    @ObservedObject var ratePresentation: LongGOPRatePresentation
     var body: some View {
         ZStack {
             PlayerSurface(model: model, fullscreen: true).ignoresSafeArea()
             Image(systemName: "play.fill").font(.system(size: 34)).frame(width: 80, height: 80).mediaGlass()
             VStack {
                 Spacer()
-                SeekBar(position: model.displayedPosition, duration: model.duration, enabled: model.isReady,
-                        cancellationID: model.gestureCancellationID, onBegin: model.beginScrubbing,
-                        onChange: model.scrub, onCommit: model.endScrubbing, onCancel: model.cancelScrubbing)
-                    .frame(height: 44).padding(12).mediaGlass()
+                PlaybackTransportControls(state: PlaybackTransportState(
+                    position: model.displayedPosition, duration: model.duration, isReady: model.isReady,
+                    canPlaySlow: model.canPlaySlow, showsPause: model.showsPauseControl,
+                    selectedRate: model.selectedRate, stateText: model.stateText,
+                    cancellationID: model.gestureCancellationID), fullscreen: true,
+                    ratePresentation: $ratePresentation.visible,
+                    actions: PlaybackTransportActions(begin: model.beginScrubbing, change: model.scrub,
+                        commit: model.endScrubbing, cancel: model.cancelScrubbing, setRate: model.setRate))
             }.padding(12)
         }.foregroundStyle(.white).tint(.white).background(.black)
     }
