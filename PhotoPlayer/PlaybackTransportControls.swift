@@ -60,10 +60,10 @@ struct PlaybackTransportControls: View {
                 // 10:00 or 59:59 to 1:00:00 must not resize the UIControl while
                 // it tracks a finger (a real resize correctly cancels tracking).
                 Text(PlaybackPolicy.clock(state.duration)).hidden().fixedSize()
-                    .overlay(alignment: .trailing) { Text(PlaybackPolicy.clock(state.position)).fixedSize() }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(PlaybackPolicy.clock(state.position))
-                    .accessibilityIdentifier("playbackPosition")
+                    .overlay(alignment: .trailing) {
+                        Text(PlaybackPolicy.clock(state.position)).fixedSize()
+                            .accessibilityIdentifier("playbackPosition")
+                    }
                 SeekBar(position: state.position, duration: state.duration,
                         enabled: state.isReady && state.duration > 0, cancellationID: state.cancellationID,
                         onBegin: actions.begin, onChange: actions.change, onCommit: actions.commit, onCancel: actions.cancel)
