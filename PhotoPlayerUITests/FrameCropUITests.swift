@@ -45,6 +45,8 @@ final class FrameCropUITests: XCTestCase {
         let canvas=preview.frame, timeline=item(app,"frameTimeline"), initialRange=timeline.value as! String
         XCTAssertEqual(item(app,"frameWindowStart").label,"0:00")
         XCTAssertEqual(item(app,"frameWindowEnd").label,"0:03")
+        XCTAssertEqual(app.buttons["setFrameStart"].label, "Start")
+        XCTAssertEqual(app.buttons["setFrameEnd"].label, "End")
         XCTAssertLessThan(app.buttons["setFrameStart"].frame.maxY,timeline.frame.minY)
         let top=[app.buttons["cancelFrames"].frame,item(app,"frameSummary").frame,app.buttons["saveFrames"].frame]
         XCTAssertLessThan(top[0].maxX,top[1].minX); XCTAssertLessThan(top[1].maxX,top[2].minX)

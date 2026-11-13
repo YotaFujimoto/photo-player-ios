@@ -72,6 +72,7 @@ final class PlaybackLifecycleTests: XCTestCase {
                 XCTAssertGreaterThan(model.gestureCancellationID, old)
                 model.endScrubbing(); model.endHorizontalSeek(); model.endTemporaryDoubleRate()
                 XCTAssertNil(model.seekPreview); XCTAssertFalse(model.isSeeking)
+                XCTAssertNil(model.horizontalFeedback)
                 XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.15)
                 XCTAssertEqual(model.wantsPlayback, playing)
                 XCTAssertEqual(model.selectedRate, 0.25)

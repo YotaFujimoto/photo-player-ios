@@ -50,6 +50,7 @@ struct PlayerScreen: View {
                         .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("playPause"), active: $0) }))
                         .offset(x: (geometry.safeAreaInsets.trailing - geometry.safeAreaInsets.leading) / 2,
                                 y: (geometry.safeAreaInsets.bottom - geometry.safeAreaInsets.top) / 2)
+                        .anchorPreference(key: PlayerButtonBoundsKey.self, value: .bounds) { $0 }
                     VStack(spacing: 0) {
                         header
                         if diagnostics, let selectionTrace {
@@ -64,6 +65,11 @@ struct PlayerScreen: View {
                         .transition(.opacity)
                 }
                 loadingOverlay
+            }.overlayPreferenceValue(PlayerButtonBoundsKey.self) { anchor in
+                GeometryReader { proxy in
+                    SeekFeedbackOverlay(preview: model.seekPreview ?? model.horizontalFeedback, skip: model.skipFeedback,
+                        pictureSize: model.pictureSize, playButtonFrame: anchor.map { proxy[$0] })
+                }.ignoresSafeArea().allowsHitTesting(false)
             }.foregroundStyle(.white).tint(.white).background(.black)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("selectedVideo")
@@ -166,7 +172,7 @@ struct PlayerScreen: View {
                 }
                 extraction = frameModel
             } label: {
-                Image(systemName: "photo.badge.plus").frame(width: 48, height: 48).contentShape(Circle()).mediaGlass()
+                Image(systemName: "square.dashed").frame(width: 48, height: 48).contentShape(Circle()).mediaGlass()
             }
             .accessibilityLabel("Save frames").accessibilityIdentifier("extractFrames")
             .disabled(!model.isReady || model.isSeeking || model.seekPreview != nil)
@@ -177,11 +183,10 @@ struct PlayerScreen: View {
     private func picture(fullscreen: Bool) -> some View {
         PlayerSurface(model: model, fullscreen: fullscreen, onSingleTap: chrome.singleTap,
                       onActivity: chrome.activity, onInteractionChanged: { chrome.block(.videoGesture, active: $0) })
-        .overlay { SeekFeedbackOverlay(preview: model.seekPreview, skip: model.skipFeedback, pictureSize: model.pictureSize) }
         .overlay(alignment: .top) {
             if let saveNotice {
-                Text(saveNotice).font(.callout).padding(10)
-                    .background(.regularMaterial, in: Capsule())
+                Text(saveNotice).font(.system(size: 16)).padding(.horizontal, 12).padding(.vertical, 7)
+                    .mediaGlass(feedback: true)
                     .padding(.horizontal, 8).padding(.top, fullscreen ? 60 : 8)
                     .accessibilityIdentifier("frameSaveSuccess").allowsHitTesting(false)
                     .task(id: saveNotice) {

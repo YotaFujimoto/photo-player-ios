@@ -14,6 +14,7 @@ final class SeekBarTests: XCTestCase {
     @MainActor func testTapAndContinuousDragCommitExactlyOnceWithLargeHitArea() {
         let bar = makeBar()
         var targets: [Double] = [], commits = 0
+        XCTAssertEqual(bar.layer.sublayers?.count, 2, "Track and played fill only; no circular thumb")
         bar.onChange = { targets.append($0) }; bar.onCommit = { commits += 1 }
         XCTAssertTrue(bar.point(inside: CGPoint(x: 150, y: 1), with: nil))
         XCTAssertTrue(bar.point(inside: CGPoint(x: 150, y: 43), with: nil))

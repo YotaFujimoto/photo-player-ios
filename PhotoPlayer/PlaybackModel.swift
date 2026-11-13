@@ -27,6 +27,7 @@ final class PlaybackModel: ObservableObject {
     @Published private(set) var duration = 0.0
     @Published private(set) var seekPreview: SeekPreview?
     @Published private(set) var skipFeedback: SkipFeedback?
+    @Published private(set) var horizontalFeedback: SeekPreview?
     @Published private(set) var gestureCancellationID = 0
     var displayedPosition: Double { seekPreview?.target ?? position }
     @Published private var speed = PlaybackSpeed()
@@ -397,6 +398,7 @@ final class PlaybackModel: ObservableObject {
         guard let preview = seekPreview, preview.source == source else { return }
         seekPreview = nil
         trace("preview commit \(source) target=\(preview.target)")
+        if source == .horizontal { showHorizontalFeedback(preview) }
         commitSeek(preview.target)
     }
     private func cancelPreview(_ source: SeekPreview.Source) {
@@ -412,7 +414,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     private func showFeedback(_ feedback: SkipFeedback) {
-        feedbackTask?.cancel()
+        clearFeedback()
         skipFeedback = feedback
         feedbackTask = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: SeekInteractionPolicy.feedbackDuration) } catch { return }
@@ -420,10 +422,20 @@ final class PlaybackModel: ObservableObject {
             self?.skipFeedback = nil
         }
     }
+    private func showHorizontalFeedback(_ preview: SeekPreview) {
+        clearFeedback()
+        horizontalFeedback = preview
+        feedbackTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.horizontalFeedback = nil
+        }
+    }
     private func clearFeedback() {
         feedbackTask?.cancel()
         feedbackTask = nil
         skipFeedback = nil
+        horizontalFeedback = nil
     }
 
     private func enqueueSeek(_ seconds: Double, exact: Bool, timescale: Int32 = 600) {

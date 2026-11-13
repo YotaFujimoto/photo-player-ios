@@ -3,6 +3,27 @@ import SwiftUI
 @testable import PhotoPlayer
 
 final class SeekFeedbackStyleTests: XCTestCase {
+    func testFeedbackNeverCoversPlayButtonAndSymbolsFitEveryPicture() {
+        for size in [CGSize(width: 320, height: 568), CGSize(width: 402, height: 874), CGSize(width: 874, height: 402)] {
+            let canvas = CGRect(origin: .zero, size: size)
+            let play = CGRect(x: canvas.midX - 40, y: canvas.midY - 40, width: 80, height: 80)
+            for ratio in [0.3, 0.5625, 1, 1.7778, 2.4, 8, 16] {
+                let video = VideoGeometry.fitted(CGSize(width: 1000 * ratio, height: 1000), in: canvas)
+                for visible in [false, true] {
+                    let hud = SeekFeedbackStyle.horizontalFrame(video: video, canvas: canvas, playButton: visible ? play : nil)
+                    XCTAssertTrue(canvas.contains(hud))
+                    XCTAssertEqual(hud.midX, video.midX, accuracy: 0.001)
+                    if visible { XCTAssertLessThanOrEqual(hud.maxY, play.minY - 10) }
+                    if video.height < 80 && visible { XCTAssertLessThan(hud.minY, video.minY, "Use existing letterbox, not a smaller picture") }
+                }
+                for forward in [false, true] {
+                    let symbol = SeekFeedbackStyle.skipFrame(in: video, forward: forward)
+                    XCTAssertTrue(video.contains(symbol)); XCTAssertLessThan(symbol.height, play.height)
+                    XCTAssertEqual(symbol.midY, video.midY)
+                }
+            }
+        }
+    }
     func testCompactClockAndUniformOneDecimalDelta() {
         XCTAssertEqual(SeekFeedbackStyle.clock(5), "00:05")
         XCTAssertEqual(SeekFeedbackStyle.clock(65), "01:05")

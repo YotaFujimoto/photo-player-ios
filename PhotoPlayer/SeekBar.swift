@@ -14,7 +14,6 @@ final class SeekBarControl: UIControl {
     private var previousSize = CGSize.zero
     private let track = CALayer()
     private let fill = CALayer()
-    private let thumb = CALayer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -22,11 +21,7 @@ final class SeekBarControl: UIControl {
         accessibilityLabel = "Playback position"
         accessibilityIdentifier = "seekSlider"
         accessibilityTraits = .adjustable
-        for part in [track, fill, thumb] { layer.addSublayer(part) }
-        thumb.shadowColor = UIColor.black.cgColor
-        thumb.shadowOpacity = 0.15
-        thumb.shadowRadius = 2
-        thumb.shadowOffset = CGSize(width: 0, height: 1)
+        for part in [track, fill] { layer.addSublayer(part) }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -55,11 +50,9 @@ final class SeekBarControl: UIControl {
         CATransaction.setDisableActions(true)
         track.frame = CGRect(x: 0, y: bounds.midY - 2, width: bounds.width, height: 4)
         fill.frame = CGRect(x: 0, y: bounds.midY - 2, width: x, height: 4)
-        thumb.frame = CGRect(x: x - 5, y: bounds.midY - 5, width: 10, height: 10)
-        track.cornerRadius = 2; fill.cornerRadius = 2; thumb.cornerRadius = 5
+        track.cornerRadius = 2; fill.cornerRadius = 2
         track.backgroundColor = UIColor.tertiaryLabel.resolvedColor(with: traitCollection).cgColor
         fill.backgroundColor = tintColor.resolvedColor(with: traitCollection).cgColor
-        thumb.backgroundColor = tintColor.resolvedColor(with: traitCollection).cgColor
         layer.opacity = isEnabled ? 1 : 0.4
         CATransaction.commit()
     }

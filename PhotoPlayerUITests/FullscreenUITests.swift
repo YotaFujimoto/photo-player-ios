@@ -196,7 +196,7 @@ final class FullscreenUITests: XCTestCase {
             withVelocity: .slow, thenHoldForDuration: 0.3)
         state(app, "Playing")
         XCTAssertFalse(play(app).exists)
-        XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
         view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         app.waitForRevealedPlayerControls()
         play(app).tap(); state(app, "Paused")
@@ -221,7 +221,7 @@ final class FullscreenUITests: XCTestCase {
         state(app, "Playing")
         app.playerButton("playPause").tap(); state(app, "Paused")
         XCTAssertEqual(app.buttons.matching(identifier: "rateMenu").firstMatch.value as? String, "0.25×")
-        XCTAssertFalse(app.staticTexts.matching(identifier: "skipFeedback").firstMatch.exists)
+        XCTAssertFalse(app.images.matching(identifier: "skipFeedback").firstMatch.exists)
         capture("fullscreen-after-held-and-bar")
         play(app).tap(); state(app, "Playing")
         XCUIDevice.shared.orientation = .portrait

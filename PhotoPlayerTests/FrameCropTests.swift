@@ -19,9 +19,9 @@ final class FrameCropTests: XCTestCase {
                 XCTAssertEqual(video.midX, bounds.midX); XCTAssertEqual(video.midY, bounds.midY)
                 XCTAssertTrue(bounds.insetBy(dx: -0.01, dy: -0.01).contains(video))
                 for forward in [false, true] {
-                    let point = SeekFeedbackStyle.skipCenter(in: video, forward: forward)
-                    let label = CGRect(x: point.x - video.width * 0.225, y: point.y - 30, width: video.width * 0.45, height: 60)
+                    let label = SeekFeedbackStyle.skipFrame(in: video, forward: forward)
                     XCTAssertTrue(video.contains(label))
+                    XCTAssertLessThan(label.width, 80)
                 }
                 let crop = FrameCrop(rect: CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.4))
                 let display = crop.displayed(in: video)
@@ -30,7 +30,7 @@ final class FrameCropTests: XCTestCase {
                 XCTAssertEqual(crop.pixels(width: 1000, height: 2000), CGRect(x: 200, y: 600, width: 600, height: 800))
             }
         }
-        XCTAssertEqual(SeekFeedbackStyle.fontSize, 14 * 1.5)
+        XCTAssertEqual(SeekFeedbackStyle.fontSize, 16)
     }
     func testCornersEdgesAndInteriorLatchWithoutJumpAndClamp() throws {
         let video = CGRect(x: 30, y: 100, width: 400, height: 300)

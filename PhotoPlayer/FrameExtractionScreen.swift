@@ -248,7 +248,8 @@ struct FrameExtractionScreen: View {
     private var footer: some View {
         VStack(spacing: 6) {
             HStack {
-                Button("Set Start") { model.setStart() }
+                Button("Start") { model.setStart() }
+                    .accessibilityLabel("Start").accessibilityHint("Set the first photo to the current frame")
                     .disabled(!model.canSetEndpoints || model.selection?.canSetStart != true)
                     .accessibilityIdentifier("setFrameStart")
                 Spacer(minLength: 4)
@@ -257,7 +258,8 @@ struct FrameExtractionScreen: View {
                         .accessibilityLabel("Reset Crop").accessibilityIdentifier("resetCrop")
                 }
                 Spacer(minLength: 4)
-                Button("Set End") { model.setEnd() }
+                Button("End") { model.setEnd() }
+                    .accessibilityLabel("End").accessibilityHint("Set the last photo to the current frame")
                     .disabled(!model.canSetEndpoints || model.selection?.canSetEnd != true)
                     .accessibilityIdentifier("setFrameEnd")
             }.buttonStyle(FrameEndpointStyle()).font(.caption)

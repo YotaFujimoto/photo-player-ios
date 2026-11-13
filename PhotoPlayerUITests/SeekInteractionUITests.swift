@@ -84,9 +84,9 @@ final class SeekInteractionUITests: XCTestCase {
         setPosition(app, fraction: 0.75, y: 0.95); position(app, near: 22)
         drag(bar(app), from: 0.2, to: 0.5); position(app, near: 15)
         state(app, "Paused")
-        XCTAssertFalse(app.staticTexts.matching(identifier: "skipFeedback").firstMatch.exists)
+        XCTAssertFalse(app.images.matching(identifier: "skipFeedback").firstMatch.exists)
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
-        XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
         XCTAssertEqual(app.playerButton("rateMenu").value as? String, "0.25×")
         // Scope both taps to the control. App-root coordinates lazily resolve
         // the entire hierarchy again while synthesizing input, which can spend
@@ -160,7 +160,7 @@ final class SeekInteractionUITests: XCTestCase {
         let frame = surface.frame
         let right = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
         right.doubleTap()
-        let feedback = app.staticTexts.matching(identifier: "skipFeedback").firstMatch
+        let feedback = app.images.matching(identifier: "skipFeedback").firstMatch
         // waitForExistence's first poll was 1.05s after the gesture in CI,
         // after this deliberately one-second HUD had already expired. Query
         // immediately after event synthesis instead of waiting a polling cycle.
@@ -172,7 +172,7 @@ final class SeekInteractionUITests: XCTestCase {
         right.doubleTap()
         XCTAssertTrue(feedback.exists)
         XCTAssertEqual(feedback.label, "End")
-        XCTAssertEqual(app.staticTexts.matching(identifier: "skipFeedback").count, 1)
+        XCTAssertEqual(app.images.matching(identifier: "skipFeedback").count, 1)
         // Hit the overlay's side again: it must not intercept the gesture.
         surface.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).doubleTap()
         position(app, near: 20, tolerance: 0)
@@ -192,11 +192,12 @@ final class SeekInteractionUITests: XCTestCase {
         let surface = app.otherElements.matching(identifier: "videoSurface").firstMatch
         setPosition(app, fraction: 0.5); position(app, near: 15)
         drag(surface, from: 0.4, to: 0.4 + 1.0 / 6.0, endHold: 0.8)
+        capture("horizontal-feedback-\(orientation.rawValue)")
         position(app, near: 25)
         state(app, "Paused")
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
-        XCTAssertFalse(app.staticTexts.matching(identifier: "skipFeedback").firstMatch.exists)
-        XCTAssertFalse(app.otherElements.matching(identifier: "seekPreview").firstMatch.exists)
+        XCTAssertFalse(app.images.matching(identifier: "skipFeedback").firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
         drag(surface, from: 0.6, to: 0.6 - 1.0 / 6.0); position(app, near: 15)
         let before = readPosition(app)
         drag(surface, from: 0.5, to: 0.5, y: 0.4, endY: 0.7)

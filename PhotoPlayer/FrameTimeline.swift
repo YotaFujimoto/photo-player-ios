@@ -45,7 +45,7 @@ final class FrameTimelineControl: UIControl {
         context.setFillColor(UIColor.white.cgColor)
         for index in selection.indices { context.fill(CGRect(x: x(index, selection) - 0.5, y: y - 3, width: 1, height: 6)) }
         for edge in [start, end] { context.fill(CGRect(x: edge - 1, y: y - 10, width: 2, height: 20)) }
-        context.fillEllipse(in: CGRect(x: x(selection.position, selection) - 6, y: y - 6, width: 12, height: 12))
+        context.fill(CGRect(x: x(selection.position, selection) - 1, y: y - 12, width: 2, height: 24))
     }
     func move(at x: CGFloat) {
         guard trackingFrame, let selection else { return }

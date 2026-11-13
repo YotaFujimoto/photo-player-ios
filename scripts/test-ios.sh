@@ -298,6 +298,7 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerTests" \
   "-skip-testing:PhotoPlayerUITests/VideoPlaybackTests" \
   "-skip-testing:PhotoPlayerUITests/SeekInteractionUITests" \
+  "-skip-testing:PhotoPlayerUITests/LongDurationSeekUITests" \
   "-skip-testing:PhotoPlayerUITests/FullscreenUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameExtractionUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameHDRUITests" \
@@ -365,5 +366,9 @@ if [[ "$test_group" == full || "$test_group" == playback || "$test_group" == see
   expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/LongDurationPlayback.xcresult \
     "-only-testing:PhotoPlayerTests/LongDurationPlaybackTests" || test_status=$?
+  run_tests build/copy-results/LongDurationPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/LongDurationSeekUITests/testTwoHourTrackEdgesPortrait" || test_status=$?
+  run_tests build/copy-results/LongDurationLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/LongDurationSeekUITests/testTwoHourTrackEdgesLandscape" || test_status=$?
 fi
 exit "$test_status"
