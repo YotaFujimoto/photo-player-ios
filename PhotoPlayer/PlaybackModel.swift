@@ -275,9 +275,17 @@ final class PlaybackModel: ObservableObject {
         keepsPlaybackAtSkippedEnd = false
         speed.endHold()
         assign(\.wantsPlayback, false)
-        if player.timeControlStatus != .paused || player.rate != 0 { player.pause() }
+        pauseTransportIfNeeded()
         assign(\.actualRate, 0)
         UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    private func pauseTransportIfNeeded() {
+        // A preview or queued destination can arrive while an exact seek is
+        // already running at rate zero. Do not issue another transport command
+        // in that state; only the latest destination should change. Waiting or
+        // playing transport still needs a real pause before committing a seek.
+        if player.timeControlStatus != .paused || player.rate != 0 { player.pause() }
     }
 
     private func resumeIfNeeded() {
@@ -285,7 +293,7 @@ final class PlaybackModel: ObservableObject {
         // At the boundary no frames remain. Retain the pre-skip play intent so
         // a subsequent backward skip resumes, without running beyond duration.
         if isAtSkippedEnd {
-            player.pause()
+            pauseTransportIfNeeded()
             UIApplication.shared.isIdleTimerDisabled = false
             return
         }
@@ -362,7 +370,7 @@ final class PlaybackModel: ObservableObject {
         clearFeedback()
         speed.endHold()
         seekPreview = SeekPreview(source: source, origin: origin, target: origin)
-        player.pause()
+        pauseTransportIfNeeded()
         trace("preview begin \(source)")
         return true
     }
@@ -421,7 +429,7 @@ final class PlaybackModel: ObservableObject {
     private func enqueueSeek(_ seconds: Double, exact: Bool, timescale: Int32 = 600) {
         guard isReady, duration > 0 else { return }
         let request = SeekRequest(seconds: PlaybackPolicy.position(seconds, duration: duration), exact: exact, timescale: timescale)
-        player.pause()
+        pauseTransportIfNeeded()
         isSeeking = true
         if let next = seekQueue.enqueue(request) { performSeek(next) }
         else {
