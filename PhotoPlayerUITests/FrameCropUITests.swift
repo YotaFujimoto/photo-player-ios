@@ -104,6 +104,7 @@ final class FrameCropUITests: XCTestCase {
         app.buttons["saveFrames"].tap()
         XCTAssertTrue(item(app,"frameSaveSuccess").waitForExistence(timeout:30))
         XCTAssertEqual(item(app,"frameSaveSuccess").label,"Saved 1 photo.")
+        capture("frame-save-glass-notice")
         expect(item(app,"videoSurface"),"value == %@","Paused"); finish(app)
     }
 }
