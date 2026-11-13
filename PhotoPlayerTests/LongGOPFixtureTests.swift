@@ -53,7 +53,7 @@ final class LongGOPFixtureTests: XCTestCase {
         }
     }
 
-    @MainActor private func ready(seeking: Bool = false, _ predicate: () -> Bool) async throws {
+    @MainActor private func ready(seeking: Bool = false, onSlowSeek: (() -> Void)? = nil, _ predicate: () -> Bool) async throws {
         let started = ContinuousClock.now
         let deadline = started.advanced(by: .seconds(15))
         var captured = false
@@ -61,6 +61,7 @@ final class LongGOPFixtureTests: XCTestCase {
             // Trigger read-only capture only for an unusually long native seek,
             // not for the intentional playback-to-4.25s precondition below.
             if seeking && !captured && ContinuousClock.now >= started.advanced(by: .seconds(2)) {
+                onSlowSeek?()
                 FileHandle.standardOutput.write(Data("CI_CAPTURE_SEEK_WAIT pid=\(ProcessInfo.processInfo.processIdentifier)\n".utf8))
                 captured = true
             }
@@ -121,9 +122,8 @@ final class LongGOPFixtureTests: XCTestCase {
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
         let surface = try XCTUnwrap(findSurface(in: controller.view))
-        XCTAssertTrue(surface.playerLayer.superlayer === surface.layer)
         XCTAssertTrue(surface.playerLayer.player === model.player)
-        XCTAssertEqual(surface.playerLayer.frame, surface.bounds)
+        describeOutput(surface, model: model, phase: "before-seek")
         print("LongGOP production view pause at \(model.player.currentTime().seconds)")
         // Also cover overlapping committed requests after actual playback,
         // rather than testing overlap only at the very beginning of the clip.
@@ -131,7 +131,9 @@ final class LongGOPFixtureTests: XCTestCase {
             let x = bar.bounds.width * CGFloat(target / model.duration)
             XCTAssertTrue(bar.start(at: x)); bar.finish(at: x)
         }
-        try await ready(seeking: true) { !model.isSeeking }
+        try await ready(seeking: true, onSlowSeek: {
+            self.describeOutput(surface, model: model, phase: "waiting-seek")
+        }) { !model.isSeeking }
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
@@ -167,6 +169,20 @@ final class LongGOPFixtureTests: XCTestCase {
     @MainActor private func findSurface(in view: UIView) -> VideoGestureView? {
         if let surface = view as? VideoGestureView { return surface }
         return view.subviews.lazy.compactMap { self.findSurface(in: $0) }.first
+    }
+
+    @MainActor private func describeOutput(_ surface: VideoGestureView, model: PlaybackModel, phase: String) {
+        print("CI_VIDEO_OUTPUT phase=\(phase) app=\(UIApplication.shared.applicationState.rawValue) scene=\(surface.window?.windowScene?.activationState.rawValue ?? -1) key=\(surface.window?.isKeyWindow ?? false) measured=\(model.player.currentTime().seconds) requested=\(model.position) seeking=\(model.isSeeking) ready=\(surface.playerLayer.isReadyForDisplay) videoRect=\(surface.playerLayer.videoRect)")
+        var view: UIView? = surface
+        while let current = view {
+            print("CI_VIDEO_VIEW type=\(type(of: current)) hidden=\(current.isHidden) alpha=\(current.alpha) bounds=\(current.bounds) window=\(current.window != nil)")
+            view = current.superview
+        }
+        var layer: CALayer? = surface.playerLayer
+        while let current = layer {
+            print("CI_VIDEO_LAYER type=\(type(of: current)) hidden=\(current.isHidden) opacity=\(current.opacity) bounds=\(current.bounds) speed=\(current.speed) timeOffset=\(current.timeOffset) presentationOpacity=\(current.presentation()?.opacity ?? -1) animations=\(current.animationKeys() ?? [])")
+            layer = current.superlayer
+        }
     }
 }
 

@@ -3,10 +3,8 @@ import AVFoundation
 
 /// Recognizers belong only to the video view, never the window or controls.
 final class VideoGestureView: UIView {
-    // Keep the media output distinct from the UIView backing layer managed by
-    // SwiftUI. It is installed once, never replaced by a state/overlay update,
-    // and resized without implicit Core Animation actions.
-    let playerLayer = AVPlayerLayer()
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
     var onSkip: ((Bool) -> Void)?
     var onSingleTap: (() -> Void)?
     var onInteractionChanged: ((Bool) -> Void)?
@@ -34,8 +32,6 @@ final class VideoGestureView: UIView {
         super.init(frame: frame)
         backgroundColor = .black
         playerLayer.videoGravity = .resizeAspect
-        playerLayer.frame = bounds
-        layer.addSublayer(playerLayer)
         doubleTap.numberOfTapsRequired = 2
         doubleTap.addTarget(self, action: #selector(tapped(_:)))
         singleTap.addTarget(self, action: #selector(singleTapped(_:)))
@@ -137,12 +133,6 @@ final class VideoGestureView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        if playerLayer.frame != bounds {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            playerLayer.frame = bounds
-            CATransaction.commit()
-        }
         if lastSize != bounds.size { cancelGestures(); lastSize = bounds.size; traceSurface("layout") }
     }
 

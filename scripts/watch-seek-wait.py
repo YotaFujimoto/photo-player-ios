@@ -46,6 +46,20 @@ with open(source) as stream:
                     stack = destination.with_name(destination.stem + f"-{pid}-spindump.log")
                     subprocess.run(["sudo", "-n", "spindump", pid, "1", "10", "-onlyTarget", "-file", str(stack)], stdout=log,
                                    stderr=subprocess.STDOUT, timeout=45, check=False)
+                # An app's output-queue wait alone cannot distinguish a hidden
+                # layer from a stopped compositor/media service. Capture these
+                # services once too, without changing or restarting any process.
+                for service in ("backboardd", "mediaserverd"):
+                    try:
+                        service_pids = subprocess.check_output(["pgrep", "-x", service], text=True, timeout=5).split()
+                        for service_pid in service_pids[:2]:
+                            if not service_pid.isdigit() or int(service_pid) <= 1:
+                                raise ValueError("Invalid service process")
+                            sample = destination.with_name(destination.stem + f"-{service}-{service_pid}.log")
+                            subprocess.run(["sudo", "-n", "sample", service_pid, "1", "10", "-file", str(sample)],
+                                           stdout=log, stderr=subprocess.STDOUT, timeout=10, check=False)
+                    except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+                        print(service, type(error).__name__, file=log, flush=True)
             except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
                 print(type(error).__name__, file=log)
         break

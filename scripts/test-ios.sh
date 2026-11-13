@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
@@ -326,7 +326,7 @@ run_tests build/copy-results/InputOn.xcresult "-only-testing:$input_on" || test_
 run_tests build/copy-results/InputOff.xcresult "-only-testing:$input_off" || test_status=$?
 run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_background" || test_status=$?
 fi
-if [[ "$test_group" == full || "$test_group" == frames || "$test_group" == original ]]; then
+if [[ "$test_group" == full || "$test_group" == frames || "$test_group" == original || "$test_group" == native ]]; then
 # A second, explicitly identified fixture condition, never a retry of a failed
 # case. Preserve the former 25-second-GOP decoding coverage alongside bounded UI
 # material. The import is last so all twelve-card selection assertions stay intact.
@@ -335,6 +335,7 @@ fixture_dirty=true
 expected_videos=$((expected_videos + 1))
 run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
   "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"
+if [[ "$test_group" == native ]]; then exit 0; fi
 run_tests build/copy-results/OriginalPlaybackSeek.xcresult \
   "-only-testing:PhotoPlayerUITests/VideoPlaybackTests/testOriginalLongGOPPhotoKitVideoPlaybackRateAndSeek" || test_status=$?
 run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \

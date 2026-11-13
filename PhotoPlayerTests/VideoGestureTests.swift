@@ -45,15 +45,6 @@ final class VideoGestureTests: XCTestCase {
         XCTAssertEqual(interactions, [true])
         view.cancelGestures(); XCTAssertEqual(interactions, [true, false])
         XCTAssertEqual(view.playerLayer.videoGravity, .resizeAspect)
-        let mediaLayer = view.playerLayer
-        XCTAssertTrue(mediaLayer.superlayer === view.layer)
-        for size in [CGSize(width: 320, height: 600), CGSize(width: 600, height: 320)] {
-            view.bounds.size = size; view.layoutIfNeeded()
-            XCTAssertTrue(view.playerLayer === mediaLayer)
-            XCTAssertEqual(mediaLayer.frame, view.bounds)
-            XCTAssertEqual(view.layer.sublayers?.filter { $0 === mediaLayer }.count, 1)
-            XCTAssertTrue(mediaLayer.animationKeys()?.isEmpty ?? true)
-        }
         PlayerSurface.dismantleUIView(view, coordinator: ())
         XCTAssertNil(view.onSingleTap); XCTAssertNil(view.onInteractionChanged)
     }
