@@ -56,12 +56,19 @@ struct PlaybackTransportControls: View {
                     .accessibilityLabel("Playback speed").accessibilityValue(String(format: "%g×", state.selectedRate))
             }
             HStack(spacing: 8) {
-                Text(PlaybackPolicy.clock(state.position)).accessibilityIdentifier("playbackPosition")
+                // Reserve the longest clock for this asset. Changing 9:59 to
+                // 10:00 or 59:59 to 1:00:00 must not resize the UIControl while
+                // it tracks a finger (a real resize correctly cancels tracking).
+                Text(PlaybackPolicy.clock(state.duration)).hidden().fixedSize()
+                    .overlay(alignment: .trailing) { Text(PlaybackPolicy.clock(state.position)).fixedSize() }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(PlaybackPolicy.clock(state.position))
+                    .accessibilityIdentifier("playbackPosition")
                 SeekBar(position: state.position, duration: state.duration,
                         enabled: state.isReady && state.duration > 0, cancellationID: state.cancellationID,
                         onBegin: actions.begin, onChange: actions.change, onCommit: actions.commit, onCancel: actions.cancel)
-                    .frame(height: 44)
-                Text(PlaybackPolicy.clock(state.duration)).accessibilityIdentifier("playbackDuration")
+                    .frame(maxWidth: .infinity).frame(height: 44)
+                Text(PlaybackPolicy.clock(state.duration)).fixedSize().accessibilityIdentifier("playbackDuration")
             }.font(.caption.monospacedDigit()).lineLimit(1).fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14).padding(.vertical, 2).mediaGlass()
             if diagnostics {

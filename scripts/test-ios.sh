@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
@@ -197,7 +197,8 @@ mkdir -p build/copy-results
 # immediately; a successful candidate still runs every test exactly once.
 if [[ "$test_group" == full || "$test_group" == core ]]; then
   run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
-    "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests"
+    "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests" \
+    "-skip-testing:PhotoPlayerTests/LongDurationPlaybackTests"
 fi
 if [[ "${PLAYBACK_CHECK_ONLY:-false}" == true ]]; then
   # Evidence-only diagnosis of startup/termination and the original encoding.
@@ -229,6 +230,15 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == seek ]]; then
+  run_tests build/copy-results/LongDurationLayout.xcresult \
+    "-only-testing:PhotoPlayerTests/LongDurationLayoutTests" "-only-testing:PhotoPlayerTests/SeekBarTests" \
+    "-only-testing:PhotoPlayerTests/SeekInteractionTests"
+  run_tests build/copy-results/SeekBarPortrait.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait" || test_status=$?
+  run_tests build/copy-results/SeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentLandscape" || test_status=$?
+fi
 if [[ "$test_group" == original ]]; then
   # Focused regression: the latest failure also used the bounded-GOP fixture.
   # Keep both bar cases before importing the distinct original encoding below.
@@ -347,5 +357,13 @@ fi
 # selection regressions. Each frame UI case gets a fresh host on this same phone.
 if [[ "$test_group" == full || "$test_group" == frames ]]; then
   run_frame_ui || test_status=$?
+fi
+if [[ "$test_group" == full || "$test_group" == playback || "$test_group" == seek ]]; then
+  bash scripts/generate-long-fixture.sh
+  xcrun simctl addmedia "$simulator_id" build/fixture-source/two-hour.mov
+  fixture_dirty=true
+  expected_videos=$((expected_videos + 1))
+  run_tests build/copy-results/LongDurationPlayback.xcresult \
+    "-only-testing:PhotoPlayerTests/LongDurationPlaybackTests" || test_status=$?
 fi
 exit "$test_status"
