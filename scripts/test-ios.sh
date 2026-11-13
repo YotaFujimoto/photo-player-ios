@@ -233,7 +233,7 @@ test_status=0
 if [[ "$test_group" == seek ]]; then
   run_tests build/copy-results/LongDurationLayout.xcresult \
     "-only-testing:PhotoPlayerTests/LongDurationLayoutTests" "-only-testing:PhotoPlayerTests/SeekBarTests" \
-    "-only-testing:PhotoPlayerTests/SeekInteractionTests"
+    "-only-testing:PhotoPlayerTests/SeekInteractionTests" "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests"
   run_tests build/copy-results/SeekBarPortrait.xcresult \
     "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testBarTapDragAndPlaybackIntentPortrait" || test_status=$?
   run_tests build/copy-results/SeekBarLandscape.xcresult \
