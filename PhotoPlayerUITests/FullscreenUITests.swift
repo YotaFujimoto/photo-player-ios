@@ -176,7 +176,14 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertEqual(surface(app).frame, canvas)
         surface(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         app.waitForRevealedPlayerControls()
-        play(app).tap(); state(app, "Paused")
+        // Menu hold, selection, automatic hiding and single-tap reveal have
+        // already been asserted. Prepare the final paused-retention check via
+        // the existing background lifecycle: an AX hit-point lookup took >3s
+        // and outlived the correctly running hide timer before synthesizing
+        // this otherwise redundant Pause tap. Keep all state/visibility checks;
+        // do not lengthen the application's timer or retry an expired target.
+        XCUIDevice.shared.press(.home); app.activate()
+        state(app, "Paused")
         observeForFourSeconds()
         XCTAssertTrue(play(app).exists)
     }
@@ -196,7 +203,10 @@ final class FullscreenUITests: XCTestCase {
             withVelocity: .slow, thenHoldForDuration: 0.3)
         state(app, "Playing")
         XCTAssertFalse(play(app).exists)
-        XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
+        // Build 15 deliberately retains the committed delta for 450ms, then
+        // fades it. Verify bounded removal, not the obsolete immediate removal.
+        expect(app.staticTexts.matching(identifier: "seekPreview").firstMatch,
+               NSPredicate(format: "exists == false"), timeout: 2)
         view.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         app.waitForRevealedPlayerControls()
         play(app).tap(); state(app, "Paused")

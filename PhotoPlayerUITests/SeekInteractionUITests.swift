@@ -197,7 +197,9 @@ final class SeekInteractionUITests: XCTestCase {
         state(app, "Paused")
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
         XCTAssertFalse(app.images.matching(identifier: "skipFeedback").firstMatch.exists)
-        XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
+        XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: NSPredicate(format: "exists == false"),
+            object: app.staticTexts.matching(identifier: "seekPreview").firstMatch)], timeout: 2), .completed,
+            "The committed delta must fade out promptly")
         drag(surface, from: 0.6, to: 0.6 - 1.0 / 6.0); position(app, near: 15)
         let before = readPosition(app)
         drag(surface, from: 0.5, to: 0.5, y: 0.4, endY: 0.7)
