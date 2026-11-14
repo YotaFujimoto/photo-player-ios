@@ -17,7 +17,7 @@ final class TransientMaterialTests: XCTestCase {
                     VStack(spacing: 12) {
                         Text("+11.4s").font(.system(size: 16).monospacedDigit())
                             .frame(width: 96, height: 32).transientMaterial()
-                        Text("2×").font(.headline.monospacedDigit()).padding(10).transientMaterial()
+                        Text("2×").font(.headline.monospacedDigit()).padding(10).transientMaterial(circular: true)
                         Text("Saved 10 photos.").font(.system(size: 16))
                             .padding(.horizontal, 12).padding(.vertical, 7).transientMaterial()
                         VStack(spacing: 8) {

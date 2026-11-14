@@ -203,7 +203,7 @@ struct PlayerScreen: View {
         .overlay(alignment: .top) {
             if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)
-                    .transientMaterial()
+                    .transientMaterial(circular: true)
                     .padding(.top, 72).accessibilityIdentifier("temporaryRate")
             }
         }
