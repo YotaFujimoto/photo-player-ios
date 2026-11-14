@@ -195,7 +195,9 @@ final class SeekInteractionUITests: XCTestCase {
         drag(surface, from: 0.4, to: 0.4 + 1.0 / 6.0, endHold: 0.8)
         let feedback = app.staticTexts.matching(identifier: "seekPreview").firstMatch
         XCTAssertTrue(feedback.exists)
-        XCTAssertLessThanOrEqual(feedback.frame.maxY, playFrame.minY - 8,
+        let feedbackFrame = feedback.frame
+        print("CI_FEEDBACK_LAYOUT orientation=\(orientation.rawValue) hud=\(feedbackFrame) play=\(playFrame) gap=\(playFrame.minY - feedbackFrame.maxY)")
+        XCTAssertLessThanOrEqual(feedbackFrame.maxY, playFrame.minY - 8,
                                  "The visible delta must clear the actual play button")
         capture("horizontal-feedback-\(orientation.rawValue)")
         position(app, near: 25)

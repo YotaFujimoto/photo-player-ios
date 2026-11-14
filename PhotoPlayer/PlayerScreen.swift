@@ -188,7 +188,9 @@ struct PlayerScreen: View {
                       onActivity: chrome.activity, onInteractionChanged: { chrome.block(.videoGesture, active: $0) })
         .overlay(alignment: .top) {
             if let saveNotice {
-                Text(saveNotice).font(.system(size: 16)).padding(.horizontal, 12).padding(.vertical, 7)
+                Text(saveNotice).font(.system(size: 16))
+                    .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
                     .mediaGlass(feedback: true)
                     .padding(.horizontal, 8).padding(.top, fullscreen ? 60 : 8)
                     .accessibilityIdentifier("frameSaveSuccess").allowsHitTesting(false)
