@@ -8,7 +8,9 @@ bundle = "io.github.photoplayer.p6a936d329b934a8ba532081564a51c07"
 
 
 def app_pids():
-    processes = subprocess.check_output(["ps", "-axo", "pid=,comm="], text=True, timeout=5)
+    # Unlimited width is required: simulator executable paths are much longer
+    # than a terminal line. Never mistake a truncated path for process absence.
+    processes = subprocess.check_output(["ps", "-axww", "-o", "pid=,comm="], text=True, timeout=5)
     result = []
     for line in processes.splitlines():
         fields = line.strip().split(maxsplit=1)
