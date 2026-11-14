@@ -22,7 +22,8 @@ final class LongGOPFixtureTests: XCTestCase {
             PHImageManager.default().requestPlayerItem(forVideo: asset, options: optionsForVideo) { item, _ in
                 continuation.resume(returning: item)
             }
-        })
+        }
+        let item = try XCTUnwrap(loadedItem)
         item.audioTimePitchAlgorithm = .spectral
         let player = AVPlayer(playerItem: item)
         try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
