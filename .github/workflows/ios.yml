@@ -106,7 +106,6 @@ jobs:
           name: ci-evidence-${{ matrix.group }}
           path: |
             build/*.log
-            build/*-display.mov
             build/toolchain.txt
             build/simulators.json
             build/device-state-*.json
