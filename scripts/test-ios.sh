@@ -92,6 +92,14 @@ record_resources after-build
 phase simulator-boot-start
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
+# Playback evidence stopped in MediaToolbox's video output queue, while the
+# main thread and decoder workers were idle. The old preparation booted the
+# device without attaching the Simulator display client. Exercise rendering
+# with that client attached to this same sole device, not with product-side
+# reseeks or relaxed completion checks. Do not change renderer preferences.
+phase simulator-display-start
+{ defaults read com.apple.CoreSimulator FramebufferServerRendererPolicy || true; } >> build/simulator.log 2>&1
+open -a "$DEVELOPER_DIR/Applications/Simulator.app" --args -CurrentDeviceUDID "$simulator_id"
 phase media-import-start
 xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
 phase application-install-start

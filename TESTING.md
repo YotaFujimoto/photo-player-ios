@@ -1,5 +1,11 @@
 # 検証方法と結果
 
+## Build 15: 出力待機のスタックを取得
+
+ef506e6 / CI 43544664970は通常バー2件とnative長GOP2件成功、製品View付きnative1件失敗、後続3件未実行。27.278秒の製品View試験で15秒の完了条件に届かない。今回のsampleは取得でき、53/53サンプルでvideoMentorThreadWaitForOutputQueueToDropBelowHighWater。メインはRunLoop待ち、H264ワーカーはセマフォ待ち。要求7.5秒→実測7.5秒、後続15秒は待機列、終了時の取消までcallbackなし。既存ログのIOSurface警告だけで原因を断定しない。証跡build/evidence-43544664970/original/OriginalFixtureIdentity-live-seek-49740-sample.log。
+
+準備を監査し、simctlだけで起動していた端末に固定XcodeのSimulator表示クライアントを明示的に接続する比較を行う。同一端末1台・同一素材・同じ製品コード／操作／判定／期限を維持する。表示クライアント有無は出力列の待機から選んだ検証仮説であり、未確定の原因を修正済みとは記録しない。
+
 ## Build 15: 最新の失敗範囲と採取不足
 
 fc88703 / CI 43541975372の確定結果は148成功・1失敗・1未実行。基本104/105、一覧21/21、通常再生12/12、写真11/12。未実行はFullscreenCanvasのdestination探索。失敗はOriginalSeekBarPortraitで、最初の7.5秒要求後のcallback記録なし、後続22.5／15秒は待機列、実測は7.5秒。15秒のPaused判定で失敗した。native長GOP3件・横バー・写真保存／クロップ6件は成功した。同一run全件成功ではないためIPAは作成しない。証跡build/evidence-43541975372/、アプリ記録build/decoded-43541975372-original-portrait/diagnostic-6.txt。sampleは採取時間切れでappスタックがなく、原因未確定。次の採取は、取得できたサービスと同じ非対話特権を所有appへ適用する。
