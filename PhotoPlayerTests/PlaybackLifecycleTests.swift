@@ -216,12 +216,14 @@ final class PlaybackLifecycleTests: XCTestCase {
             XCTAssertEqual(feedback.target, origin + 10, accuracy: 0.01)
             model.endHorizontalSeek() // A late duplicate release has no effect.
             XCTAssertEqual(model.horizontalFeedback?.target, feedback.target)
-            try await wait(timeout: 2) { model.horizontalFeedback == nil }
             try await wait { !model.isSeeking }
             if playing { try await wait { model.player.timeControlStatus == .playing } }
             XCTAssertEqual(model.player.currentTime().seconds, origin + 10, accuracy: 0.25)
             XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
             XCTAssertEqual(model.wantsPlayback, playing)
+            // Check the seek target before waiting for the HUD to expire: a
+            // playing item naturally advances during that independent timer.
+            try await wait(timeout: 2) { model.horizontalFeedback == nil }
             XCTAssertTrue(model.beginHorizontalSeek())
             let cancelledOrigin = model.player.currentTime().seconds
             model.updateHorizontalSeek(translation: -360, width: 360)
