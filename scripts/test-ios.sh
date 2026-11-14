@@ -155,8 +155,15 @@ if not device["isAvailable"] or device["state"] != "Booted":
 PY
   local host_status=0
   touch build/test.log
-  python3 scripts/watch-seek-wait.py build/test.log "$(wc -c < build/test.log)" "$result_bundle" &
-  local evidence_watcher=$!
+  # Live sample/spindump is intrusive: symbolication and suspension can overlap
+  # a short seek assertion on this small VM. Keep normal verification passive;
+  # opt in only for a separately identified diagnostic run. Failed hosts still
+  # collect system logs below, after their original result is established.
+  local evidence_watcher=''
+  if [[ "${CAPTURE_LIVE_STACKS:-0}" == 1 ]]; then
+    python3 scripts/watch-seek-wait.py build/test.log "$(wc -c < build/test.log)" "$result_bundle" &
+    evidence_watcher=$!
+  fi
   xcodebuild test-without-building \
   -xctestrun "$test_run_file" \
   -destination "platform=iOS Simulator,id=$simulator_id" \
@@ -169,8 +176,10 @@ PY
   -resultBundlePath "$result_bundle" \
   "$@" \
   2>&1 | tee -a build/test.log || host_status=$?
-  kill "$evidence_watcher" 2>/dev/null || true
-  wait "$evidence_watcher" 2>/dev/null || true
+  if [[ -n "$evidence_watcher" ]]; then
+    kill "$evidence_watcher" 2>/dev/null || true
+    wait "$evidence_watcher" 2>/dev/null || true
+  fi
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi
@@ -383,8 +392,8 @@ xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.m
 fixture_dirty=true
 expected_videos=$((expected_videos + 1))
 run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
-  "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"
-if [[ "$test_group" == native ]]; then exit 0; fi
+  "-only-testing:PhotoPlayerTests/LongGOPFixtureTests" || test_status=$?
+if [[ "$test_group" == native ]]; then exit "$test_status"; fi
 run_tests build/copy-results/OriginalPlaybackSeek.xcresult \
   "-only-testing:PhotoPlayerUITests/VideoPlaybackTests/testOriginalLongGOPPhotoKitVideoPlaybackRateAndSeek" || test_status=$?
 run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
