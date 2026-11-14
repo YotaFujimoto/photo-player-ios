@@ -10,6 +10,31 @@ private final class CropStateFixture: CropGestureRecognizer {
 }
 
 final class FrameCropTests: XCTestCase {
+    @MainActor func testPortraitMarginExpandsOnlyTapFamilyAndKeepsLandscapePictureBoundary() throws {
+        let view = FramePreviewView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.image = UIGraphicsImageRenderer(size: CGSize(width: 160, height: 96)).image { _ in UIColor.white.setFill(); UIRectFill(CGRect(x: 0, y: 0, width: 160, height: 96)) }
+        let recognizers = try XCTUnwrap(view.gestureRecognizers)
+        XCTAssertEqual(recognizers.count, 5, "No parent/window recognizers or new drag surface")
+        for cropping in [false, true] {
+            view.cropping = cropping
+            for allowsMargins in [false, true] {
+                view.allowsMarginTap = allowsMargins
+                for recognizer in recognizers {
+                    let tapFamily = recognizer is UITapGestureRecognizer || recognizer is UILongPressGestureRecognizer
+                    for point in [CGPoint(x: 195, y: 180), CGPoint(x: 195, y: 660)] {
+                        XCTAssertFalse(view.videoRect.insetBy(dx: -22, dy: -22).contains(point))
+                        XCTAssertEqual(view.accepts(recognizer, at: point), allowsMargins && tapFamily)
+                    }
+                    XCTAssertTrue(view.accepts(recognizer, at: CGPoint(x: 195, y: 422)))
+                    XCTAssertFalse(view.accepts(recognizer, at: CGPoint(x: -50, y: -50)))
+                }
+            }
+        }
+        view.frame = CGRect(x: 0, y: 0, width: 844, height: 390)
+        view.allowsMarginTap = false
+        for recognizer in recognizers { XCTAssertFalse(view.accepts(recognizer, at: CGPoint(x: 20, y: 195))) }
+    }
+
     func testAspectFitAndFeedbackStayInsideTallWideSquareImagesAcrossRotation() {
         for canvas in [CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
             for image in [CGSize(width: 1080, height: 1920), CGSize(width: 1920, height: 1080), CGSize(width: 1000, height: 1000)] {

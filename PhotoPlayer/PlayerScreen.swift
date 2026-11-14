@@ -191,7 +191,7 @@ struct PlayerScreen: View {
                 Text(saveNotice).font(.system(size: 16))
                     .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                     .padding(.horizontal, 12).padding(.vertical, 7)
-                    .mediaGlass(feedback: true)
+                    .transientMaterial()
                     .padding(.horizontal, 8).padding(.top, fullscreen ? 60 : 8)
                     .accessibilityIdentifier("frameSaveSuccess").allowsHitTesting(false)
                     .task(id: saveNotice) {
@@ -203,14 +203,14 @@ struct PlayerScreen: View {
         .overlay(alignment: .top) {
             if model.isTemporaryDoubleRate {
                 Text("2×").font(.headline.monospacedDigit()).padding(10)
-                    .background(.regularMaterial, in: Capsule()).allowsHitTesting(false)
+                    .transientMaterial()
                     .padding(.top, 72).accessibilityIdentifier("temporaryRate")
             }
         }
         .overlay(alignment: .bottom) {
             if model.isReady && !model.canPlaySlow {
                 Text("Slow playback unavailable.").font(.caption).padding(8)
-                    .background(.regularMaterial, in: Capsule()).padding(8).allowsHitTesting(false)
+                    .transientMaterial().padding(8)
             }
         }
         .background(.black)

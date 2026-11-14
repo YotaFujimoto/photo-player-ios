@@ -68,6 +68,9 @@ final class FrameExtractionModelTests: XCTestCase {
         let crop=model.crop
         XCTAssertEqual(crop.rect,CGRect(x:0.2,y:0.2,width:0.8,height:0.8))
         XCTAssertTrue(model.isCropping,"Releasing a drag does not exit")
+        model.toggleCrop(); model.toggleCrop()
+        XCTAssertEqual(model.crop,crop); XCTAssertEqual(model.selection?.position,30)
+        XCTAssertEqual(model.selection?.start,30); XCTAssertEqual(model.selection?.end,90)
         model.step(forward:true); try await wait { !model.isPreviewing }
         XCTAssertEqual(model.selection?.position,31); XCTAssertEqual(model.selection?.start,30)
         XCTAssertEqual(model.selection?.end,90); XCTAssertEqual(model.crop,crop); XCTAssertTrue(model.isCropping)
@@ -139,6 +142,8 @@ final class FrameExtractionModelTests: XCTestCase {
         defer { model.close() }
         model.save(); model.save(); model.request(index:40); model.setStart()
         try await wait { model.phase == .saving }
+        model.toggleCrop(); model.resetCrop(); model.save()
+        XCTAssertFalse(model.isCropping); XCTAssertFalse(model.canSave)
         XCTAssertEqual(writer.batches.count,1); XCTAssertEqual(writer.batches[0].count,10)
         XCTAssertEqual(model.selection?.position,0); XCTAssertEqual(model.selection?.start,0)
         let files=writer.batches[0].map(\.url)

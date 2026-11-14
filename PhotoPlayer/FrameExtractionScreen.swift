@@ -5,6 +5,11 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
     var onCropBegin: ((CGPoint, CGRect) -> Bool)?
     var onCropMove: ((CGPoint) -> Void)?
     var onCropEnd: (() -> Void)?
+    // Only portrait expands single taps. Controls are sibling overlays, so their
+    // touches never enter this view's recognizers. Drags stay on the picture.
+    var allowsMarginTap = false {
+        didSet { if oldValue != allowsMarginTap { cancelFrameGesture() } }
+    }
     var crop = FrameCrop.full { didSet { updateGuides() } }
     var cropping = false { didSet { if oldValue != cropping { cancelFrameGesture(); swipe.isEnabled = !cropping; cropPan.isEnabled = cropping; updateGuides() } } }
     var cancellationID = 0
@@ -59,8 +64,14 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // Touch slop is permitted at the real edge. Black bars are not crop coordinates.
-        videoRect.insetBy(dx: -22, dy: -22).contains(touch.location(in: self))
+        accepts(recognizer, at: touch.location(in: self))
+    }
+    func accepts(_ recognizer: UIGestureRecognizer, at point: CGPoint) -> Bool {
+        // Double taps and stationary presses must veto a single tap in the same
+        // area. The double's action below still only steps inside the picture.
+        let tapFamily = recognizer === single || recognizer === tap || recognizer === stationaryPress
+        if allowsMarginTap && tapFamily { return bounds.contains(point) }
+        return videoRect.insetBy(dx: -22, dy: -22).contains(point)
     }
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
         (recognizer === stationaryPress && (other === cropPan || other === swipe)) ||
@@ -104,7 +115,10 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
         CATransaction.commit()
     }
     @objc private func stepped(_ recognizer: UITapGestureRecognizer) {
-        if recognizer.state == .ended { onStep?(recognizer.location(in: self).x >= bounds.midX) }
+        let point = recognizer.location(in: self)
+        if recognizer.state == .ended && videoRect.insetBy(dx: -22, dy: -22).contains(point) {
+            onStep?(point.x >= bounds.midX)
+        }
     }
     @objc private func moved(_ recognizer: HorizontalSeekGestureRecognizer) {
         switch recognizer.state {
@@ -141,12 +155,14 @@ final class FramePreviewView: UIImageView, UIGestureRecognizerDelegate {
 
 struct FramePreview: UIViewRepresentable {
     @ObservedObject var model: FrameExtractionModel
+    var allowsMarginTap = false
     func makeUIView(context: Context) -> FramePreviewView { FramePreviewView(frame: .zero) }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: FramePreviewView, context: Context) -> CGSize? {
         guard let width = proposal.width, let height = proposal.height else { return nil }
         return CGSize(width: width, height: height)
     }
     func updateUIView(_ view: FramePreviewView, context: Context) {
+        view.allowsMarginTap = allowsMarginTap
         view.onStep = model.step; view.onBegin = model.beginInteraction; view.onMove = model.swipe
         view.onEnd = model.finishInteraction; view.onCancel = model.cancelInteraction
         view.onToggleCrop = model.toggleCrop; view.onCropBegin = model.beginCrop
@@ -191,7 +207,7 @@ struct FrameExtractionScreen: View {
         GeometryReader { geometry in
             let landscape = geometry.size.width > geometry.size.height
             ZStack {
-                FramePreview(model: model).ignoresSafeArea()
+                FramePreview(model: model, allowsMarginTap: !landscape).ignoresSafeArea()
                 if !model.isCropping {
                     VStack(spacing: 0) {
                         header
@@ -205,7 +221,7 @@ struct FrameExtractionScreen: View {
                     VStack(spacing: 8) {
                         ProgressView()
                         Text(model.progress).font(.caption).accessibilityIdentifier("frameProgress")
-                    }.padding().mediaGlass().allowsHitTesting(false)
+                    }.padding().transientMaterial()
                 } else if let error = model.error {
                     VStack(spacing: 8) {
                         Text(error).font(.callout).multilineTextAlignment(.center).accessibilityIdentifier("frameError")
