@@ -6,19 +6,6 @@ set -euo pipefail
 test_group="${TEST_GROUP:-full}"
 case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|cleanup) ;; *) exit 2 ;; esac
 
-# Fail before compilation when this display experiment is not supported by the
-# pinned installation, and retain the actual app layout for the investigation.
-simulator_display="$DEVELOPER_DIR/Applications/Simulator.app"
-if [[ ! -d "$simulator_display" ]]; then
-  {
-    printf 'CI_DISPLAY_APP_MISSING %s\n' "$simulator_display"
-    ls -ld "$DEVELOPER_DIR" "$DEVELOPER_DIR/Applications" || true
-    find /Applications -maxdepth 7 -name Simulator.app -print 2>/dev/null
-    xcrun simctl io help || true
-  } 2>&1 | tee build/display-capability.log
-  exit 2
-fi
-
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
 simulator_id="$(python3 -c '
@@ -105,14 +92,6 @@ record_resources after-build
 phase simulator-boot-start
 xcrun simctl boot "$simulator_id" 2>&1 | tee -a build/simulator.log
 xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
-# Playback evidence stopped in MediaToolbox's video output queue, while the
-# main thread and decoder workers were idle. The old preparation booted the
-# device without attaching the Simulator display client. Exercise rendering
-# with that client attached to this same sole device, not with product-side
-# reseeks or relaxed completion checks. Do not change renderer preferences.
-phase simulator-display-start
-{ defaults read com.apple.CoreSimulator FramebufferServerRendererPolicy || true; } >> build/simulator.log 2>&1
-open -a "$simulator_display" --args -CurrentDeviceUDID "$simulator_id"
 phase media-import-start
 xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
 phase application-install-start
@@ -176,6 +155,31 @@ if not device["isAvailable"] or device["state"] != "Booted":
 PY
   local host_status=0
   touch build/test.log
+  local recording_pid=''
+  # This standard image has no Simulator.app. Capture the synthetic long-GOP
+  # display through the documented simctl client instead: its output queue
+  # stalled without a continuous display consumer. This is a CI rendering
+  # condition, never a product-side reseek or a relaxed completion assertion.
+  if [[ "$(basename "$result_bundle")" == Original* ]]; then
+    local recording_log="build/$(basename "$result_bundle" .xcresult)-display.log"
+    xcrun simctl io "$simulator_id" recordVideo --codec=h264 \
+      "build/$(basename "$result_bundle" .xcresult)-display.mov" > "$recording_log" 2>&1 &
+    recording_pid=$!
+    python3 - "$recording_log" "$recording_pid" <<'PY' || return $?
+from pathlib import Path
+import os, sys, time
+source, pid = Path(sys.argv[1]), int(sys.argv[2])
+deadline = time.monotonic() + 15
+while time.monotonic() < deadline:
+    os.kill(pid, 0)
+    if source.exists() and "Recording started" in source.read_text():
+        print("CI_DISPLAY_FIRST_FRAME", flush=True)
+        break
+    time.sleep(0.1)
+else:
+    sys.exit("Display client did not receive its first frame")
+PY
+  fi
   python3 scripts/watch-seek-wait.py build/test.log "$(wc -c < build/test.log)" "$result_bundle" &
   local evidence_watcher=$!
   xcodebuild test-without-building \
@@ -192,6 +196,10 @@ PY
   2>&1 | tee -a build/test.log || host_status=$?
   kill "$evidence_watcher" 2>/dev/null || true
   wait "$evidence_watcher" 2>/dev/null || true
+  if [[ -n "$recording_pid" ]]; then
+    kill -INT "$recording_pid" 2>/dev/null || true
+    wait "$recording_pid" || host_status=1
+  fi
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi

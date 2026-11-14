@@ -1,5 +1,11 @@
 # 開発状況
 
+## Build 15: 基本群105件成功、表示機能を確認
+
+afe722b / [CI 43545316410](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43545316410)は基本105件とIPA検査器4件が成功、18分18秒。manifest実行と補助アプリ起動変更後の検証であり、以前の起動不安定の原因確定とはしない。
+
+964412d / CI 43546276551、配置確認8840730 / CI 43546947339は試験前に終了。この標準XcodeインストールにはDeveloper/Applications自体がなく、/Applications配下にもSimulator.appがなかった。FramebufferServerRendererPolicyの独自設定もない。利用可能なsimctl io recordVideoで合成長GOPケースの表示を記録し、最初のフレーム到着を確認してから同じ試験を実行する比較へ切り替える。表示先接続と映像証跡のためで、アプリの操作・シーク・期限は変更しない。仮説の成功待ち再試行ではなく、表示クライアントの条件を変えて検証する。
+
 ## Build 15: 映像出力待ちの採取と表示クライアントの比較
 
 ef506e6 / [CI 43544664970](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43544664970)の長GOP製品View試験でも完了待ちが再発。今回のsampleはシンボル付きで取得でき、MediaToolboxのvideoMentorThreadWaitForOutputQueueToDropBelowHighWaterで出力列が空くのを待ち、メインスレッドはイベント待ち、H264処理スレッドも待機していた。要求のcallbackは終了時の取消まで来ない。入力受付や時刻変換ではなく映像出力側の停滞であり、原因がアプリかシミュレーターかはまだ未確定。

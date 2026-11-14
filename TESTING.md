@@ -1,5 +1,11 @@
 # 検証方法と結果
 
+## Build 15: manifest基本群成功と表示機能の実測
+
+afe722b / CI 43545316410 attempt 1は18分18秒、基本105件＋IPA検査器4件成功。過去の失敗は保持する。964412d / CI 43546276551はSimulator.app不在で試験0件、8840730 / CI 43546947339の早期配置確認でもDeveloper/Applicationsと/Applications配下のSimulator.app不在を確認。独自のFramebufferServerRendererPolicy設定はなかった。
+
+実際に存在するsimctl io recordVideoのhelpが示す最初の「Recording started」を条件にして、合成長GOPケースへ表示消費クライアントを接続する。対象はOriginal各ホスト、1台の同じシミュレーター、アプリ入力なし。映像出力待ちの仮説を比較し、映像も証跡として保持する。これ以外のテスト対象・製品コード・入力・判定・期限は維持する。失敗していた過去の記録を合格へ置換しない。
+
 ## Build 15: 出力待機のスタックを取得
 
 ef506e6 / CI 43544664970は通常バー2件とnative長GOP2件成功、製品View付きnative1件失敗、後続3件未実行。27.278秒の製品View試験で15秒の完了条件に届かない。今回のsampleは取得でき、53/53サンプルでvideoMentorThreadWaitForOutputQueueToDropBelowHighWater。メインはRunLoop待ち、H264ワーカーはセマフォ待ち。要求7.5秒→実測7.5秒、後続15秒は待機列、終了時の取消までcallbackなし。既存ログのIOSurface警告だけで原因を断定しない。証跡build/evidence-43544664970/original/OriginalFixtureIdentity-live-seek-49740-sample.log。
