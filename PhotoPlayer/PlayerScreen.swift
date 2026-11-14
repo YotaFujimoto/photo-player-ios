@@ -77,7 +77,8 @@ struct PlayerScreen: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("selectedVideo")
                 .accessibilityLabel(diagnostics ? "Video \(video.diagnosticNumber)" : "Playback")
-                .accessibilityValue("\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
+                .accessibilityValue(ProcessInfo.processInfo.arguments.contains("--chrome-tracking-audit")
+                    ? chrome.interactionAuditValue : "\(model.asset.pixelWidth)x\(model.asset.pixelHeight)")
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chrome.isVisible)
             .statusBarHidden(fullscreen)
             .onAppear { configureLayout(fullscreen: fullscreen) }

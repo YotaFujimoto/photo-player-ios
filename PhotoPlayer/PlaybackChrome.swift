@@ -53,6 +53,16 @@ struct PlaybackChromeState {
 @MainActor
 final class PlaybackChrome: ObservableObject {
     @Published private(set) var state = PlaybackChromeState()
+    // Opt-in CI observation only. XCTest returns from a held gesture after an
+    // unbounded idle/AX lookup; checking visibility then can occur after the
+    // correct three-second post-release hide. Retain what happened DURING the
+    // interaction without changing the timer, input or normal accessibility.
+    private let auditsInteractions = ProcessInfo.processInfo.arguments.contains("--chrome-tracking-audit")
+    private struct Observation { let began: TimeInterval; var stayedVisible: Bool }
+    private var observations: [PlaybackChromeState.Blocker: Observation] = [:]
+    private var completedObservations: [PlaybackChromeState.Blocker: String] = [:]
+    private var observationSequence = 0
+    @Published private(set) var interactionAuditValue = ""
     private var timer: Task<Void, Never>?
     var isVisible: Bool { state.isVisible }
 
@@ -66,6 +76,7 @@ final class PlaybackChrome: ObservableObject {
     private func update(_ change: (inout PlaybackChromeState) -> Void) {
         let oldToken = state.timeoutToken
         change(&state)
+        observeInteractions()
         let newToken = state.timeoutToken
         guard newToken != oldToken else { return }
         timer?.cancel()
@@ -75,6 +86,26 @@ final class PlaybackChrome: ObservableObject {
             do { try await Task.sleep(for: PlaybackChromeState.hideDelay) } catch { return }
             guard !Task.isCancelled else { return }
             self?.state.expire(token: token)
+            self?.observeInteractions()
+        }
+    }
+
+    private func observeInteractions() {
+        guard auditsInteractions else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        for blocker in [PlaybackChromeState.Blocker.bar, .videoGesture] {
+            if var observation = observations[blocker] {
+                observation.stayedVisible = observation.stayedVisible && state.isVisible
+                if state.blockers.contains(blocker) { observations[blocker] = observation }
+                else {
+                    observationSequence += 1
+                    completedObservations[blocker] = "\(blocker):\(observationSequence):\(now - observation.began):\(observation.stayedVisible ? 1 : 0)"
+                    observations[blocker] = nil
+                    interactionAuditValue = [PlaybackChromeState.Blocker.bar, .videoGesture].compactMap { completedObservations[$0] }.joined(separator: "|")
+                }
+            } else if state.blockers.contains(blocker) {
+                observations[blocker] = Observation(began: now, stayedVisible: state.isVisible)
+            }
         }
     }
 }

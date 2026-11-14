@@ -2,11 +2,12 @@ import XCTest
 import UIKit
 
 final class FullscreenUITests: XCTestCase {
-    @MainActor private func openPaused() -> XCUIApplication {
+    @MainActor private func openPaused(auditChrome: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication.photoPlayerForTesting()
         app.launchArguments = ["--playback-diagnostics"]
+        if auditChrome { app.launchArguments.append("--chrome-tracking-audit") }
         app.launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'videoCard.' AND value == '320x180'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 20)); card.tap()
@@ -189,7 +190,7 @@ final class FullscreenUITests: XCTestCase {
     }
 
     @MainActor func testHiddenSwipeHeldRateBarAndLifecycleCleanup() {
-        let app = openPaused()
+        let app = openPaused(auditChrome: true)
         defer { finish(app) }
         bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         state(app, "Paused")
@@ -216,7 +217,8 @@ final class FullscreenUITests: XCTestCase {
         let start = seconds(app), began = ProcessInfo.processInfo.systemUptime
         play(app).tap()
         holdPoint.press(forDuration: 4)
-        XCTAssertTrue(play(app).exists, "A held gesture must suspend the hide timer")
+        assertHeldControlsStayedVisible(app, interaction: "videoGesture")
+        app.revealPlayerControls()
         let extra = Double(seconds(app) - start) - (ProcessInfo.processInfo.systemUptime - began) * 0.25
         XCTAssertGreaterThan(extra, 4); XCTAssertLessThan(extra, 9)
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
@@ -227,8 +229,10 @@ final class FullscreenUITests: XCTestCase {
         play(app).tap()
         barStart.press(forDuration: 0.05, thenDragTo: barEnd,
             withVelocity: .slow, thenHoldForDuration: 4)
-        XCTAssertTrue(play(app).exists, "Bar tracking must suspend the hide timer")
+        assertHeldControlsStayedVisible(app, interaction: "bar")
         state(app, "Playing")
+        // A delayed AX response may arrive after the correct post-release hide.
+        // Reveal once if necessary before the next independent Pause action.
         app.playerButton("playPause").tap(); state(app, "Paused")
         XCTAssertEqual(app.buttons.matching(identifier: "rateMenu").firstMatch.value as? String, "0.25×")
         XCTAssertFalse(app.images.matching(identifier: "skipFeedback").firstMatch.exists)
@@ -246,5 +250,15 @@ final class FullscreenUITests: XCTestCase {
         capture("fullscreen-after-background")
         app.buttons.matching(identifier: "closePlayer").firstMatch.tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
+    }
+
+    @MainActor private func assertHeldControlsStayedVisible(_ app: XCUIApplication, interaction: String) {
+        let value = app.otherElements.matching(identifier: "selectedVideo").firstMatch.value as? String ?? ""
+        print("CI_CHROME_INTERACTION \(value)")
+        let fields = value.split(separator: "|").first { $0.hasPrefix(interaction + ":") }?.split(separator: ":") ?? []
+        XCTAssertEqual(fields.count, 4, "Missing in-app interaction observation: \(value)")
+        guard fields.count == 4 else { return }
+        XCTAssertGreaterThan(Double(fields[2]) ?? 0, 3, "Observe beyond the production hide deadline")
+        XCTAssertEqual(fields[3], "1", "Controls must remain visible throughout the held interaction")
     }
 }
