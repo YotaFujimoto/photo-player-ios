@@ -13,30 +13,14 @@ func liveUIExpectation(predicate: NSPredicate, object: Any?) -> XCTNSPredicateEx
 
 extension XCUIApplication {
     @MainActor func finishTestApplication(file: StaticString = #filePath, line: UInt = #line) {
-        var backgroundResult = XCTWaiter.Result.completed
-        var observed = state
-        print("CI_APP_CLEANUP initial=\(observed.rawValue)")
-        if state == .runningForeground {
-            XCUIDevice.shared.press(.home)
-            let started = ProcessInfo.processInfo.systemUptime
-            // Read the public enum directly, including an immediate observation;
-            // do not depend on KVC conversion of application.state. Keep the
-            // same background/suspended condition and total ten-second budget.
-            let condition = NSPredicate { _, _ in
-                let current = self.state
-                if current != observed { print("CI_APP_CLEANUP observed=\(current.rawValue)"); observed = current }
-                return current == .runningBackground || current == .runningBackgroundSuspended
-            }
-            if !condition.evaluate(with: nil) {
-                backgroundResult = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: condition, object: nil)],
-                    timeout: max(0, 10 - (ProcessInfo.processInfo.systemUptime - started)))
-            }
-        }
-        // Always request termination before an assertion can abort cleanup.
-        // A failed background wait remains a failure, never a silent retry.
+        // End this test's process directly. An extra Home transition here left
+        // XCTest reporting foreground while the captured screen was already
+        // SpringBoard, after all selection/return assertions had passed.
+        // Actual background/restore behavior remains asserted separately in
+        // InputLifecycle, Fullscreen and PlaybackGesture tests.
+        print("CI_APP_CLEANUP terminate initial=\(state.rawValue)")
         terminate()
-        print("CI_APP_CLEANUP terminated=\(state.rawValue) backgroundResult=\(backgroundResult.rawValue)")
-        XCTAssertEqual(backgroundResult, .completed, "Last pre-termination state: \(observed.rawValue)", file: file, line: line)
+        print("CI_APP_CLEANUP terminated=\(state.rawValue)")
         XCTAssertEqual(state, .notRunning, file: file, line: line)
     }
 

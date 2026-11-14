@@ -124,14 +124,7 @@ final class SeekInteractionUITests: XCTestCase {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
-        // Finish the foreground scene transition before asking XCTest to kill
-        // its process, as in the persistence test. Keep the termination check.
-        XCUIDevice.shared.press(.home)
-        expect(app, NSPredicate(format: "state == %d OR state == %d",
-                               Int(XCUIApplication.State.runningBackground.rawValue),
-                               Int(XCUIApplication.State.runningBackgroundSuspended.rawValue)))
-        app.terminate()
-        XCTAssertEqual(app.state, .notRunning)
+        app.finishTestApplication()
     }
 
     @MainActor func testLoadingErrorAndSeekOverlaysNeverMoveNormalControls() {

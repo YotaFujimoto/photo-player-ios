@@ -310,13 +310,15 @@ if [[ "$test_group" == selection ]]; then
   # Failed row plus adjacent rows, followed by the failed fresh-host launch
   # and its return-to-library neighbor. Full coverage below is unchanged.
   run_tests build/copy-results/SelectionRegression.xcresult \
-    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow2SelectionBounds" \
     "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow3SelectionBounds" \
-    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow4SelectionBounds" || test_status=$?
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow4SelectionBounds" \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow5SelectionBounds" || test_status=$?
   run_tests build/copy-results/SingleTapLoading.xcresult \
     "-only-testing:PhotoPlayerUITests/SingleTapTests/testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes" || test_status=$?
   run_tests build/copy-results/SingleTapReturnOff.xcresult \
     "-only-testing:PhotoPlayerUITests/SingleTapTests/testShortSingleTapsAfterReturningWithDiagnosticsOff" || test_status=$?
+  # Keep the actual background/pause/restore assertions alongside cleanup changes.
+  run_tests build/copy-results/InputBackground.xcresult "-only-testing:$input_background" || test_status=$?
   exit "$test_status"
 fi
 if [[ "$test_group" == full || "$test_group" == core ]]; then
@@ -370,7 +372,7 @@ run_tests build/TestResults.xcresult \
 # test's first input. The app was already foreground, while the runner processed
 # delayed application/AX state. Give each SingleTap case a fresh XCTest session,
 # as for the existing copy/geometry/gesture cases; keep every input, assertion
-# and deadline. Each case now also backgrounds and terminates its app explicitly.
+# and deadline. Selection cases explicitly terminate their app after assertions.
 run_tests build/copy-results/SingleTapLoading.xcresult \
   "-only-testing:PhotoPlayerUITests/SingleTapTests/testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes" || test_status=$?
 run_tests build/copy-results/SingleTapReturnOff.xcresult \
