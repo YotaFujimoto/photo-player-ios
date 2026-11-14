@@ -6,6 +6,19 @@ set -euo pipefail
 test_group="${TEST_GROUP:-full}"
 case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|cleanup) ;; *) exit 2 ;; esac
 
+# Fail before compilation when this display experiment is not supported by the
+# pinned installation, and retain the actual app layout for the investigation.
+simulator_display="$DEVELOPER_DIR/Applications/Simulator.app"
+if [[ ! -d "$simulator_display" ]]; then
+  {
+    printf 'CI_DISPLAY_APP_MISSING %s\n' "$simulator_display"
+    ls -ld "$DEVELOPER_DIR" "$DEVELOPER_DIR/Applications" || true
+    find /Applications -maxdepth 7 -name Simulator.app -print 2>/dev/null
+    xcrun simctl io help || true
+  } 2>&1 | tee build/display-capability.log
+  exit 2
+fi
+
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
 simulator_id="$(python3 -c '
@@ -99,7 +112,7 @@ xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee -a build/simulator.log
 # reseeks or relaxed completion checks. Do not change renderer preferences.
 phase simulator-display-start
 { defaults read com.apple.CoreSimulator FramebufferServerRendererPolicy || true; } >> build/simulator.log 2>&1
-open -a "$DEVELOPER_DIR/Applications/Simulator.app" --args -CurrentDeviceUDID "$simulator_id"
+open -a "$simulator_display" --args -CurrentDeviceUDID "$simulator_id"
 phase media-import-start
 xcrun simctl addmedia "$simulator_id" build/fixtures/synthetic-still.png build/fixtures/*.mov
 phase application-install-start
