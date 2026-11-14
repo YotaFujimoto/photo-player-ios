@@ -72,7 +72,6 @@ final class FullscreenUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
         expect(app, NSPredicate { _, _ in app.frame.height > app.frame.width })
-        app.finishTestApplication()
     }
 
     @MainActor func testLandscapeCanvasSafeControlsAndPortraitPreserved() {

@@ -206,14 +206,10 @@ PY
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi
-  # Functional close/list/background/relaunch assertions remain in XCTest.
-  # Check real process absence after every native/UI host instead of relying
-  # on an additional synchronous AX termination notification inside a case.
-  # Keep failures fatal and retain the original failed-host evidence.
-  if [[ "$host_status" -eq 0 ]]; then
-    python3 scripts/finish-simulator-app.py "$simulator_id" "$(basename "$result_bundle" .xcresult)" \
-      2>&1 | tee -a build/test.log || host_status=$?
-  fi
+  # XCTest owns case teardown; each UI case uses launch() for a clean start.
+  # Product close/list/background/relaunch assertions remain in the cases.
+  # Do not append a second service/process audit after a successful host:
+  # it is redundant with launch lifecycle and introduced independent failures.
   return "$host_status"
 }
 

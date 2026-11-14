@@ -38,7 +38,7 @@ final class FrameCropUITests: XCTestCase {
     @MainActor private func finish(_ app:XCUIApplication) {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout:10))
-        XCUIDevice.shared.orientation = .portrait; app.finishTestApplication()
+        XCUIDevice.shared.orientation = .portrait
     }
     @MainActor func testPortraitCropGesturesRelativeWindowResetAndCancel() {
         let app=open(), preview=item(app,"framePreview")

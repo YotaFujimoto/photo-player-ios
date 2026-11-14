@@ -51,7 +51,7 @@ final class LongDurationSeekUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["skipFeedback"].exists)
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons["videoCard.1"].waitForExistence(timeout: 10))
-        XCUIDevice.shared.orientation = .portrait; app.finishTestApplication()
+        XCUIDevice.shared.orientation = .portrait
     }
     @MainActor private func wait(_ item: XCUIElement, _ format: String, _ value: String) {
         XCTAssertEqual(XCTWaiter.wait(for: [liveUIExpectation(predicate: NSPredicate(format: format, value), object: item)], timeout: 15), .completed)

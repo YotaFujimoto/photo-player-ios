@@ -124,7 +124,6 @@ final class SeekInteractionUITests: XCTestCase {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
-        app.finishTestApplication()
     }
 
     @MainActor func testLoadingErrorAndSeekOverlaysNeverMoveNormalControls() {
@@ -241,7 +240,6 @@ final class SeekInteractionUITests: XCTestCase {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
-        app.finishTestApplication()
     }
 
     @MainActor private func assertFrames(_ elements: [XCUIElement], _ frames: [CGRect]) {

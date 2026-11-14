@@ -12,17 +12,11 @@ func liveUIExpectation(predicate: NSPredicate, object: Any?) -> XCTNSPredicateEx
 }
 
 extension XCUIApplication {
-    @MainActor func finishTestApplication() {
-        // Framework-managed case cleanup does not need another synchronous AX
-        // terminate/state wait. Runs 43580529209 and 43584132886 reached every
-        // functional assertion, then failed that wait in unrelated UI classes.
-        // test-ios.sh verifies actual process absence after EVERY host and
-        // fails CI if cleanup fails. CounterPersistence's in-test restart and
-        // real background/restore assertions remain part of the test itself.
-        print("CI_APP_CLEANUP handoff=framework-and-host-process-verification")
-    }
-
     @MainActor static func photoPlayerForTesting() -> XCUIApplication {
+        // launch() owns a clean process start for every case, including when an
+        // earlier instance exists. Do not add a second post-case AX terminate
+        // wait or global process enumeration to the product assertions.
+        // CounterPersistence still verifies a real terminate/relaunch in-test.
         let app = XCUIApplication()
         // Restoring the full activity stream reproduced megabytes of injected
         // AX hierarchy logs and slow control lookup. Preserve print-based

@@ -6,7 +6,6 @@ final class CounterPersistenceTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication.photoPlayerForTesting()
         app.launch()
-        defer { app.finishTestApplication() }
         app.tabBars.buttons["Diagnostics"].tap()
 
         let counter = app.staticTexts["counterValue"]
