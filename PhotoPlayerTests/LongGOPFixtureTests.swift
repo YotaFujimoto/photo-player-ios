@@ -57,11 +57,19 @@ final class LongGOPFixtureTests: XCTestCase {
         for target in [7.5, 22.5, 15.0] {
             let result = RawSeekResult()
             print("CI_RAW_PLAYER seek=\(target)")
+            // Diagnostic only: refresh the output attachment in one transaction,
+            // around the single user-equivalent seek. No delay or second seek.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.player = nil
             player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
                 print("CI_RAW_PLAYER callback=\(finished)")
                 Task { @MainActor in result.finished = finished }
             }
+            layer.player = player
+            CATransaction.commit()
             try await ready(seeking: true) { result.finished != nil }
+            try await ready { layer.isReadyForDisplay }
             XCTAssertEqual(result.finished, true)
             XCTAssertEqual(player.currentTime().seconds, target, accuracy: 0.001)
             XCTAssertEqual(player.rate, 0)
