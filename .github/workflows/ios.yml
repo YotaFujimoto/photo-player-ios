@@ -16,7 +16,7 @@ on:
       verification:
         description: 'Full verification produces an IPA; focused checks produce evidence only.'
         type: choice
-        options: [full, core, library, frames, playback, original, native, regressions, seek, feedback, presentation, cleanup-regression]
+        options: [full, core, library, frames, playback, original, native, selection, regressions, seek, feedback, presentation, cleanup-regression]
         default: full
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        group: ${{ fromJSON(inputs.verification == 'cleanup-regression' && '["selection","presentation","chrome"]' || inputs.verification == 'presentation' && '["presentation"]' || inputs.verification == 'feedback' && '["feedback","cleanup"]' || inputs.verification == 'seek' && '["seek"]' || inputs.verification == 'native' && '["native"]' || inputs.verification == 'regressions' && '["selection","original"]' || inputs.verification == 'core' && '["core"]' || inputs.verification == 'library' && '["library"]' || inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","library","playback","frames"]') }}
+        group: ${{ fromJSON(inputs.verification == 'selection' && '["selection"]' || inputs.verification == 'cleanup-regression' && '["selection","presentation","chrome"]' || inputs.verification == 'presentation' && '["presentation"]' || inputs.verification == 'feedback' && '["feedback","cleanup"]' || inputs.verification == 'seek' && '["seek"]' || inputs.verification == 'native' && '["native"]' || inputs.verification == 'regressions' && '["selection","original"]' || inputs.verification == 'core' && '["core"]' || inputs.verification == 'library' && '["library"]' || inputs.verification == 'original' && '["original"]' || inputs.verification == 'frames' && '["core","frames"]' || inputs.verification == 'playback' && '["core","playback","original"]' || '["core","library","playback","frames"]') }}
     runs-on: xcode-27
     timeout-minutes: 45
     env:

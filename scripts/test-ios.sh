@@ -118,6 +118,10 @@ phase application-install-start
 # Grant read access on the synthetic simulator library before exercising the real PhotoKit path.
 xcrun simctl install "$simulator_id" build/simulator/Build/Products/Release-iphonesimulator/PhotoPlayer.app
 xcrun simctl privacy "$simulator_id" grant photos io.github.photoplayer.p6a936d329b934a8ba532081564a51c07
+app_container="$(xcrun simctl get_app_container "$simulator_id" io.github.photoplayer.p6a936d329b934a8ba532081564a51c07 app)"
+test -d "$app_container"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_container/Info.plist")" = io.github.photoplayer.p6a936d329b934a8ba532081564a51c07
+printf 'CI_APP_INSTALLATION_VERIFIED %s\n' "$simulator_id" | tee -a build/simulator.log
 
 # Register the UI test host explicitly. Xcode's implicit installation previously
 # reached launch with FrontBoard reporting that this bundle was unknown.

@@ -24,9 +24,10 @@ def app_pids():
 
 
 try:
-    # Resolve the app on this exact simulator before treating absence as valid.
-    subprocess.run(["xcrun", "simctl", "get_app_container", simulator, bundle, "app"],
-                   check=True, stdout=subprocess.DEVNULL, timeout=10)
+    # Installation/identity is verified once in test-ios.sh before any host.
+    # Repeating get_app_container after a completed UI host stalled for 10s in
+    # run 43586949104 even though the case itself passed. Process absence does
+    # not require another installation-service IPC; ps remains independent of AX.
     initial = app_pids()
     print(f"CI_HOST_CLEANUP {label} initial_pids={initial}", flush=True)
     if len(initial) > 1:
