@@ -48,9 +48,12 @@ struct PlayerScreen: View {
                     }.disabled(!model.isReady).accessibilityLabel(model.showsPauseControl ? "Pause" : "Play")
                         .accessibilityIdentifier("playPause").accessibilityValue(model.stateText)
                         .buttonStyle(TrackedPlayerButtonStyle(onPress: { chrome.block(.button("playPause"), active: $0) }))
+                        // Anchor the button itself, then transform it. An
+                        // anchor on the offset modifier measures its unshifted
+                        // layout slot and can place feedback too close above it.
+                        .anchorPreference(key: PlayerButtonBoundsKey.self, value: .bounds) { $0 }
                         .offset(x: (geometry.safeAreaInsets.trailing - geometry.safeAreaInsets.leading) / 2,
                                 y: (geometry.safeAreaInsets.bottom - geometry.safeAreaInsets.top) / 2)
-                        .anchorPreference(key: PlayerButtonBoundsKey.self, value: .bounds) { $0 }
                     VStack(spacing: 0) {
                         header
                         if diagnostics, let selectionTrace {

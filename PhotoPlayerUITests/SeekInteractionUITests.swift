@@ -191,7 +191,12 @@ final class SeekInteractionUITests: XCTestCase {
         XCUIDevice.shared.orientation = orientation
         let surface = app.otherElements.matching(identifier: "videoSurface").firstMatch
         setPosition(app, fraction: 0.5); position(app, near: 15)
+        let playFrame = app.playerButton("playPause").frame
         drag(surface, from: 0.4, to: 0.4 + 1.0 / 6.0, endHold: 0.8)
+        let feedback = app.staticTexts.matching(identifier: "seekPreview").firstMatch
+        XCTAssertTrue(feedback.exists)
+        XCTAssertLessThanOrEqual(feedback.frame.maxY, playFrame.minY - 8,
+                                 "The visible delta must clear the actual play button")
         capture("horizontal-feedback-\(orientation.rawValue)")
         position(app, near: 25)
         state(app, "Paused")
@@ -231,6 +236,12 @@ final class SeekInteractionUITests: XCTestCase {
         XCTAssertEqual(app.playerButton("rateMenu").value as? String, "0.25×")
         app.playerButton("playPause").tap(); state(app, "Paused")
         capture("horizontal-seek-\(orientation.rawValue)")
+        // Release the real player before the next fresh XCTest runner starts
+        // Accessibility. Previously this passing case left its player open.
+        app.playerButton("closePlayer").tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .portrait
+        app.finishTestApplication()
     }
 
     @MainActor private func assertFrames(_ elements: [XCUIElement], _ frames: [CGRect]) {

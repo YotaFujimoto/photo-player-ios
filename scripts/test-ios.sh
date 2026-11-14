@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|cleanup) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 xcrun simctl list devices available --json > build/simulators.json
@@ -230,6 +230,12 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == cleanup ]]; then
+  run_tests build/copy-results/SelectionCleanup.xcresult \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow5SelectionBounds" \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow6SelectionBounds" || test_status=$?
+  exit "$test_status"
+fi
 if [[ "$test_group" == feedback ]]; then
   run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection" || test_status=$?
   run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?

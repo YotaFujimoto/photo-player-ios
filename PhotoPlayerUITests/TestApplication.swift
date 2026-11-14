@@ -13,13 +13,30 @@ func liveUIExpectation(predicate: NSPredicate, object: Any?) -> XCTNSPredicateEx
 
 extension XCUIApplication {
     @MainActor func finishTestApplication(file: StaticString = #filePath, line: UInt = #line) {
+        var backgroundResult = XCTWaiter.Result.completed
+        var observed = state
+        print("CI_APP_CLEANUP initial=\(observed.rawValue)")
         if state == .runningForeground {
             XCUIDevice.shared.press(.home)
-            let background = liveUIExpectation(predicate: NSPredicate(format: "state == %d OR state == %d",
-                Int(State.runningBackground.rawValue), Int(State.runningBackgroundSuspended.rawValue)), object: self)
-            XCTAssertEqual(XCTWaiter.wait(for: [background], timeout: 10), .completed, file: file, line: line)
+            let started = ProcessInfo.processInfo.systemUptime
+            // Read the public enum directly, including an immediate observation;
+            // do not depend on KVC conversion of application.state. Keep the
+            // same background/suspended condition and total ten-second budget.
+            let condition = NSPredicate { _, _ in
+                let current = self.state
+                if current != observed { print("CI_APP_CLEANUP observed=\(current.rawValue)"); observed = current }
+                return current == .runningBackground || current == .runningBackgroundSuspended
+            }
+            if !condition.evaluate(with: nil) {
+                backgroundResult = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: condition, object: nil)],
+                    timeout: max(0, 10 - (ProcessInfo.processInfo.systemUptime - started)))
+            }
         }
+        // Always request termination before an assertion can abort cleanup.
+        // A failed background wait remains a failure, never a silent retry.
         terminate()
+        print("CI_APP_CLEANUP terminated=\(state.rawValue) backgroundResult=\(backgroundResult.rawValue)")
+        XCTAssertEqual(backgroundResult, .completed, "Last pre-termination state: \(observed.rawValue)", file: file, line: line)
         XCTAssertEqual(state, .notRunning, file: file, line: line)
     }
 
