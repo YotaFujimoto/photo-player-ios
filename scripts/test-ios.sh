@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -289,6 +289,13 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == selection-hosts ]]; then
+  for row in 4 5 6; do
+    run_tests "build/copy-results/SelectionRow$row.xcresult" \
+      "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow${row}SelectionBounds" || test_status=$?
+  done
+  exit "$test_status"
+fi
 if [[ "$test_group" == feedback-timing ]]; then
   run_tests build/copy-results/FeedbackNative.xcresult \
     "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests" \
@@ -417,9 +424,23 @@ run_tests build/TestResults.xcresult \
   "-skip-testing:PhotoPlayerUITests/FrameHDRUITests" \
   "-skip-testing:PhotoPlayerUITests/FrameCropUITests" \
   "-skip-testing:PhotoPlayerUITests/SingleTapTests" \
+  "-skip-testing:PhotoPlayerUITests/VideoSelectionTests" \
   "-skip-testing:$geometry_live" "-skip-testing:$geometry_controls" \
   "-skip-testing:PhotoPlayerUITests/InputLifecycleTests" \
   "-skip-testing:PhotoPlayerUITests/PlaybackGestureTests" || test_status=$?
+# Run 43593727416 completed all row-5 tap assertions but exhausted its
+# case budget during teardown in the shared nine-case host; the following
+# row-6 launch then failed in termination. Give selection cases the same
+# independent XCTest session already used for the other library UI cases.
+# Keep all eight cases, physical taps, assertions and 120/180s deadlines.
+for row in 1 2 3 4 5 6; do
+  run_tests "build/copy-results/SelectionRow$row.xcresult" \
+    "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow${row}SelectionBounds" || test_status=$?
+done
+run_tests build/copy-results/SelectionReload.xcresult \
+  "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testScrollReloadAndPendingThumbnailsKeepAssetIdentity" || test_status=$?
+run_tests build/copy-results/SelectionDiagnosticsOff.xcresult \
+  "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testSelectionBoundsWithDiagnosticsOff" || test_status=$?
 # A combined host stalled in XCUIApplication._waitForValidPID before the next
 # test's first input. The app was already foreground, while the runner processed
 # delayed application/AX state. Give each SingleTap case a fresh XCTest session,
