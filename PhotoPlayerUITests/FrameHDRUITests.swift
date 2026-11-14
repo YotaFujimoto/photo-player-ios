@@ -45,6 +45,5 @@ final class FrameHDRUITests: XCTestCase {
         }
         XCTAssertFalse(report.contains("frames-hdr-ui")); XCTAssertFalse(report.contains("file:"))
         app.finishTestApplication()
-        XCTAssertEqual(app.state,.notRunning)
     }
 }

@@ -1,5 +1,13 @@
 # 開発状況
 
+## Build 16: HDR試験に残った旧後始末判定を修正（2026-11-14）
+
+6eeb807 / CI 43586949104は37 XCTest成功・1失敗、加えてホスト後処理2件の失敗。selection 6件成功、chrome 5件成功、presentation 26件成功・HDRの1件失敗だった。2つの後処理失敗はSingleTapLoadingとFrameSaveLandscape後のget_app_containerの10秒超過で、923ba57へ準備時の一度の確認に移す修正を実装し、CI 43588562651でselection 6件を検証中。
+
+HDR試験の失敗は、私の共通後始末変更後にもテスト関数末尾のXCTAssertEqual(app.state,.notRunning)を1か所残した不整合。HDR取得・保存・0.25倍維持・診断コピーの判定までは通過しており、OS／環境原因には分類しない。即時AX状態判定を削除し、他のケースと同じホスト後の実プロセス不在検査へ移す。保存値の機能確認用terminate以外に旧終了判定が残っていないことを検索で確認した。
+
+追加検証はFrameSaveLandscapeとFrameHDRの2件だけ。両方の同じ合成素材を準備時に取り込み、既存の寸法識別・全保存判定をそのまま実行する。今回成功した37件を限定CIで一から繰り返さず、別ブランチのselection検証と合計4VM以下で進める。最終候補の全152件／40ホストは別途同一コミットで照合する。証跡build/evidence-43586949104/limited-results.json、build/failed-43586949104.log。
+
 ## Build 16: 後始末の追加サービス照会を準備時へ移動（2026-11-14）
 
 6eeb807 / 限定CI 43586949104のselectionは6 XCTestすべて成功（Row3 45.547秒、Row4 40.991秒、Row5 40.051秒、Loading 32.292秒、ReturnOff 44.089秒、背景復帰29.209秒）。ただしSingleTapLoadingの試験後に追加したget_app_containerが10秒で時間切れになり、ホスト後始末のゲートで失敗した。機能試験の失敗ではなく、CI全体の合格にも数えない。chrome群5件は成功、presentation群は継続中。

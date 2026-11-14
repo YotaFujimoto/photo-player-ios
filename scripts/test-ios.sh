@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -293,6 +293,18 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == photo-cleanup ]]; then
+  # The two failed cleanup sites, with identical uniquely sized fixtures and
+  # original assertions. Import both before UI hosts; no test is retried.
+  xcrun simctl addmedia "$simulator_id" build/frame-fixtures/frames-ui.mov build/frame-fixtures/frames-hdr-ui.mov
+  fixture_dirty=true
+  expected_videos=$((expected_videos + 2))
+  run_tests build/copy-results/FrameSaveLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameExtractionUITests/testLandscapeControlsStayVisibleAndDoneSavesThenReturnsPaused" || test_status=$?
+  run_tests build/copy-results/FrameHDR.xcresult \
+    "-only-testing:PhotoPlayerUITests/FrameHDRUITests" || test_status=$?
+  exit "$test_status"
+fi
 if [[ "$test_group" == presentation ]]; then
   # Build 16 input and display changes; same cases also run in the final four groups.
   run_tests build/copy-results/PresentationUnit.xcresult \
