@@ -24,13 +24,11 @@ for (const group of groups) {
     throw new Error(`Missing or failed cases: ${group}`);
   }
   cases.push(...completed.map(match => match[1]));
-  hosts += [...log.matchAll(/\*\* TEST EXECUTE SUCCEEDED \*\*/g)].length;
-  if (group === 'playback' || group === 'frames') {
-    const prefix = group === 'frames' ? 'Original' : '';
-    for (const orientation of ['Portrait', 'Landscape']) {
-      const marker = `CI_HOST_CLEANUP verified_not_running ${prefix}SeekBar${orientation}`;
-      if (log.split(marker).length - 1 !== 1) throw new Error(`Missing/repeated process cleanup: ${marker}`);
-    }
+  const completedHosts = [...log.matchAll(/\*\* TEST EXECUTE SUCCEEDED \*\*/g)].length;
+  hosts += completedHosts;
+  const cleanedHosts = [...log.matchAll(/CI_HOST_CLEANUP verified_not_running (\w+)/g)].map(match => match[1]);
+  if (cleanedHosts.length !== completedHosts || new Set(cleanedHosts).size !== completedHosts) {
+    throw new Error(`Missing/repeated process cleanup: ${group} hosts=${completedHosts} cleanup=${cleanedHosts.length}`);
   }
 }
 const actual = new Set(cases);

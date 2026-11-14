@@ -1,4 +1,4 @@
-"""Bounded process cleanup after a single-case bar host, without AX state."""
+"""Bounded process cleanup after every XCTest host, without AX state."""
 import subprocess
 import sys
 import time

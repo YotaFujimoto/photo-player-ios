@@ -12,16 +12,14 @@ func liveUIExpectation(predicate: NSPredicate, object: Any?) -> XCTNSPredicateEx
 }
 
 extension XCUIApplication {
-    @MainActor func finishTestApplication(file: StaticString = #filePath, line: UInt = #line) {
-        // End this test's process directly. An extra Home transition here left
-        // XCTest reporting foreground while the captured screen was already
-        // SpringBoard, after all selection/return assertions had passed.
-        // Actual background/restore behavior remains asserted separately in
-        // InputLifecycle, Fullscreen and PlaybackGesture tests.
-        print("CI_APP_CLEANUP terminate initial=\(state.rawValue)")
-        terminate()
-        print("CI_APP_CLEANUP terminated=\(state.rawValue)")
-        XCTAssertEqual(state, .notRunning, file: file, line: line)
+    @MainActor func finishTestApplication() {
+        // Framework-managed case cleanup does not need another synchronous AX
+        // terminate/state wait. Runs 43580529209 and 43584132886 reached every
+        // functional assertion, then failed that wait in unrelated UI classes.
+        // test-ios.sh verifies actual process absence after EVERY host and
+        // fails CI if cleanup fails. CounterPersistence's in-test restart and
+        // real background/restore assertions remain part of the test itself.
+        print("CI_APP_CLEANUP handoff=framework-and-host-process-verification")
     }
 
     @MainActor static func photoPlayerForTesting() -> XCUIApplication {

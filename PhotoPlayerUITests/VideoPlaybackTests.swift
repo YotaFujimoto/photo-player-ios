@@ -77,8 +77,13 @@ final class VideoPlaybackTests: XCTestCase {
         XCTAssertTrue(app.buttons["playPause"].isHittable)
         screenshot("video-landscape-seek")
         app.buttons["closePlayer"].tap()
-        XCUIDevice.shared.orientation = .portrait
+        // Observe the real dismissal before a separate rotation. Run
+        // 43584132886 waited 60s for animation idle when those transitions
+        // overlapped; all predicates still passed at 119.282s of the 120s cap.
+        // Keep the same close deadline and assert the list after rotation too.
         XCTAssertTrue(card.waitForExistence(timeout: 10))
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(card.exists)
         XCTAssertFalse(app.buttons["playPause"].exists)
     }
 

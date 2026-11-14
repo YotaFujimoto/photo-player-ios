@@ -44,7 +44,7 @@ final class FrameHDRUITests: XCTestCase {
             XCTAssertTrue(report.contains(value),"Missing \(value) in anonymous diagnostics")
         }
         XCTAssertFalse(report.contains("frames-hdr-ui")); XCTAssertFalse(report.contains("file:"))
-        app.terminate()
+        app.finishTestApplication()
         XCTAssertEqual(app.state,.notRunning)
     }
 }

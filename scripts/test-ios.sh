@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|cleanup|presentation) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -202,18 +202,14 @@ PY
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi
-  # These bar cases complete their real close/list assertions inside XCTest.
-  # Check process absence independently after the single-case result rather
-  # than waiting for AX termination notifications within its function deadline.
-  # Preserve any test failure; a cleanup failure also fails this host/job.
-  case "$(basename "$result_bundle" .xcresult)" in
-    SeekBarPortrait|SeekBarLandscape|OriginalSeekBarPortrait|OriginalSeekBarLandscape)
-      if [[ "$host_status" -eq 0 ]]; then
-        python3 scripts/finish-simulator-app.py "$simulator_id" "$(basename "$result_bundle" .xcresult)" \
-          2>&1 | tee -a build/test.log || host_status=$?
-      fi
-      ;;
-  esac
+  # Functional close/list/background/relaunch assertions remain in XCTest.
+  # Check real process absence after every native/UI host instead of relying
+  # on an additional synchronous AX termination notification inside a case.
+  # Keep failures fatal and retain the original failed-host evidence.
+  if [[ "$host_status" -eq 0 ]]; then
+    python3 scripts/finish-simulator-app.py "$simulator_id" "$(basename "$result_bundle" .xcresult)" \
+      2>&1 | tee -a build/test.log || host_status=$?
+  fi
   return "$host_status"
 }
 
@@ -311,11 +307,15 @@ if [[ "$test_group" == cleanup ]]; then
     "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow6SelectionBounds" || test_status=$?
   exit "$test_status"
 fi
-if [[ "$test_group" == feedback ]]; then
+if [[ "$test_group" == feedback || "$test_group" == chrome ]]; then
   run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?
   run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection" || test_status=$?
   run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?
   run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls" || test_status=$?
+  if [[ "$test_group" == chrome ]]; then
+    run_tests build/copy-results/PlaybackSeek.xcresult "-only-testing:PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRateAndSeek" || test_status=$?
+    exit "$test_status"
+  fi
   run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait" || test_status=$?
   run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape" || test_status=$?
   run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
