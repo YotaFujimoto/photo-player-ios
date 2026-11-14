@@ -1,5 +1,13 @@
 # 検証方法と結果
 
+## 3791db7全件候補: 長GOPの完了待ち失敗
+
+[CI 43539085406](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43539085406) attempt 1の写真群は早期停止2.512秒・素材識別0.014秒が成功、製品View付きケース30.255秒で15秒のシーク完了条件を満たさず失敗。初期停止位置4.272505209秒、最初の要求後のAVPlayer実測7.5秒、最新要求15秒、seeking=true。callbackログをネイティブ起動へ付けていなかったため、通知前／MainActor処理前の切り分けは未確定。失敗後のInvalidTransitionも別に保持する。写真／クロップの9件は未実行であり、除外・合格にはしない。証跡build/evidence-43539085406/frames/とbuild/frames-43539085406.log。
+
+生存中のapp／scene／window／レイヤーは可視・active。スピンダンプのシンボル欠落や背景優先度スレッドの長いrunnable記録だけで環境原因とは断定しない。native限定3件へ既存の要求／callback／完了ログを追加し、sampleでシンボル付きスタックを優先する。試験のメニュー終了準備は、関係のnilだけでなく実際のViewのwindow離脱まで確認する。元の15秒期限・実測精度・全判定は維持し、同条件の成功待ち再実行にはしない。根本原因は未確定。
+
+逐次要求は[Apple QA1820](https://developer.apple.com/library/archive/qa/qa1820/_index.html)と再照合済み。テストだけの起動引数は[XcodeGenのscheme仕様](https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md)で設定し、配布IPAへは含めない。
+
 ## Build 15限定表示・終了試験の成功（2026-11-14）
 
 [CI 43537252369](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43537252369) / 3d478cd12b4518334da78ad062f7bebd62af949e / attempt 1は8/8成功・7ホスト、feedbackとcleanupの2標準VM。表示6件は54.736／62.929／46.248／52.503／52.065／43.807秒、一覧Row5／Row6は51.071／37.547秒。縦横の実frameでHUDと再生ボタンの間隔8pt以上を確認し、スクリーンショットでも重なりなし。中央ボタン・動画のサイズ／位置は変更していない。終了時はstate 4→3→1、背景待機completedを確認。以前のdyld／AX初期化停止と背景待機の失敗は履歴を保持し、今回の成功で内部原因確定や完全安定とはしない。

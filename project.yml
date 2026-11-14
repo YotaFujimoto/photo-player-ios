@@ -78,6 +78,11 @@ schemes:
       debugEnabled: false
       gatherCoverageData: false
       preferredScreenCaptureFormat: screenshots
+      # Include callback-arrival and MainActor seek traces in native tests too.
+      # These launch arguments do not enter the archived application.
+      shouldUseLaunchSchemeArgsEnv: false
+      commandLineArguments:
+        "--playback-diagnostics": true
       environmentVariables:
         OS_ACTIVITY_MODE: disable
       targets:

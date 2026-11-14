@@ -43,9 +43,22 @@ with open(source) as stream:
                     if not pid.isdigit() or int(pid) <= 1:
                         raise ValueError("Invalid capture process")
                     print(f"\nSTACK PhotoPlayer pid={pid}", file=log, flush=True)
-                    stack = destination.with_name(destination.stem + f"-{pid}-spindump.log")
-                    subprocess.run(["sudo", "-n", "spindump", pid, "1", "10", "-onlyTarget", "-file", str(stack)], stdout=log,
-                                   stderr=subprocess.STDOUT, timeout=45, check=False)
+                    # The last privileged spindump could not resolve the
+                    # simulator's shared cache or XCTest images. sample runs
+                    # as the same user as this owned test process and resolves
+                    # its loaded images; keep the old stackshot as a fallback.
+                    stack = destination.with_name(destination.stem + f"-{pid}-sample.log")
+                    try:
+                        sampled = subprocess.run(["sample", pid, "1", "10", "-file", str(stack)], stdout=log,
+                                                 stderr=subprocess.STDOUT, timeout=8, check=False)
+                        captured = sampled.returncode == 0
+                    except subprocess.TimeoutExpired:
+                        captured = False
+                        print("sample exceeded capture budget", file=log, flush=True)
+                    if not captured:
+                        stack = destination.with_name(destination.stem + f"-{pid}-spindump.log")
+                        subprocess.run(["sudo", "-n", "spindump", pid, "1", "10", "-onlyTarget", "-file", str(stack)], stdout=log,
+                                       stderr=subprocess.STDOUT, timeout=45, check=False)
                 # An app's output-queue wait alone cannot distinguish a hidden
                 # layer from a stopped compositor/media service. Capture these
                 # services once too, without changing or restarting any process.

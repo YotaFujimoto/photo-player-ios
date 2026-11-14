@@ -116,9 +116,14 @@ final class LongGOPFixtureTests: XCTestCase {
             guard let presented = controller.presentedViewController else { return false }
             return !presented.isBeingPresented && presented.view.window != nil
         }
+        let menu = try XCTUnwrap(controller.presentedViewController)
         model.setRate(0.25)
         ratePresentation.visible = false
-        try await ready { controller.presentedViewController == nil }
+        // A cleared presentation relationship alone does not prove that the
+        // outgoing popover has left the window. Complete this test setup at
+        // actual view detachment, without a fixed post-dismissal delay.
+        try await ready { controller.presentedViewController == nil && menu.view.window == nil }
+        print("CI_NATIVE_MENU dismissed=true detached=\(menu.view.window == nil) transition=\(controller.transitionCoordinator != nil)")
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
         let surface = try XCTUnwrap(findSurface(in: controller.view))

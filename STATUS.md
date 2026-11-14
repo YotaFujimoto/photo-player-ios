@@ -1,5 +1,13 @@
 # 開発状況
 
+## Build 15: 全件候補の長GOP完了待ちを再調査（2026-11-14）
+
+3791db72d2ef1d2d08c2b9d00d704e4171a8cf3f / [CI 43539085406](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43539085406)の写真群が、既存LongGOPFixtureTestsの製品View付き試験で失敗。最初のシーク実測は7.5秒へ動いたが、15秒以内に要求列が完了しなかった。先行する早期停止・素材識別は成功。写真／クロップUIは未到達であり、同run全体は不合格。基本群は成功し、他群は結果回収まで継続する。IPAはBuild 14のまま。
+
+失敗時はapp／scene active・key window・全祖先可視・レイヤーアニメーションなし。特権spindumpはシミュレーター／XCTestのシンボルが解決できず、完了通知の到着前かMainActor処理前かを断定できない。Apple QA1820に沿う既存の逐次シークとゼロ許容精度は維持する。次のnative限定3件では既存の起動引数で要求／callback到着／処理完了のログを有効にし、同一ユーザーのsampleを優先してスタックを取得する。
+
+試験準備も監査し、popoverのpresentedViewControllerがnilだけでなく、保持した旧メニューViewがwindowから外れたことを条件にしてから入力する。固定待ち・期限延長・製品の再シークは追加しない。この準備条件の不足が過去の停止原因と確定したわけではない。今回の時刻欄による取消機構と、この既存のAVPlayer完了待ちは区別する。
+
 ## Build 15最終候補の全件検証へ（2026-11-14）
 
 [限定CI 43537252369](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43537252369) / 3d478cd12b4518334da78ad062f7bebd62af949e / attempt 1は8/8成功・7ホスト。表示6件と一覧終了2件を2標準VMで検証した。横スワイプの縦横画像で差分と中央再生ボタンが離れ、実画面frameで8pt以上の判定も成功。中央ボタンと映像の位置・大きさは維持した。終了時はforeground→background→notRunningを観測した。過去のAX起動停止や背景待ちの内部原因確定とはしない。
