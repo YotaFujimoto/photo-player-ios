@@ -43,13 +43,13 @@ with open(source) as stream:
                     if not pid.isdigit() or int(pid) <= 1:
                         raise ValueError("Invalid capture process")
                     print(f"\nSTACK PhotoPlayer pid={pid}", file=log, flush=True)
-                    # The last privileged spindump could not resolve the
-                    # simulator's shared cache or XCTest images. sample runs
-                    # as the same user as this owned test process and resolves
-                    # its loaded images; keep the old stackshot as a fallback.
+                    # Unprivileged sample produced no output before its budget
+                    # expired, whereas the privileged service sample captured
+                    # stacks. Request the same noninteractive privilege for
+                    # this owned simulator app; retain the stackshot fallback.
                     stack = destination.with_name(destination.stem + f"-{pid}-sample.log")
                     try:
-                        sampled = subprocess.run(["sample", pid, "1", "10", "-file", str(stack)], stdout=log,
+                        sampled = subprocess.run(["sudo", "-n", "sample", pid, "1", "10", "-file", str(stack)], stdout=log,
                                                  stderr=subprocess.STDOUT, timeout=8, check=False)
                         captured = sampled.returncode == 0
                     except subprocess.TimeoutExpired:

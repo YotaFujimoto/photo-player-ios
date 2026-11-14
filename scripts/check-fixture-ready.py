@@ -30,14 +30,34 @@ def finish_probe(lines):
         time.sleep(0.1)
     raise TimeoutError("Fixture helper did not exit after host acknowledgement")
 
-try:
-    subprocess.run(
-        ["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle,
-         "--expected-videos", expected, "--result-token", token], check=True, timeout=45
-    )
-except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+def report_launch_failure(error):
+    print(f"FIXTURE_LAUNCH_FAILED {type(error).__name__} entryRecorded={result.exists()}", flush=True)
     if result.exists():
         print(result.read_text(), end="", flush=True)
+    # The previous launch timeout raised before collecting any service state.
+    # Read evidence only: do not launch again or accept an older probe result.
+    for command in (
+        ["xcrun", "simctl", "list", "devices", "--json"],
+        ["xcrun", "simctl", "spawn", simulator, "log", "show", "--style", "compact", "--last", "2m",
+         "--predicate", 'process == "FixtureReadiness" OR eventMessage CONTAINS "ci-fixture-readiness"'],
+    ):
+        try:
+            subprocess.run(command, timeout=15, check=False)
+        except (OSError, subprocess.TimeoutExpired) as diagnostic_error:
+            print(f"FIXTURE_LAUNCH_EVIDENCE {type(diagnostic_error).__name__}", flush=True)
+
+try:
+    print("FIXTURE_LAUNCH_REQUESTED", flush=True)
+    subprocess.run(
+        # The helper is freshly installed, or its exact previous PID has been
+        # acknowledged and observed to exit by finish_probe(). There is no old
+        # process to terminate; do not request an extra FrontBoard transaction.
+        ["xcrun", "simctl", "launch", simulator, bundle,
+         "--expected-videos", expected, "--result-token", token], check=True, timeout=45
+    )
+    print("FIXTURE_LAUNCH_RETURNED", flush=True)
+except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+    report_launch_failure(error)
     raise
 # Console attachment can miss output from an app that exits during launch.
 # Observe the atomic result instead, with one launch and a bounded condition.

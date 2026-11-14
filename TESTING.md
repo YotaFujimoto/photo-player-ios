@@ -1,5 +1,11 @@
 # 検証方法と結果
 
+## Build 15: 最新の失敗範囲と採取不足
+
+fc88703 / CI 43541975372の確定結果は148成功・1失敗・1未実行。基本104/105、一覧21/21、通常再生12/12、写真11/12。未実行はFullscreenCanvasのdestination探索。失敗はOriginalSeekBarPortraitで、最初の7.5秒要求後のcallback記録なし、後続22.5／15秒は待機列、実測は7.5秒。15秒のPaused判定で失敗した。native長GOP3件・横バー・写真保存／クロップ6件は成功した。同一run全件成功ではないためIPAは作成しない。証跡build/evidence-43541975372/、アプリ記録build/decoded-43541975372-original-portrait/diagnostic-6.txt。sampleは採取時間切れでappスタックがなく、原因未確定。次の採取は、取得できたサービスと同じ非対話特権を所有appへ適用する。
+
+ef506e6 / CI 43543821044は試験0件、補助アプリ起動の45秒期限で失敗。入口ファイルなし。製品アプリや新manifestによるテストは未到達。証跡build/evidence-43543821044/core/。launch失敗の経路でも端末状態と対象補助アプリのシステム記録を保存する。前回PIDが退出したことを既に確認しているため、次回launchの不要な強制終了オプションを外す。再試行、固定待ち、期限拡大、素材確認の削除は行わない。過去の起動失敗を解決済みとは扱わない。
+
 ## fc88703全件候補: destination探索で1件未実行
 
 [CI 43541975372](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43541975372)の基本群は101単体が成功後、FullscreenCanvasのxcodebuildが01:48:11 UTCに開始し、01:49:29に実端末候補なしで終了。60秒のdestination期限で試験本文へ未到達。同じUUIDの後続Chrome／Menu／Lifecycleは60.490／56.265／73.154秒で成功し、基本104成功・1未実行。この失敗をシーク・起動後のAX失敗と混同しない。証跡build/evidence-43541975372/core/とbuild/core-43541975372.log。
