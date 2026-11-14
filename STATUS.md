@@ -1,5 +1,13 @@
 # 開発状況
 
+## Build 15: 再開後の全件結果と計測干渉の切り分け（2026-11-14）
+
+6f9ac325c88e66b0e6b078116a4ce47e6a2ff839 / [CI 43552699581](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43552699581) attempt 1は148成功・2失敗、全150件実行。基本105・一覧21・通常再生12は成功、写真群10成功・2失敗。長GOPの通常再生39.579秒と縦バー41.645秒でシーク完了状態待ちが失敗し、native3件・横バー・写真保存／クロップ6件は成功。未署名IPAは作成されず、distはBuild 14を保持。
+
+コード監査で、VideoPlaybackTestsは通常のSeekingを観測した最初の時点でCI_CAPTURE_SEEK_WAITを出し、外部watcherが直ちにsudo sampleを実行していたことを確認。今回もsampleの8秒予算を超えspindumpへ進み、10秒のシーク判定と重なった。これは出力待ちの根本原因の確定ではないが、試験中の重い計測が判定へ干渉する交絡条件である。
+
+通常検証では外部live profilerを起動せず、アプリログ・時刻・元の全判定・期限・精度を維持する。native／UIの出力は残し、失敗後のシステムログ採取も残す。live stack採取はCAPTURE_LIVE_STACKS=1の明示的な診断時だけとする。製品コードへの遅延、再シーク、layer切断、許容値変更は追加しない。限定original8件で比較し、同条件の成功待ち再実行は行わない。過去の失敗は保持する。
+
 ## 一時中断: Windows更新・再起動（2026-11-14、本人指示）
 
 作業を一時中断した。GitHub上の[全件CI 43552699581](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43552699581) attempt 1は中断時点で4群とも実行中。実装・試験対象コミットは6f9ac325c88e66b0e6b078116a4ce47e6a2ff839、mainへpush済み。リモートCIは中止せず継続させ、ローカルgh run watchだけを停止した。状態スナップショットはbuild/run-43552699581-pause.json。新しいCIの起動や同条件の再試行は行っていない。
