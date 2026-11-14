@@ -144,7 +144,9 @@ final class LongGOPFixtureTests: XCTestCase {
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
-        for target in [7.5, 22.5, 15.0] {
+        // Rebinding must also retain a displayable image at the exact end,
+        // then permit a return to the beginning without starting playback.
+        for target in [7.5, 22.5, 15.0, model.duration, 0.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
             try await ready(seeking: true) { !model.isSeeking }
             print("LongGOP production view completed \(target) measured=\(model.player.currentTime().seconds)")
