@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup) ;; *) exit 2 ;; esac
+case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -289,6 +289,14 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == feedback-timing ]]; then
+  run_tests build/copy-results/FeedbackNative.xcresult \
+    "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests" \
+    "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testHorizontalPreviewCommitsOnceAndCancelRetainsOriginAndRate" || test_status=$?
+  run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionPortrait" || test_status=$?
+  run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape" || test_status=$?
+  exit "$test_status"
+fi
 if [[ "$test_group" == photo-cleanup ]]; then
   # The two failed cleanup sites, with identical uniquely sized fixtures and
   # original assertions. Import both before UI hosts; no test is retried.
@@ -416,7 +424,7 @@ run_tests build/TestResults.xcresult \
 # test's first input. The app was already foreground, while the runner processed
 # delayed application/AX state. Give each SingleTap case a fresh XCTest session,
 # as for the existing copy/geometry/gesture cases; keep every input, assertion
-# and deadline. Selection cases explicitly terminate their app after assertions.
+# and deadline. Each selection case starts a new application instance with launch().
 run_tests build/copy-results/SingleTapLoading.xcresult \
   "-only-testing:PhotoPlayerUITests/SingleTapTests/testOneTapPresentsVisibleLoadingBeforePhotoKitCompletes" || test_status=$?
 run_tests build/copy-results/SingleTapReturnOff.xcresult \

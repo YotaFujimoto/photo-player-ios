@@ -211,7 +211,12 @@ final class PlaybackLifecycleTests: XCTestCase {
             model.skip(forward: true)
             XCTAssertNil(model.skipFeedback)
             model.endHorizontalSeek()
+            let feedback = try XCTUnwrap(model.horizontalFeedback)
+            XCTAssertEqual(feedback.origin, origin, accuracy: 0.01)
+            XCTAssertEqual(feedback.target, origin + 10, accuracy: 0.01)
             model.endHorizontalSeek() // A late duplicate release has no effect.
+            XCTAssertEqual(model.horizontalFeedback?.target, feedback.target)
+            try await wait(timeout: 2) { model.horizontalFeedback == nil }
             try await wait { !model.isSeeking }
             if playing { try await wait { model.player.timeControlStatus == .playing } }
             XCTAssertEqual(model.player.currentTime().seconds, origin + 10, accuracy: 0.25)
@@ -312,11 +317,11 @@ final class PlaybackLifecycleTests: XCTestCase {
         XCTAssertEqual(model.player.rate, 0, file: file, line: line)
     }
 
-    @MainActor private func wait(_ condition: () -> Bool) async throws {
-        let deadline = ProcessInfo.processInfo.systemUptime + 15
+    @MainActor private func wait(timeout: TimeInterval = 15, _ condition: () -> Bool) async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
         while !condition() {
             if ProcessInfo.processInfo.systemUptime >= deadline {
-                XCTFail("AVPlayer did not reach the expected state within 15 seconds")
+                XCTFail("Playback did not reach the expected state within \(timeout) seconds")
                 throw CancellationError()
             }
             try await Task.sleep(for: .milliseconds(20))
