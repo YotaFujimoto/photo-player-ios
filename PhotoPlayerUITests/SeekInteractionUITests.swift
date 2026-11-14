@@ -124,7 +124,12 @@ final class SeekInteractionUITests: XCTestCase {
         app.playerButton("closePlayer").tap()
         XCTAssertTrue(app.buttons.matching(identifier: "videoCard.1").firstMatch.waitForExistence(timeout: 10))
         XCUIDevice.shared.orientation = .portrait
-        app.finishTestApplication()
+        // This single-case host hands process cleanup to test-ios.sh. In run
+        // 43580529209 the simulator reported SIGTERM/death, but XCTest kept
+        // waiting on a stale running/AX notification until the case timed out.
+        // Keep every UI assertion here; verify process absence on the host
+        // after the result is finalized, without another application action.
+        print("CI_APP_CLEANUP handoff=host-process-verification")
     }
 
     @MainActor func testLoadingErrorAndSeekOverlaysNeverMoveNormalControls() {

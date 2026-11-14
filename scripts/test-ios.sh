@@ -202,6 +202,18 @@ PY
   if [[ "$host_status" -ne 0 ]]; then
     python3 scripts/collect-simulator-failure.py "$simulator_id" "$result_bundle" || true
   fi
+  # These bar cases complete their real close/list assertions inside XCTest.
+  # Check process absence independently after the single-case result rather
+  # than waiting for AX termination notifications within its function deadline.
+  # Preserve any test failure; a cleanup failure also fails this host/job.
+  case "$(basename "$result_bundle" .xcresult)" in
+    SeekBarPortrait|SeekBarLandscape|OriginalSeekBarPortrait|OriginalSeekBarLandscape)
+      if [[ "$host_status" -eq 0 ]]; then
+        python3 scripts/finish-simulator-app.py "$simulator_id" "$(basename "$result_bundle" .xcresult)" \
+          2>&1 | tee -a build/test.log || host_status=$?
+      fi
+      ;;
+  esac
   return "$host_status"
 }
 

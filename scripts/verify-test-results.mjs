@@ -16,7 +16,7 @@ const cases = [];
 let hosts = 0;
 for (const group of groups) {
   const log = fs.readFileSync(path.join(directory, `results-${group}.log`), 'utf8');
-  if (/TEST EXECUTE FAILED|Restarting after unexpected|exceeded execution time|Timed out while/.test(log)) {
+  if (/TEST EXECUTE FAILED|Restarting after unexpected|exceeded execution time|Timed out while|CI_HOST_CLEANUP_FAILED/.test(log)) {
     throw new Error(`Failed or incomplete test host: ${group}`);
   }
   const completed = [...log.matchAll(/Test Case '-\[(.*?)\]' (passed|failed) \((.*?) seconds\)\./g)];
@@ -25,6 +25,13 @@ for (const group of groups) {
   }
   cases.push(...completed.map(match => match[1]));
   hosts += [...log.matchAll(/\*\* TEST EXECUTE SUCCEEDED \*\*/g)].length;
+  if (group === 'playback' || group === 'frames') {
+    const prefix = group === 'frames' ? 'Original' : '';
+    for (const orientation of ['Portrait', 'Landscape']) {
+      const marker = `CI_HOST_CLEANUP verified_not_running ${prefix}SeekBar${orientation}`;
+      if (log.split(marker).length - 1 !== 1) throw new Error(`Missing/repeated process cleanup: ${marker}`);
+    }
+  }
 }
 const actual = new Set(cases);
 const missing = expected.filter(name => !actual.has(name));
