@@ -139,6 +139,8 @@ final class LongGOPFixtureTests: XCTestCase {
         try await ready(seeking: true, onSlowSeek: {
             self.describeOutput(surface, model: model, phase: "waiting-seek")
         }) { !model.isSeeking }
+        try await ready { surface.playerLayer.isReadyForDisplay }
+        XCTAssertTrue(surface.playerLayer.player === model.player)
         XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
@@ -146,6 +148,8 @@ final class LongGOPFixtureTests: XCTestCase {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
             try await ready(seeking: true) { !model.isSeeking }
             print("LongGOP production view completed \(target) measured=\(model.player.currentTime().seconds)")
+            try await ready { surface.playerLayer.isReadyForDisplay }
+            XCTAssertTrue(surface.playerLayer.player === model.player)
             XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
             XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
             XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)

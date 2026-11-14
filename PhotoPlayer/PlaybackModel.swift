@@ -58,8 +58,14 @@ final class PlaybackModel: ObservableObject {
     private var audioActive = false
     private var audioActivating = false
     private var audioRequest = UUID()
+    private weak var videoOutput: AVPlayerLayer?
 
     init(asset: PHAsset) { self.asset = asset }
+
+    func connectVideoOutput(_ layer: AVPlayerLayer) {
+        videoOutput = layer
+        if layer.player !== player { layer.player = player }
+    }
 
     private func assign<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<PlaybackModel, Value>, _ value: Value) {
         if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
@@ -458,6 +464,18 @@ final class PlaybackModel: ObservableObject {
         trace("seek start \(request.seconds), exact=\(request.exact)")
         let diagnostics = ProcessInfo.processInfo.arguments.contains("--playback-diagnostics")
         let tolerance = request.exact ? CMTime.zero : CMTime(seconds: 0.15, preferredTimescale: 600)
+        // A paused long-GOP output can retain a full presentation queue while
+        // the player's time has already advanced to the requested destination.
+        // The isolated AVPlayer comparison completed only after refreshing its
+        // output attachment. Keep the item, precision and single seek request;
+        // update the same layer atomically, without a timer or a second seek.
+        // A dismantled surface has player == nil and must not be reattached.
+        let output = videoOutput.flatMap { $0.player === player ? $0 : nil }
+        if let output {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            output.player = nil
+        }
         player.seek(to: CMTime(seconds: request.seconds, preferredTimescale: request.timescale), toleranceBefore: tolerance, toleranceAfter: tolerance) {
             @Sendable [weak self] finished in
             if diagnostics { print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) seek callback received finished=\(finished)") }
@@ -477,6 +495,10 @@ final class PlaybackModel: ObservableObject {
                     self.trace("seek completed=\(finished)")
                 }
             }
+        }
+        if let output {
+            output.player = player
+            CATransaction.commit()
         }
     }
 

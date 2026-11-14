@@ -152,7 +152,7 @@ struct PlayerSurface: UIViewRepresentable {
     var onInteractionChanged: (Bool) -> Void = { _ in }
     func makeUIView(context: Context) -> VideoGestureView {
         let view = VideoGestureView()
-        view.playerLayer.player = model.player
+        model.connectVideoOutput(view.playerLayer)
         view.onHoldBegan = { [weak model] in model?.beginTemporaryDoubleRate() }
         view.onHoldEnded = { [weak model] in model?.endTemporaryDoubleRate() }
         view.onSwipeBegan = { [weak model] in model?.beginHorizontalSeek() ?? false }
@@ -167,7 +167,7 @@ struct PlayerSurface: UIViewRepresentable {
         view.onInteractionChanged = onInteractionChanged
         if view.singleTap.isEnabled != fullscreen { view.singleTap.isEnabled = fullscreen }
         view.accessibilityValue = model.stateText
-        if view.playerLayer.player !== model.player { view.playerLayer.player = model.player }
+        model.connectVideoOutput(view.playerLayer)
         if view.cancellationID != model.gestureCancellationID {
             view.cancellationID = model.gestureCancellationID
             view.cancelGestures()
