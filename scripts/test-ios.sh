@@ -7,8 +7,14 @@ test_group="${TEST_GROUP:-full}"
 case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|cleanup|presentation) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
+# Do not reuse the runner image's pre-created, Watch-paired phone. In run
+# 43574459807 its Watch runtime became unavailable while Xcode lost the phone
+# destination even though simctl still reported Booted/available. A separate
+# host timed out in crash-reporter synchronization after all assertions passed.
+# Isolate the device configuration (not the test result) on every fresh VM;
+# keep the same runtime/model, one booted phone, every case and every deadline.
 xcrun simctl list devices available --json > build/simulators.json
-simulator_id="$(python3 -c '
+simulator_type="$(python3 -c '
 import json, os, sys
 with open("build/simulators.json") as source:
     devices = json.load(source)["devices"]
@@ -17,8 +23,21 @@ phones = [d for d in devices.get(runtime, [])
           if d["isAvailable"] and d["name"] == os.environ["SIMULATOR_MODEL"]]
 if not phones:
     sys.exit("Pinned stable iPhone simulator is not available")
-print(phones[0]["udid"])
+if any(d["state"] == "Booted" for group in devices.values() for d in group):
+    sys.exit("Expected no booted simulator before CI device creation")
+print(phones[0]["deviceTypeIdentifier"])
 ')"
+simulator_runtime="com.apple.CoreSimulator.SimRuntime.iOS-${SIMULATOR_OS//./-}"
+simulator_id="$(xcrun simctl create "PhotoPlayer CI ${test_group}" "$simulator_type" "$simulator_runtime")"
+xcrun simctl list pairs --json > build/simulator-pairs.json
+python3 - "$simulator_id" <<'PY'
+import json, sys
+with open("build/simulator-pairs.json") as source:
+    pairs = json.load(source)["pairs"]
+if sys.argv[1] in json.dumps(pairs):
+    sys.exit("CI phone must not be paired with a Watch")
+print("CI_SIMULATOR_ISOLATION unpaired", sys.argv[1])
+PY
 printf 'Simulator: %s / iOS %s / %s\n' "$SIMULATOR_MODEL" "$SIMULATOR_OS" "$simulator_id" | tee build/simulator.log
 
 # Export screenshots on test failure too, without losing the original failure status.
@@ -281,6 +300,7 @@ if [[ "$test_group" == cleanup ]]; then
   exit "$test_status"
 fi
 if [[ "$test_group" == feedback ]]; then
+  run_tests build/copy-results/FullscreenCanvas.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testLandscapeCanvasSafeControlsAndPortraitPreserved" || test_status=$?
   run_tests build/copy-results/FullscreenMenu.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testSpeedMenuPinsControlsThroughPressAndSelection" || test_status=$?
   run_tests build/copy-results/FullscreenLifecycle.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testHiddenSwipeHeldRateBarAndLifecycleCleanup" || test_status=$?
   run_tests build/copy-results/FullscreenChrome.xcresult "-only-testing:PhotoPlayerUITests/FullscreenUITests/testAutoHideSingleDoubleTapAndPausedControls" || test_status=$?
