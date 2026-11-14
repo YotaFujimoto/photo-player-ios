@@ -9,9 +9,7 @@ private struct MediaGlass: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                // Diagnostic branch only: isolate backdrop sampling from the
-                // same media/gesture/layout path. Never distribute this view.
-                // .glassEffect(.clear, in: Capsule())
+                .glassEffect(.clear, in: Capsule())
                 .background(.black.opacity(reduceTransparency ? 0.85 : contrast == .increased ? 0.55 : feedback ? 0.18 : 0.35), in: Capsule())
         } else {
             content.background(reduceTransparency ? .black : .black.opacity(0.55), in: Capsule())

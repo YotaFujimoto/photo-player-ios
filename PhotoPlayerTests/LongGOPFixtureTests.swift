@@ -30,13 +30,15 @@ final class LongGOPFixtureTests: XCTestCase {
         controller.view.layer.addSublayer(layer)
         defer { model.close(); layer.player = nil; window.isHidden = true; previous?.makeKey() }
         model.load()
-        try await ready { model.player.timeControlStatus == .playing }
-        // Pause at the first Playing observation, without waiting for the
-        // control timer or a minimum playback time. Preserve that regression
-        // condition independently of XCTest's accessibility startup latency.
+        // Diagnostic branch only: compare the plain UIKit layer under the
+        // same playback/paused-idle precondition as the failing SwiftUI case.
+        // Restore the established early-pause regression before release.
+        try await ready { model.player.timeControlStatus == .playing && model.player.currentTime().seconds >= 4.25 }
         model.pause(); model.setRate(0.25)
         let earlyPosition = model.player.currentTime().seconds
-        print("LongGOP early pause at \(earlyPosition)")
+        try await Task.sleep(for: .seconds(6))
+        XCTAssertEqual(model.player.currentTime().seconds, earlyPosition, accuracy: 0.001)
+        print("LongGOP diagnostic plain layer after playback pause at \(earlyPosition)")
         for target in [7.5, 22.5, 15.0] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
         }
