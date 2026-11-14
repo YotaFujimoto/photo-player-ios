@@ -13,21 +13,7 @@ final class LongGOPFixtureTests: XCTestCase {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let asset = try XCTUnwrap(PHAsset.fetchAssets(with: .video, options: options).firstObject)
-        // Diagnostic branch only. Use PhotoKit + AVPlayer directly, without
-        // PlaybackModel, its observers, intent state or seek queue.
-        let optionsForVideo = PHVideoRequestOptions()
-        optionsForVideo.version = .current
-        optionsForVideo.deliveryMode = .highQualityFormat
-        let loadedItem: AVPlayerItem? = await withCheckedContinuation { continuation in
-            PHImageManager.default().requestPlayerItem(forVideo: asset, options: optionsForVideo) { item, _ in
-                continuation.resume(returning: item)
-            }
-        }
-        let item = try XCTUnwrap(loadedItem)
-        item.audioTimePitchAlgorithm = .spectral
-        let player = AVPlayer(playerItem: item)
-        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-        try AVAudioSession.sharedInstance().setActive(true)
+        let model = PlaybackModel(asset: asset)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
@@ -37,34 +23,33 @@ final class LongGOPFixtureTests: XCTestCase {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
-        let layer = AVPlayerLayer() // Diagnostic: same visible layer, no AVPlayer attachment.
+        let layer = AVPlayerLayer(player: model.player)
         layer.frame = controller.view.bounds
         XCTAssertGreaterThan(layer.bounds.width, 0)
         XCTAssertGreaterThan(layer.bounds.height, 0)
         controller.view.layer.addSublayer(layer)
-        defer {
-            player.pause(); player.replaceCurrentItem(with: nil); layer.player = nil
-            window.isHidden = true; previous?.makeKey()
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        }
-        player.play()
-        try await ready { player.timeControlStatus == .playing && player.currentTime().seconds >= 4.25 }
-        player.pause()
-        let pausedPosition = player.currentTime().seconds
-        try await Task.sleep(for: .seconds(6))
-        XCTAssertEqual(player.currentTime().seconds, pausedPosition, accuracy: 0.001)
-        print("CI_RAW_PLAYER paused=\(pausedPosition) status=\(item.status.rawValue)")
+        defer { model.close(); layer.player = nil; window.isHidden = true; previous?.makeKey() }
+        model.load()
+        try await ready { model.player.timeControlStatus == .playing }
+        // Pause at the first Playing observation, without waiting for the
+        // control timer or a minimum playback time. Preserve that regression
+        // condition independently of XCTest's accessibility startup latency.
+        model.pause(); model.setRate(0.25)
+        let earlyPosition = model.player.currentTime().seconds
+        print("LongGOP early pause at \(earlyPosition)")
         for target in [7.5, 22.5, 15.0] {
-            let result = RawSeekResult()
-            print("CI_RAW_PLAYER seek=\(target)")
-            player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
-                print("CI_RAW_PLAYER callback=\(finished)")
-                Task { @MainActor in result.finished = finished }
-            }
-            try await ready(seeking: true) { result.finished != nil }
-            XCTAssertEqual(result.finished, true)
-            XCTAssertEqual(player.currentTime().seconds, target, accuracy: 0.001)
-            XCTAssertEqual(player.rate, 0)
+            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+        }
+        try await ready(seeking: true) { !model.isSeeking }
+        XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
+        // Verify AVPlayer's measured destination after its completion too,
+        // not only optimistic UI labels.
+        for target in [7.5, 22.5, 15.0] {
+            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+            try await ready(seeking: true) { !model.isSeeking }
+            XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
+            XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
+            XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
         }
     }
 
@@ -208,10 +193,6 @@ final class LongGOPFixtureTests: XCTestCase {
 
 @MainActor private final class LongGOPRatePresentation: ObservableObject {
     @Published var visible = false
-}
-
-@MainActor private final class RawSeekResult {
-    var finished: Bool?
 }
 
 @MainActor private struct LongGOPPlayerHarness: View {

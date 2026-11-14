@@ -383,8 +383,8 @@ xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.m
 fixture_dirty=true
 expected_videos=$((expected_videos + 1))
 run_tests build/copy-results/OriginalFixtureIdentity.xcresult \
-  "-only-testing:PhotoPlayerTests/LongGOPFixtureTests"
-if [[ "$test_group" == native ]]; then exit 0; fi
+  "-only-testing:PhotoPlayerTests/LongGOPFixtureTests" || test_status=$?
+if [[ "$test_group" == native ]]; then exit "$test_status"; fi
 run_tests build/copy-results/OriginalPlaybackSeek.xcresult \
   "-only-testing:PhotoPlayerUITests/VideoPlaybackTests/testOriginalLongGOPPhotoKitVideoPlaybackRateAndSeek" || test_status=$?
 run_tests build/copy-results/OriginalSeekBarPortrait.xcresult \
