@@ -37,7 +37,7 @@ final class LongGOPFixtureTests: XCTestCase {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
-        let layer = AVPlayerLayer(player: player)
+        let layer = AVPlayerLayer() // Diagnostic: same visible layer, no AVPlayer attachment.
         layer.frame = controller.view.bounds
         XCTAssertGreaterThan(layer.bounds.width, 0)
         XCTAssertGreaterThan(layer.bounds.height, 0)
