@@ -13,7 +13,20 @@ final class LongGOPFixtureTests: XCTestCase {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let asset = try XCTUnwrap(PHAsset.fetchAssets(with: .video, options: options).firstObject)
-        let model = PlaybackModel(asset: asset)
+        // Diagnostic branch only. Use PhotoKit + AVPlayer directly, without
+        // PlaybackModel, its observers, intent state or seek queue.
+        let optionsForVideo = PHVideoRequestOptions()
+        optionsForVideo.version = .current
+        optionsForVideo.deliveryMode = .highQualityFormat
+        let loadedItem: AVPlayerItem? = await withCheckedContinuation { continuation in
+            PHImageManager.default().requestPlayerItem(forVideo: asset, options: optionsForVideo) { item, _ in
+                continuation.resume(returning: item)
+            }
+        })
+        item.audioTimePitchAlgorithm = .spectral
+        let player = AVPlayer(playerItem: item)
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try AVAudioSession.sharedInstance().setActive(true)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
@@ -23,33 +36,34 @@ final class LongGOPFixtureTests: XCTestCase {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
-        let layer = AVPlayerLayer(player: model.player)
+        let layer = AVPlayerLayer(player: player)
         layer.frame = controller.view.bounds
         XCTAssertGreaterThan(layer.bounds.width, 0)
         XCTAssertGreaterThan(layer.bounds.height, 0)
         controller.view.layer.addSublayer(layer)
-        defer { model.close(); layer.player = nil; window.isHidden = true; previous?.makeKey() }
-        model.load()
-        try await ready { model.player.timeControlStatus == .playing }
-        // Pause at the first Playing observation, without waiting for the
-        // control timer or a minimum playback time. Preserve that regression
-        // condition independently of XCTest's accessibility startup latency.
-        model.pause(); model.setRate(0.25)
-        let earlyPosition = model.player.currentTime().seconds
-        print("LongGOP early pause at \(earlyPosition)")
-        for target in [7.5, 22.5, 15.0] {
-            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
+        defer {
+            player.pause(); player.replaceCurrentItem(with: nil); layer.player = nil
+            window.isHidden = true; previous?.makeKey()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
-        try await ready(seeking: true) { !model.isSeeking }
-        XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.001)
-        // Verify AVPlayer's measured destination after its completion too,
-        // not only optimistic UI labels.
+        player.play()
+        try await ready { player.timeControlStatus == .playing && player.currentTime().seconds >= 4.25 }
+        player.pause()
+        let pausedPosition = player.currentTime().seconds
+        try await Task.sleep(for: .seconds(6))
+        XCTAssertEqual(player.currentTime().seconds, pausedPosition, accuracy: 0.001)
+        print("CI_RAW_PLAYER paused=\(pausedPosition) status=\(item.status.rawValue)")
         for target in [7.5, 22.5, 15.0] {
-            XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target); model.endScrubbing()
-            try await ready(seeking: true) { !model.isSeeking }
-            XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
-            XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
-            XCTAssertEqual(model.selectedRate, 0.25); XCTAssertNil(model.errorMessage)
+            let result = RawSeekResult()
+            print("CI_RAW_PLAYER seek=\(target)")
+            player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+                print("CI_RAW_PLAYER callback=\(finished)")
+                Task { @MainActor in result.finished = finished }
+            }
+            try await ready(seeking: true) { result.finished != nil }
+            XCTAssertEqual(result.finished, true)
+            XCTAssertEqual(player.currentTime().seconds, target, accuracy: 0.001)
+            XCTAssertEqual(player.rate, 0)
         }
     }
 
@@ -111,11 +125,19 @@ final class LongGOPFixtureTests: XCTestCase {
         XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
         // Every failing UI path selected speed through the production popover;
         // directly setting a model property did not exercise its presentation.
-        // Diagnostic branch only: keep the production surface and custom
-        // glass, but isolate presentation/dismissal of the system popover.
-        // Restore the real menu interaction before any release verification.
+        ratePresentation.visible = true
+        try await ready {
+            guard let presented = controller.presentedViewController else { return false }
+            return !presented.isBeingPresented && presented.view.window != nil
+        }
+        let menu = try XCTUnwrap(controller.presentedViewController)
         model.setRate(0.25)
-        print("CI_NATIVE_MENU diagnosticSkipped=true")
+        ratePresentation.visible = false
+        // A cleared presentation relationship alone does not prove that the
+        // outgoing popover has left the window. Complete this test setup at
+        // actual view detachment, without a fixed post-dismissal delay.
+        try await ready { controller.presentedViewController == nil && menu.view.window == nil }
+        print("CI_NATIVE_MENU dismissed=true detached=\(menu.view.window == nil) transition=\(controller.transitionCoordinator != nil)")
         let bar = try XCTUnwrap(findBar(in: controller.view))
         XCTAssertGreaterThan(bar.bounds.width, 0)
         let surface = try XCTUnwrap(findSurface(in: controller.view))
@@ -185,6 +207,10 @@ final class LongGOPFixtureTests: XCTestCase {
 
 @MainActor private final class LongGOPRatePresentation: ObservableObject {
     @Published var visible = false
+}
+
+@MainActor private final class RawSeekResult {
+    var finished: Bool?
 }
 
 @MainActor private struct LongGOPPlayerHarness: View {
