@@ -1,5 +1,9 @@
 # 開発状況
 
+## Build 15: ゼロ許容と最小有限許容の診断比較
+
+生のAVPlayer比較に対し、別ブランチでは許容値だけを0から1/600秒へ変更する。Appleのseek APIはゼロをsample-accurate経路とし追加デコード待ちの可能性を明記するため、出力列の停滞がその経路に限定されるかを比較する。停止位置±0.001秒・callback成功・15秒期限の判定は維持する。製品コード、写真抽出と復帰の実PTS・ゼロ許容は変更しない。診断用であり、このブランチからIPAを配布しない。参照: https://developer.apple.com/documentation/avfoundation/avplayer/seek(to:tolerancebefore:toleranceafter:completionhandler:)
+
 ## Build 15: 描画要素だけでは説明できない結果
 
 17927a1 / CI 43549218282は独自glassEffectを外しても製品View付きnativeで失敗（2成功・1失敗）。205286c / CI 43549316919は、同じ4.25秒以上再生→6秒停止を与えた単純UIKit PlayerLayerでも失敗し、後続の製品View付きは成功（2成功・1失敗）。0fa2a42 / CI 43549902722は速度popoverを省いた条件で3成功。これらを合わせ、独自ガラス・SwiftUI・popoverのいずれかだけを必要原因とは扱わない。仮説を目的にしたUI変更は採用しない。

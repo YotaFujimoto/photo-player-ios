@@ -56,7 +56,7 @@ final class LongGOPFixtureTests: XCTestCase {
         for target in [7.5, 22.5, 15.0] {
             let result = RawSeekResult()
             print("CI_RAW_PLAYER seek=\(target)")
-            player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+            player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: CMTime(value: 1, timescale: 600), toleranceAfter: CMTime(value: 1, timescale: 600)) { finished in
                 print("CI_RAW_PLAYER callback=\(finished)")
                 Task { @MainActor in result.finished = finished }
             }
