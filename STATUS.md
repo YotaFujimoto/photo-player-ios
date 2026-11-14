@@ -1,5 +1,17 @@
 # 開発状況
 
+## Build 15: Xcodeの端末選択での未実行を分離（2026-11-14）
+
+fc88703 / [CI 43541975372](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43541975372)の基本群は101単体と3全画面UIが成功し、FullscreenCanvasだけ試験開始前に未実行。Xcodeのschemeに対するdestination照合が60秒以内に実在端末を列挙できず、候補がplaceholderのみとなった。直前・直後の別ホストは同じUUIDで成功しており、テスト本文やシークの失敗とは区別する。CoreSimulatorとXcodeのどちらで列挙が欠けたかは当時の証跡では未確定。他群は回収まで継続し、この候補からIPAは作成しない。
+
+ビルド済みのローカルxctestrunを明示して実行し、各ホストでproject／schemeから対象を再構成する経路を省く。Appleがサポートするtest-without-building方式で、VM間共有・テスト再編・再試行は追加しない。各起動前にsimctlのavailable／Bootedを一度だけ記録・検査して、Xcode側の探索失敗と区別する。群・150ケース・40ホスト・判定・期限は同じ。まず基本群だけで検証する。
+
+## Build 15: 限定確認後の最終全件CI（2026-11-14）
+
+最新候補はfc88703f414bcb7fd891547f81f90b7f9d996b9f。[限定CI 43540936478](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43540936478) attempt 1は8分25秒で長GOPの3/3件成功。メニューのwindow離脱とtransition=false、要求→callback→MainActor処理完了、7.5／22.5／15秒の実測を確認した。製品View付きは13.315秒。異常待機の採取は発動しなかった。試験準備を補正した条件での成功であり、過去の完了待ちの内部原因や実機への非影響を確定したものではない。
+
+同一コミットの[全件CI 43541975372](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43541975372)で150 XCTest＋IPA検査4件を4群並列検証中。完了・画像・IPA検査は未完了。dist/PhotoPlayer.ipaはBuild 14を維持する。旧3791db7全件は基本105／一覧21／通常再生12成功、写真2成功・1失敗・9未実行で、合計140成功・1失敗・9未実行。未実行を除外して合格とはしていない。
+
 ## Build 15: 全件候補の長GOP完了待ちを再調査（2026-11-14）
 
 3791db72d2ef1d2d08c2b9d00d704e4171a8cf3f / [CI 43539085406](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43539085406)の写真群が、既存LongGOPFixtureTestsの製品View付き試験で失敗。最初のシーク実測は7.5秒へ動いたが、15秒以内に要求列が完了しなかった。先行する早期停止・素材識別は成功。写真／クロップUIは未到達であり、同run全体は不合格。基本群は成功し、他群は結果回収まで継続する。IPAはBuild 14のまま。

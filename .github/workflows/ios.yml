@@ -108,6 +108,7 @@ jobs:
             build/*.log
             build/toolchain.txt
             build/simulators.json
+            build/device-state-*.json
             build/fixture-info.json
             build/fixture-seek-info.json
             build/frame-fixtures/fixture-report.json

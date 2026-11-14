@@ -66,6 +66,18 @@ xcodebuild build-for-testing \
   2>&1 | tee build/test-build.log
 phase test-build-finished
 
+# Execute the exact manifest produced on this VM. Project/scheme lookup in a
+# fresh xcodebuild process lost all concrete simulator destinations between a
+# passing native host and the next UI host. No build sharing or case retry:
+# each host keeps its existing filters, destination, deadlines and result.
+test_run_files=(build/simulator/Build/Products/*.xctestrun)
+if [[ ${#test_run_files[@]} -ne 1 || ! -f "${test_run_files[0]}" ]]; then
+  echo 'Expected exactly one local build-for-testing manifest.' >&2
+  exit 1
+fi
+test_run_file="${test_run_files[0]}"
+printf 'CI_TEST_MANIFEST %s\n' "$test_run_file"
+
 record_resources() {
   {
     printf '\nResource checkpoint: %s\n' "$1"
@@ -125,15 +137,28 @@ run_tests() {
     fixture_dirty=false
   fi
   record_resources "$result_bundle"
+  # Distinguish CoreSimulator state from Xcode destination discovery failures.
+  # This is one read-only snapshot, never a reboot, retry or additional wait.
+  xcrun simctl list devices --json > "build/device-state-$test_hosts.json" || return $?
+  python3 - "$simulator_id" "build/device-state-$test_hosts.json" <<'PY' || return $?
+import json, sys
+identifier, source = sys.argv[1:]
+with open(source) as stream:
+    devices = json.load(stream)["devices"]
+matches = [(runtime, device) for runtime, group in devices.items() for device in group if device["udid"] == identifier]
+if len(matches) != 1:
+    sys.exit("Pinned simulator is absent or duplicated before test launch")
+runtime, device = matches[0]
+print("CI_TEST_DESTINATION", runtime, identifier, device["state"], device["isAvailable"], flush=True)
+if not device["isAvailable"] or device["state"] != "Booted":
+    sys.exit("Pinned simulator is not available and booted before test launch")
+PY
   local host_status=0
   touch build/test.log
   python3 scripts/watch-seek-wait.py build/test.log "$(wc -c < build/test.log)" "$result_bundle" &
   local evidence_watcher=$!
   xcodebuild test-without-building \
-  -project PhotoPlayer.xcodeproj \
-  -scheme PhotoPlayer \
-  -configuration Release \
-  -sdk iphonesimulator \
+  -xctestrun "$test_run_file" \
   -destination "platform=iOS Simulator,id=$simulator_id" \
   -parallel-testing-enabled NO \
   -maximum-concurrent-test-simulator-destinations 1 \
@@ -141,10 +166,8 @@ run_tests() {
   -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 120 \
   -maximum-test-execution-time-allowance 180 \
-  -derivedDataPath build/simulator \
   -resultBundlePath "$result_bundle" \
   "$@" \
-  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   2>&1 | tee -a build/test.log || host_status=$?
   kill "$evidence_watcher" 2>/dev/null || true
   wait "$evidence_watcher" 2>/dev/null || true

@@ -1,5 +1,17 @@
 # 検証方法と結果
 
+## fc88703全件候補: destination探索で1件未実行
+
+[CI 43541975372](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43541975372)の基本群は101単体が成功後、FullscreenCanvasのxcodebuildが01:48:11 UTCに開始し、01:49:29に実端末候補なしで終了。60秒のdestination期限で試験本文へ未到達。同じUUIDの後続Chrome／Menu／Lifecycleは60.490／56.265／73.154秒で成功し、基本104成功・1未実行。この失敗をシーク・起動後のAX失敗と混同しない。証跡build/evidence-43541975372/core/とbuild/core-43541975372.log。
+
+[Apple TN2339](https://developer.apple.com/library/archive/technotes/tn2339/_index.html)のローカルxctestrun指定へ切り替え、毎ホストのproject／scheme照合を省く。manifestは同じVMのRelease build-for-testingが生成した唯一のファイルに限定する。各ホストの直前に端末available／Bootedを一度だけ検査・記録し、失敗なら実行せず不合格とする。固定待ち、探索・試験の再試行、期限延長、ケース除外は追加しない。まず基本群でネイティブ→UIホスト遷移と全105件を検証する。探索失敗の内部原因確定とは扱わない。
+
+## fc88703: 長GOP限定成功と同一ソースの全件検証
+
+[CI 43540936478](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43540936478) attempt 1は8分25秒で3/3成功・1ホスト。早期停止1.581秒、素材識別0.007秒、製品View付き13.315秒。CI_NATIVE_MENUはdismissed=true／detached=true／transition=false。最初の7.5秒要求→callbackは約50ms、最新15秒のcallbackと処理完了も観測し、その後の7.5／22.5／15秒と実測一致・停止・0.25倍を保持した。異常採取なし。以前の失敗を環境原因や解決済みへ変更せず保持する。
+
+同じfc88703f414bcb7fd891547f81f90b7f9d996b9fの[全件CI 43541975372](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43541975372)を開始。全件の成否はこのrunだけで判定する。旧3791db7は150件中140成功・1失敗・9未実行、27分13秒で終了しIPAは作成していない。同runのHUD実frameは縦10pt・横44.33ptのボタン間隔、実2時間素材の要求と実測一致を記録したが、新runの全件成功へ合算しない。
+
 ## 3791db7全件候補: 長GOPの完了待ち失敗
 
 [CI 43539085406](https://github.com/YotaFujimoto/photo-player-ios/actions/runs/43539085406) attempt 1の写真群は早期停止2.512秒・素材識別0.014秒が成功、製品View付きケース30.255秒で15秒のシーク完了条件を満たさず失敗。初期停止位置4.272505209秒、最初の要求後のAVPlayer実測7.5秒、最新要求15秒、seeking=true。callbackログをネイティブ起動へ付けていなかったため、通知前／MainActor処理前の切り分けは未確定。失敗後のInvalidTransitionも別に保持する。写真／クロップの9件は未実行であり、除外・合格にはしない。証跡build/evidence-43539085406/frames/とbuild/frames-43539085406.log。
