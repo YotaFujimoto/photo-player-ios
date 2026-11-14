@@ -16,7 +16,7 @@ final class LongDurationPlaybackTests: XCTestCase {
         let window = UIWindow(windowScene: scene); window.frame = scene.coordinateSpace.bounds
         let controller = UIViewController(); window.rootViewController = controller; window.makeKeyAndVisible()
         let surface = VideoGestureView(frame: window.bounds); controller.view.addSubview(surface)
-        surface.playerLayer.player = model.player
+        model.connectVideoOutput(surface.playerLayer)
         defer { model.close(); window.isHidden = true; previous?.makeKey() }
         model.load(); try await ready { model.player.timeControlStatus == .playing }
         model.pause(); model.setRate(0.25)
@@ -25,6 +25,8 @@ final class LongDurationPlaybackTests: XCTestCase {
             XCTAssertEqual(model.displayedPosition, target, accuracy: 0.001)
             model.endScrubbing()
             try await ready { !model.isSeeking }
+            try await ready { surface.playerLayer.isReadyForDisplay }
+            XCTAssertTrue(surface.playerLayer.player === model.player)
             XCTAssertEqual(model.player.currentTime().seconds, target, accuracy: 0.001)
             XCTAssertEqual(model.position, target, accuracy: 0.001)
             XCTAssertFalse(model.wantsPlayback); XCTAssertEqual(model.player.rate, 0)
