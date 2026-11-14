@@ -97,6 +97,11 @@ final class SeekInteractionUITests: XCTestCase {
         // searching every AX type after Play spent the timer in input lookup.
         let playingSeek = bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         pauseButton.tap(); state(app, "Playing")
+        // In CI the input's own idle/snapshot preparation spent 3.11 seconds
+        // after Play and resolved a control that had already auto-hidden.
+        // Begin from an observed fresh visibility cycle, as during opening.
+        // This is one reveal and one seek, not an input retry or a longer timer.
+        app.revealAfterPlayerControlsHide()
         playingSeek.tap()
         let seekReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Playing")

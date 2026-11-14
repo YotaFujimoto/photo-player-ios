@@ -5,11 +5,15 @@ extension XCUIApplication {
     /// a partially spent initial timer after slow accessibility startup.
     /// Call only after asserting Playing in a non-diagnostic player.
     @MainActor func pauseAfterInitialControlsHide(file: StaticString = #filePath, line: UInt = #line) {
+        revealAfterPlayerControlsHide(file: file, line: line)
+        buttons.matching(identifier: "playPause").firstMatch.tap()
+    }
+
+    @MainActor func revealAfterPlayerControlsHide(file: StaticString = #filePath, line: UInt = #line) {
         let play = buttons.matching(identifier: "playPause").firstMatch
         let hidden = liveUIExpectation(predicate: NSPredicate(format: "exists == false"), object: play)
         XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 15), .completed, file: file, line: line)
         revealPlayerControls()
-        play.tap()
     }
 
     /// Poll from now, within the original three-second assertion deadline.
