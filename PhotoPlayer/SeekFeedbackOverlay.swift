@@ -38,14 +38,22 @@ enum SeekFeedbackStyle {
     }
     static func skipFrame(in video: CGRect, canvas: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
         let baseline = build17SkipFrame(in: video, forward: forward, playButton: playButton)
-        let center = video.minX + video.width * (forward ? 0.75 : 0.25)
+        var center = video.minX + video.width * (forward ? 0.75 : 0.25)
         var size = CGSize(width: baseline.width * 0.9, height: baseline.height * 0.9)
-        // The latest placement and Build 18 size take precedence over the old
-        // extra gap beside the button. A narrow portrait picture in landscape
-        // can have a small visual overlap; do not shrink the symbol to a dot.
         let available = min(center - video.minX, video.maxX - center)
         let fit = max(0, min(1, 2 * available / max(1, size.width)))
         size.width *= fit; size.height *= fit
+        let quarterFrame = CGRect(x: center - size.width / 2, y: video.midY - size.height / 2,
+                                  width: size.width, height: size.height)
+        // User-approved exception: portrait picture on a landscape screen.
+        // Preserve size and move outward only when the quarter center would
+        // overlap the actual central button. All other centers remain exact.
+        if canvas.width > canvas.height, video.height > video.width,
+           let playButton, quarterFrame.intersects(playButton) {
+            center = forward ? playButton.maxX + 8 + size.width / 2
+                : playButton.minX - 8 - size.width / 2
+            center = min(max(center, video.minX + size.width / 2), video.maxX - size.width / 2)
+        }
         return CGRect(x: center - size.width / 2, y: video.midY - size.height / 2, width: size.width, height: size.height)
     }
     static func horizontalFrame(video: CGRect, canvas: CGRect, playButton: CGRect?, text: String = "+0.0s") -> CGRect {
