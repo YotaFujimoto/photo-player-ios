@@ -4,7 +4,7 @@ import SwiftUI
 /// Time is measured from the current feedback, so replacement never queues turns.
 struct AnimatedSkipSymbol: View {
     let feedback: SkipFeedback
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let reduceMotion: Bool
     static let turnDuration = 0.42
 
     var body: some View {

@@ -106,7 +106,7 @@ final class SkipAnimationTests: XCTestCase {
                 [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay]] as CFDictionary)
         }
         XCTAssertTrue(CGImageDestinationFinalize(output))
-        let movie = XCTAttachment(contentsOf: url); movie.name = name; movie.lifetime = .keepAlways; add(movie)
+        let movie = XCTAttachment(contentsOfFile: url); movie.name = name; movie.lifetime = .keepAlways; add(movie)
         for index in [0, 1, 2] {
             let still = XCTAttachment(image: frames[index].1)
             still.name = "\(name)-t\(String(format: "%.3f", frames[index].0))"
@@ -125,8 +125,8 @@ private struct SkipAnimationHarness: View {
         ZStack {
             Color.black
             if let feedback = state.feedback {
-                AnimatedSkipSymbol(feedback: feedback).frame(width: 96, height: 96)
+                AnimatedSkipSymbol(feedback: feedback, reduceMotion: state.reduced).frame(width: 96, height: 96)
             }
-        }.foregroundStyle(.white).environment(\.accessibilityReduceMotion, state.reduced).ignoresSafeArea()
+        }.foregroundStyle(.white).ignoresSafeArea()
     }
 }

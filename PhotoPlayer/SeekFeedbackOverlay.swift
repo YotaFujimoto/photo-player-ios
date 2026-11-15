@@ -109,7 +109,7 @@ struct SeekFeedbackOverlay: View {
                 }
                 if let skip, video.width > 0 {
                     let frame = SeekFeedbackStyle.skipFrame(in: video, canvas: canvas, forward: skip.forward, playButton: playButtonFrame)
-                    AnimatedSkipSymbol(feedback: skip)
+                    AnimatedSkipSymbol(feedback: skip, reduceMotion: reduceMotion)
                         .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
