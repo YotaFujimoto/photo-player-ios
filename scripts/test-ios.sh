@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
+case "$test_group" in full|skip-feedback|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -294,6 +294,19 @@ if [[ "$test_group" == selection-hosts ]]; then
     run_tests "build/copy-results/SelectionRow$row.xcresult" \
       "-only-testing:PhotoPlayerUITests/VideoSelectionTests/testRow${row}SelectionBounds" || test_status=$?
   done
+  exit "$test_status"
+fi
+if [[ "$test_group" == skip-feedback ]]; then
+  run_tests build/copy-results/SkipNative.xcresult \
+    "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests" \
+    "-only-testing:PhotoPlayerTests/SkipAnimationTests" \
+    "-only-testing:PhotoPlayerTests/FrameCropTests/testAspectFitAndFeedbackStayInsideTallWideSquareImagesAcrossRotation" \
+    "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRealPlayerQueuedSkipsPreservePausedAndPlayingRate" \
+    "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek" \
+    "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testBarAndSwipeAtEndPreservePlaybackIntentAndFeedbackUsesClampedDelta" || test_status=$?
+  run_tests build/copy-results/SkipGesture.xcresult "-only-testing:$gesture_skip" || test_status=$?
+  run_tests build/copy-results/SeekFeedback.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
   exit "$test_status"
 fi
 if [[ "$test_group" == feedback-timing ]]; then

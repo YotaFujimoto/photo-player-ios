@@ -44,7 +44,7 @@ final class FrameCropTests: XCTestCase {
                 XCTAssertEqual(video.midX, bounds.midX); XCTAssertEqual(video.midY, bounds.midY)
                 XCTAssertTrue(bounds.insetBy(dx: -0.01, dy: -0.01).contains(video))
                 for forward in [false, true] {
-                    let label = SeekFeedbackStyle.skipFrame(in: video, forward: forward)
+                    let label = SeekFeedbackStyle.skipFrame(in: video, canvas: bounds, forward: forward)
                     XCTAssertTrue(video.contains(label))
                     XCTAssertLessThan(label.width, 80)
                 }

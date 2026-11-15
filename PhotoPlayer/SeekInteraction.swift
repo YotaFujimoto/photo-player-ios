@@ -45,6 +45,7 @@ struct SeekPreview: Equatable {
 
 struct SkipFeedback: Equatable, Identifiable {
     let id = UUID()
+    let presentedAt = Date()
     let forward: Bool
     let origin: Double
     let target: Double

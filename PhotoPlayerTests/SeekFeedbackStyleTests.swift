@@ -17,10 +17,24 @@ final class SeekFeedbackStyleTests: XCTestCase {
                     if video.height < 80 && visible { XCTAssertLessThan(hud.minY, video.minY, "Use existing letterbox, not a smaller picture") }
                 }
                 for forward in [false, true] {
-                    let symbol = SeekFeedbackStyle.skipFrame(in: video, forward: forward, playButton: play)
+                    let symbol = SeekFeedbackStyle.skipFrame(in: video, canvas: canvas, forward: forward, playButton: play)
                     XCTAssertTrue(video.contains(symbol)); XCTAssertLessThan(symbol.height, play.height)
                     XCTAssertEqual(symbol.midY, video.midY)
                     if !symbol.isEmpty { XCTAssertFalse(symbol.intersects(play)) }
+                    if ratio <= 1 {
+                        let previous = SeekFeedbackStyle.build17SkipFrame(in: video, forward: forward, playButton: play)
+                        XCTAssertEqual(symbol.midX, previous.midX, accuracy: 0.001, "Resizing must not move the portrait center")
+                    } else {
+                        let reference = VideoGeometry.fitted(CGSize(width: 1000, height: 1000 * ratio), in: canvas)
+                        let previous = SeekFeedbackStyle.build17SkipFrame(in: reference, forward: forward, playButton: play)
+                        if !previous.isEmpty {
+                            XCTAssertEqual((symbol.midX - video.midX) / (video.width / 2),
+                                           (previous.midX - reference.midX) / (reference.width / 2), accuracy: 0.00001)
+                        }
+                    }
+                    if abs(ratio - 1.7778) < 0.001 {
+                        print("CI_SKIP_LAYOUT canvas=\(size) direction=\(forward) video=\(video) glyph=\(symbol) ratio=\(abs(symbol.midX-video.midX)/(video.width/2))")
+                    }
                 }
             }
         }
@@ -55,6 +69,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
         defer { window.isHidden = true; previous?.makeKey() }
         for size in [CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
             for bright in [false, true] {
+                let picture = bright ? CGSize(width: 180, height: 320) : CGSize(width: 320, height: 180)
                 let record = FeedbackLayoutRecord()
                 let content = GeometryReader { geometry in
                     ZStack {
@@ -69,7 +84,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
                             let play = anchor.map { proxy[$0] }
                             SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 63.5, target: 75.8),
                                 skip: SkipFeedback(forward: bright, origin: bright ? 10 : 20, target: bright ? 20 : 10, duration: 30),
-                                pictureSize: CGSize(width: 320, height: 180), playButtonFrame: play)
+                                pictureSize: picture, playButtonFrame: play)
                                 .onAppear { record.play = play }
                                 .onChange(of: play) { _, value in record.play = value }
                         }
@@ -84,7 +99,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
                 let play = try XCTUnwrap(record.play)
                 XCTAssertEqual(play.size, CGSize(width: 80, height: 80))
                 let canvas = CGRect(origin: .zero, size: size)
-                let video = VideoGeometry.fitted(CGSize(width: 320, height: 180), in: canvas)
+                let video = VideoGeometry.fitted(picture, in: canvas)
                 let hud = SeekFeedbackStyle.horizontalFrame(video: video, canvas: canvas, playButton: play)
                 XCTAssertLessThanOrEqual(hud.maxY, play.minY - 8)
                 XCTAssertTrue(canvas.contains(hud))

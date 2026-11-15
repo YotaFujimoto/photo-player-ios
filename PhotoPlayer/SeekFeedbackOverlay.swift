@@ -15,7 +15,8 @@ enum SeekFeedbackStyle {
     // the former 44pt transparent container, as the movement/scale reference.
     private static let originalGlyph = UIImage(systemName: "goforward.10",
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .regular))!.size
-    static func skipFrame(in video: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
+    // Frozen Build 17 geometry: derive centers BEFORE resizing the glyph.
+    static func build17SkipFrame(in video: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
         let oldContainer = max(0, min(44, video.height - 4, video.width * 0.3))
         let oldScale = min(24, oldContainer * 0.55) / 24
         let oldGlyph = CGSize(width: originalGlyph.width * oldScale, height: originalGlyph.height * oldScale)
@@ -35,9 +36,31 @@ enum SeekFeedbackStyle {
         let center = min(max(desiredCenter, minX + size.width / 2), maxX - size.width / 2)
         return CGRect(x: center - size.width / 2, y: video.midY - size.height / 2, width: size.width, height: size.height)
     }
-    static func skipCenter(in video: CGRect, forward: Bool) -> CGPoint {
-        let frame = skipFrame(in: video, forward: forward)
-        return CGPoint(x: frame.midX, y: frame.midY)
+    static func skipFrame(in video: CGRect, canvas: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
+        let baseline = build17SkipFrame(in: video, forward: forward, playButton: playButton)
+        var center = baseline.midX
+        if video.width > video.height {
+            // Transpose this material's aspect ratio, then fit its portrait
+            // counterpart in this canvas. No previous video or orientation cache.
+            let reference = VideoGeometry.fitted(CGSize(width: video.height, height: video.width), in: canvas)
+            var referenceGlyph = build17SkipFrame(in: reference, forward: forward, playButton: playButton)
+            // Extremely narrow references may have no space beside the button.
+            // Derive the ratio without that obstruction, then fit the real glyph.
+            if referenceGlyph.isEmpty { referenceGlyph = build17SkipFrame(in: reference, forward: forward) }
+            let ratio = (referenceGlyph.midX - reference.midX) / max(1, reference.width / 2)
+            center = video.midX + ratio * video.width / 2
+        }
+        var size = CGSize(width: baseline.width * 0.9, height: baseline.height * 0.9)
+        // Keep the requested center/ratio even on unusual aspect ratios. Reduce
+        // only if required for containment, rather than sliding toward the button.
+        var available = min(center - video.minX, video.maxX - center)
+        if let playButton, playButton.minY < video.midY + size.height / 2,
+           playButton.maxY > video.midY - size.height / 2 {
+            available = min(available, forward ? center - playButton.maxX - 8 : playButton.minX - center - 8)
+        }
+        let fit = max(0, min(1, 2 * available / max(1, size.width)))
+        size.width *= fit; size.height *= fit
+        return CGRect(x: center - size.width / 2, y: video.midY - size.height / 2, width: size.width, height: size.height)
     }
     static func horizontalFrame(video: CGRect, canvas: CGRect, playButton: CGRect?, text: String = "+0.0s") -> CGRect {
         let textWidth = (text as NSString).size(withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .regular)]).width
@@ -85,12 +108,12 @@ struct SeekFeedbackOverlay: View {
                         .transition(.opacity)
                 }
                 if let skip, video.width > 0 {
-                    let frame = SeekFeedbackStyle.skipFrame(in: video, forward: skip.forward, playButton: playButtonFrame)
-                    Image(systemName: skip.forward ? "goforward.10" : "gobackward.10")
-                        .resizable().scaledToFit()
+                    let frame = SeekFeedbackStyle.skipFrame(in: video, canvas: canvas, forward: skip.forward, playButton: playButtonFrame)
+                    AnimatedSkipSymbol(feedback: skip)
                         .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
+                        .accessibilityElement(children: .ignore).accessibilityAddTraits(.isImage)
                         .accessibilityLabel(skip.text).accessibilityIdentifier("skipFeedback")
                         .transition(.opacity)
                 }
@@ -99,6 +122,6 @@ struct SeekFeedbackOverlay: View {
         .foregroundStyle(.white)
         .allowsHitTesting(false)
         .animation(reduceMotion ? nil : .easeOut(duration: SeekFeedbackStyle.fadeDuration), value: preview != nil)
-        .animation(reduceMotion ? nil : .easeOut(duration: SeekFeedbackStyle.fadeDuration), value: skip == nil)
+        .animation(.easeOut(duration: reduceMotion ? 0.12 : SeekFeedbackStyle.fadeDuration), value: skip == nil)
     }
 }
