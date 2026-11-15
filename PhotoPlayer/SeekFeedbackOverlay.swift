@@ -1,7 +1,6 @@
 import SwiftUI
 
 enum SeekFeedbackStyle {
-    static let columnWidth = 96.0
     static let fontSize = 16.0
     static let fadeDuration = 0.18
     static func clock(_ seconds: Double) -> String {
@@ -12,18 +11,37 @@ enum SeekFeedbackStyle {
         guard seconds.isFinite, abs(seconds) >= 0.05 else { return "+0.0s" }
         return String(format: "%@%.1fs", seconds < 0 ? "−" : "+", abs(seconds))
     }
-    static func skipFrame(in video: CGRect, forward: Bool) -> CGRect {
-        let diameter = max(0, min(44, video.height - 4, video.width * 0.3))
-        let inset = min(12, max(0, (video.width - diameter) / 4))
-        return CGRect(x: forward ? video.maxX - inset - diameter : video.minX + inset,
-                      y: video.midY - diameter / 2, width: diameter, height: diameter)
+    // Use the SF glyph's intrinsic dimensions at Build 16's 24pt font, never
+    // the former 44pt transparent container, as the movement/scale reference.
+    private static let originalGlyph = UIImage(systemName: "goforward.10",
+        withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .regular))!.size
+    static func skipFrame(in video: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
+        let oldContainer = max(0, min(44, video.height - 4, video.width * 0.3))
+        let oldScale = min(24, oldContainer * 0.55) / 24
+        let oldGlyph = CGSize(width: originalGlyph.width * oldScale, height: originalGlyph.height * oldScale)
+        let inset = min(12, max(0, (video.width - oldContainer) / 4))
+        let desiredCenter = forward ? video.maxX - inset - oldContainer / 2 - oldGlyph.width
+            : video.minX + inset + oldContainer / 2 + oldGlyph.width
+        var minX = forward ? video.midX + 4 : video.minX + 2
+        var maxX = forward ? video.maxX - 2 : video.midX - 4
+        if let playButton, playButton.minY < video.midY + oldGlyph.height * 0.75,
+           playButton.maxY > video.midY - oldGlyph.height * 0.75 {
+            if forward { minX = max(minX, playButton.maxX + 8) }
+            else { maxX = min(maxX, playButton.minX - 8) }
+        }
+        let scale = max(0, min(1.5, (maxX - minX) / max(1, oldGlyph.width), (video.height - 4) / max(1, oldGlyph.height)))
+        let size = CGSize(width: oldGlyph.width * scale, height: oldGlyph.height * scale)
+        guard size.width > 0 else { return CGRect(x: video.minX, y: video.midY, width: 0, height: 0) }
+        let center = min(max(desiredCenter, minX + size.width / 2), maxX - size.width / 2)
+        return CGRect(x: center - size.width / 2, y: video.midY - size.height / 2, width: size.width, height: size.height)
     }
     static func skipCenter(in video: CGRect, forward: Bool) -> CGPoint {
         let frame = skipFrame(in: video, forward: forward)
         return CGPoint(x: frame.midX, y: frame.midY)
     }
-    static func horizontalFrame(video: CGRect, canvas: CGRect, playButton: CGRect?) -> CGRect {
-        let width = min(columnWidth, canvas.width), height = min(32, canvas.height)
+    static func horizontalFrame(video: CGRect, canvas: CGRect, playButton: CGRect?, text: String = "+0.0s") -> CGRect {
+        let textWidth = (text as NSString).size(withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .regular)]).width
+        let width = min(ceil(textWidth) + 16, canvas.width), height = min(32, canvas.height)
         var y = video.minY + video.height * 0.25 - height / 2
         if let playButton {
             // The actual button anchor includes its safe-area offset. A short
@@ -56,8 +74,9 @@ struct SeekFeedbackOverlay: View {
             let video = VideoGeometry.fitted(pictureSize, in: canvas)
             ZStack(alignment: .topLeading) {
                 if let preview, preview.source == .horizontal, video.width > 0 {
-                    let frame = SeekFeedbackStyle.horizontalFrame(video: video, canvas: canvas, playButton: playButtonFrame)
-                    Text(SeekFeedbackStyle.difference(preview.target - preview.origin))
+                    let text = SeekFeedbackStyle.difference(preview.target - preview.origin)
+                    let frame = SeekFeedbackStyle.horizontalFrame(video: video, canvas: canvas, playButton: playButtonFrame, text: text)
+                    Text(text)
                         .font(.system(size: SeekFeedbackStyle.fontSize, weight: .regular).monospacedDigit())
                         .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                         .frame(width: frame.width, height: frame.height).transientMaterial()
@@ -66,9 +85,9 @@ struct SeekFeedbackOverlay: View {
                         .transition(.opacity)
                 }
                 if let skip, video.width > 0 {
-                    let frame = SeekFeedbackStyle.skipFrame(in: video, forward: skip.forward)
+                    let frame = SeekFeedbackStyle.skipFrame(in: video, forward: skip.forward, playButton: playButtonFrame)
                     Image(systemName: skip.forward ? "goforward.10" : "gobackward.10")
-                        .font(.system(size: min(24, frame.height * 0.55), weight: .regular))
+                        .resizable().scaledToFit()
                         .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)

@@ -69,7 +69,7 @@ struct PlaybackTransportControls: View {
                         onBegin: actions.begin, onChange: actions.change, onCommit: actions.commit, onCancel: actions.cancel)
                     .frame(maxWidth: .infinity).frame(height: 44)
                 Text(PlaybackPolicy.clock(state.duration)).fixedSize().accessibilityIdentifier("playbackDuration")
-            }.font(.caption.monospacedDigit()).lineLimit(1).fixedSize(horizontal: false, vertical: true)
+            }.font(.caption.weight(.semibold).monospacedDigit()).lineLimit(1).fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14).padding(.vertical, 2).mediaGlass()
             if diagnostics {
                 Text(state.stateText).font(.caption).accessibilityIdentifier("playerState")

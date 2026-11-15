@@ -48,9 +48,11 @@ final class SeekBarControl: UIControl {
         let x = bounds.width * CGFloat(fraction)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        track.frame = CGRect(x: 0, y: bounds.midY - 2, width: bounds.width, height: 4)
-        fill.frame = CGRect(x: 0, y: bounds.midY - 2, width: x, height: 4)
-        track.cornerRadius = 2; fill.cornerRadius = 2
+        let height: CGFloat = 9
+        track.frame = CGRect(x: 0, y: bounds.midY - height / 2, width: bounds.width, height: height)
+        fill.frame = CGRect(x: 0, y: bounds.midY - height / 2, width: x, height: height)
+        track.cornerRadius = height / 2; fill.cornerRadius = height / 2
+        fill.maskedCorners = fraction >= 1 ? [.layerMinXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMinYCorner, .layerMaxXMaxYCorner] : [.layerMinXMinYCorner, .layerMinXMaxYCorner]
         track.backgroundColor = UIColor.tertiaryLabel.resolvedColor(with: traitCollection).cgColor
         fill.backgroundColor = tintColor.resolvedColor(with: traitCollection).cgColor
         layer.opacity = isEnabled ? 1 : 0.4

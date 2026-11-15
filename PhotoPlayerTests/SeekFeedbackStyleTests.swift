@@ -17,9 +17,10 @@ final class SeekFeedbackStyleTests: XCTestCase {
                     if video.height < 80 && visible { XCTAssertLessThan(hud.minY, video.minY, "Use existing letterbox, not a smaller picture") }
                 }
                 for forward in [false, true] {
-                    let symbol = SeekFeedbackStyle.skipFrame(in: video, forward: forward)
+                    let symbol = SeekFeedbackStyle.skipFrame(in: video, forward: forward, playButton: play)
                     XCTAssertTrue(video.contains(symbol)); XCTAssertLessThan(symbol.height, play.height)
                     XCTAssertEqual(symbol.midY, video.midY)
+                    if !symbol.isEmpty { XCTAssertFalse(symbol.intersects(play)) }
                 }
             }
         }
