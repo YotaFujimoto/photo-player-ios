@@ -7,6 +7,7 @@ video, log = sys.argv[1:]
 width, height = map(int, re.findall(r"CI_DISPLAY_CANVAS (\d+) (\d+)", open(log).read())[-1])
 filters = f"scale={width}:{height},crop=320:220:20:120,scale=32:22"
 process = subprocess.Popen(["ffmpeg", "-v", "error", "-i", video, "-vf", filters,
+                            "-enc_time_base", "demux", "-fps_mode", "passthrough",
                             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
 count = active = changed = 0
 black = []
@@ -17,8 +18,13 @@ while True:
     if not frame: break
     if len(frame) != 32*22*3: raise SystemExit("Incomplete screen frame")
     count += 1
-    r, g, b = frame[3:6]
-    if g > 130 and r < 40 and b < 40:
+    def marker_pixel(x, y):
+        offset = (y*32+x)*3
+        r, g, b = frame[offset:offset+3]
+        return g > 130 and r < 40 and b < 40
+    # Check the marker's interior area, not one green pixel that could occur
+    # in a Home-screen icon after teardown. Avoid its resampled outer edge.
+    if all(marker_pixel(x, y) for x in [0, 1] for y in [0, 1]):
         active += 1
         marked.append(count)
         picture = frame[32*4*3:]

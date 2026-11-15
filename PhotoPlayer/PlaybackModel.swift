@@ -55,6 +55,8 @@ final class PlaybackModel: ObservableObject {
     private var notifications: [NSObjectProtocol] = []
     private var timeObserver: Any?
     private var seekQueue = SeekQueue()
+    private var seekGeneration = UUID()
+    private var prerollGeneration: UUID?
     private var keepsPlaybackAtSkippedEnd = false
     private var isAtSkippedEnd: Bool { keepsPlaybackAtSkippedEnd && duration > 0 && position >= duration }
     private var feedbackTask: Task<Void, Never>?
@@ -191,6 +193,12 @@ final class PlaybackModel: ObservableObject {
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) {
             @Sendable [weak self] _ in Task { @MainActor in self?.refresh(ifSession: currentSession) }
         }
+        notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemTimeJumped, object: item, queue: .main) {
+            [weak self] _ in Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                self.prepareSeekOutput()
+            }
+        })
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) {
             [weak self] _ in Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
@@ -486,6 +494,9 @@ final class PlaybackModel: ObservableObject {
     }
 
     private func performSeek(_ request: SeekRequest) {
+        player.cancelPendingPrerolls()
+        seekGeneration = UUID()
+        prerollGeneration = nil
         let currentSession = session
         trace("seek start \(request.seconds), exact=\(request.exact)")
         let diagnostics = ProcessInfo.processInfo.arguments.contains("--playback-diagnostics")
@@ -514,6 +525,25 @@ final class PlaybackModel: ObservableObject {
                     self.trace("seek completed=\(finished)")
                 }
             }
+        }
+    }
+
+    private func prepareSeekOutput() {
+        guard let request = seekQueue.active, request.exact,
+              player.status == .readyToPlay, player.rate == 0,
+              prerollGeneration != seekGeneration,
+              abs(player.currentTime().seconds - request.seconds) <= max(0.001, 1 / Double(request.timescale)) else { return }
+        // A paused long-GOP seek can advance item time while its completion is
+        // still awaiting the presentation pipeline. Prime that destination at
+        // rate zero after the actual time jump, without clearing the layer,
+        // issuing a second seek, starting audio, or using a timer as readiness.
+        prerollGeneration = seekGeneration
+        trace("seek destination preroll")
+        let diagnostics = ProcessInfo.processInfo.arguments.contains("--playback-diagnostics")
+        player.preroll(atRate: selectedRate) { finished in
+            if diagnostics { print("Playback: tick=\(ProcessInfo.processInfo.systemUptime) preroll completed=\(finished)") }
+            // Preroll completion is not evidence of screen presentation and
+            // never changes the request queue, position, or playback intent.
         }
     }
 
@@ -554,6 +584,7 @@ final class PlaybackModel: ObservableObject {
     func suspend() {
         clearFeedback()
         pause()
+        player.cancelPendingPrerolls()
         if isLoading { cancelLoading() }
         deactivateAudio()
     }
@@ -577,6 +608,7 @@ final class PlaybackModel: ObservableObject {
         isBarSeeking = false
         seekPreview = nil
         seekQueue.cancel()
+        player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
         pause()
         if let timeObserver { player.removeTimeObserver(timeObserver) }

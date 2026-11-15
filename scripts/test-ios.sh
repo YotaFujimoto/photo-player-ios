@@ -305,6 +305,8 @@ if [[ "$test_group" == seek-display ]]; then
   xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
   fixture_dirty=true; expected_videos=$((expected_videos + 1))
   run_tests build/copy-results/OriginalFixtureIdentity.xcresult "-only-testing:PhotoPlayerTests/LongGOPFixtureTests" || test_status=$?
+  run_tests build/copy-results/OriginalSeekBarLandscape.xcresult \
+    "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testOriginalLongGOPBarTapDragAndPlaybackIntentLandscape" || test_status=$?
   bash scripts/generate-long-fixture.sh
   xcrun simctl addmedia "$simulator_id" build/fixture-source/two-hour.mov
   fixture_dirty=true; expected_videos=$((expected_videos + 1))
