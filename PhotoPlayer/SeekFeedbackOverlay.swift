@@ -40,13 +40,10 @@ enum SeekFeedbackStyle {
         let baseline = build17SkipFrame(in: video, forward: forward, playButton: playButton)
         let center = video.minX + video.width * (forward ? 0.75 : 0.25)
         var size = CGSize(width: baseline.width * 0.9, height: baseline.height * 0.9)
-        // Keep the requested quarter center even on unusual aspect ratios. Reduce
-        // only if required for containment, rather than sliding toward the button.
-        var available = min(center - video.minX, video.maxX - center)
-        if let playButton, playButton.minY < video.midY + size.height / 2,
-           playButton.maxY > video.midY - size.height / 2 {
-            available = min(available, forward ? center - playButton.maxX - 8 : playButton.minX - center - 8)
-        }
+        // The latest placement and Build 18 size take precedence over the old
+        // extra gap beside the button. A narrow portrait picture in landscape
+        // can have a small visual overlap; do not shrink the symbol to a dot.
+        let available = min(center - video.minX, video.maxX - center)
         let fit = max(0, min(1, 2 * available / max(1, size.width)))
         size.width *= fit; size.height *= fit
         return CGRect(x: center - size.width / 2, y: video.midY - size.height / 2, width: size.width, height: size.height)

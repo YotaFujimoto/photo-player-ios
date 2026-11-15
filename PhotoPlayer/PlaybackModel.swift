@@ -530,6 +530,7 @@ final class PlaybackModel: ObservableObject {
 
     private func prepareSeekOutput() {
         guard let request = seekQueue.active, request.exact,
+              UIApplication.shared.applicationState == .active,
               player.status == .readyToPlay, player.rate == 0,
               prerollGeneration != seekGeneration,
               abs(player.currentTime().seconds - request.seconds) <= max(0.001, 1 / Double(request.timescale)) else { return }

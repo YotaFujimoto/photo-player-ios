@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|skip-native|seek-display|skip-feedback|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
+case "$test_group" in full|persistence|skip-native|seek-display|skip-feedback|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -291,6 +291,11 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == persistence ]]; then
+  run_tests build/copy-results/CounterPersistence.xcresult "-only-testing:PhotoPlayerUITests/CounterPersistenceTests" || test_status=$?
+  run_tests build/copy-results/InputBackground.xcresult "-only-testing:PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn" || test_status=$?
+  exit "$test_status"
+fi
 if [[ "$test_group" == full || "$test_group" == core || "$test_group" == seek-display ]]; then
   mkdir -p build/recordings
   xcrun simctl io "$simulator_id" recordVideo --codec=h264 build/recordings/seek-screen.mp4 >build/recording.log 2>&1 &

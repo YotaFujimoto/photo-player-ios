@@ -26,19 +26,17 @@ final class CounterPersistenceTests: XCTestCase {
 
         // Use a normal background transition before terminating the process.
         XCUIDevice.shared.press(.home)
-        // Observe both valid states together: state updates arrive asynchronously.
-        // Sequential waits can miss a late background update while waiting for suspension.
-        let backgroundState = NSPredicate(
-            format: "state == %d OR state == %d",
-            Int(XCUIApplication.State.runningBackground.rawValue),
-            Int(XCUIApplication.State.runningBackgroundSuspended.rawValue)
-        )
-        let backgrounded = liveUIExpectation(predicate: backgroundState, object: app)
+        // CI 43689265348 showed Home onscreen while XCUIApplication.state still
+        // reported foreground. Observe the actual Home icon before terminating;
+        // persistence still requires a real process exit and a new launch.
+        let homeIcon = XCUIApplication(bundleIdentifier: "com.apple.springboard").icons["PhotoPlayer"]
+        let backgrounded = liveUIExpectation(predicate: NSPredicate(format: "hittable == YES"), object: homeIcon)
         XCTAssertEqual(
             XCTWaiter.wait(for: [backgrounded], timeout: 10), .completed,
-            "App must leave the foreground before relaunch; state=\(app.state.rawValue)"
+            "Home must be visible before relaunch; state=\(app.state.rawValue)"
         )
         app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
         app.launch()
         app.tabBars.buttons["Diagnostics"].tap()
         XCTAssertTrue(counter.waitForExistence(timeout: 10))

@@ -20,7 +20,12 @@ final class SeekFeedbackStyleTests: XCTestCase {
                     let symbol = SeekFeedbackStyle.skipFrame(in: video, canvas: canvas, forward: forward, playButton: play)
                     XCTAssertTrue(video.contains(symbol)); XCTAssertLessThan(symbol.height, play.height)
                     XCTAssertEqual(symbol.midY, video.midY)
-                    if !symbol.isEmpty { XCTAssertFalse(symbol.intersects(play)) }
+                    // Exact quarter centers + unchanged size can overlap the
+                    // button on a narrow portrait picture in landscape. Keep
+                    // non-overlap for layouts that have room at those centers.
+                    if video.width / 4 >= play.width / 2 + symbol.width / 2 {
+                        XCTAssertFalse(symbol.intersects(play))
+                    }
                     XCTAssertEqual(symbol.midX, video.minX + video.width * (forward ? 0.75 : 0.25), accuracy: 0.001)
                     if abs(ratio - 1.7778) < 0.001 {
                         print("CI_SKIP_LAYOUT canvas=\(size) direction=\(forward) video=\(video) glyph=\(symbol) ratio=\(abs(symbol.midX-video.midX)/(video.width/2))")
