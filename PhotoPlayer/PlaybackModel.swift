@@ -288,7 +288,6 @@ final class PlaybackModel: ObservableObject {
         gestureCancellationID += 1
         keepsPlaybackAtSkippedEnd = false
         speed.endHold()
-        assign(\.wantsPlayback, false)
         pauseTransportIfNeeded()
         assign(\.actualRate, 0)
         UIApplication.shared.isIdleTimerDisabled = false
@@ -378,7 +377,7 @@ final class PlaybackModel: ObservableObject {
     @discardableResult func beginScrubbing() -> Bool { beginPreview(.bar) }
 
     private func beginPreview(_ source: SeekPreview.Source) -> Bool {
-        guard isReady, duration > 0, seekPreview == nil, !isBarSeeking else { return false }
+        guard isReady, duration > 0, seekPreview == nil, !isBarSeeking || source == .bar else { return false }
         if source == .horizontal && speed.isBoosting { return false }
         let origin = PlaybackPolicy.position(seekQueue.isBusy ? position : player.currentTime().seconds, duration: duration)
         clearFeedback()

@@ -178,6 +178,11 @@ final class PlaybackLifecycleTests: XCTestCase {
             XCTAssertTrue(model.isBarSeeking, "Tracking remains active between decoded previews")
             XCTAssertEqual(model.player.rate, 0, "No fragmentary audio during scrubbing")
             for index in 0..<200 { model.scrub(to: index.isMultiple(of: 2) ? 2 : 28) }
+            model.scrub(to: 13)
+            model.endScrubbing()
+            // Another bar input may supersede a still-committing bar seek.
+            // Hiding the play button must not disable the seek track itself.
+            XCTAssertTrue(model.beginScrubbing())
             model.scrub(to: 15)
             model.endScrubbing()
             XCTAssertTrue(model.isBarSeeking, "The final seek still owns button visibility")

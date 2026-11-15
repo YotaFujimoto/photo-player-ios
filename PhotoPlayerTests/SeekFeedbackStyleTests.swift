@@ -68,7 +68,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
                         GeometryReader { proxy in
                             let play = anchor.map { proxy[$0] }
                             SeekFeedbackOverlay(preview: SeekPreview(source: .horizontal, origin: 63.5, target: 75.8),
-                                skip: SkipFeedback(forward: true, origin: 10, target: 20, duration: 30),
+                                skip: SkipFeedback(forward: bright, origin: bright ? 10 : 20, target: bright ? 20 : 10, duration: 30),
                                 pictureSize: CGSize(width: 320, height: 180), playButtonFrame: play)
                                 .onAppear { record.play = play }
                                 .onChange(of: play) { _, value in record.play = value }

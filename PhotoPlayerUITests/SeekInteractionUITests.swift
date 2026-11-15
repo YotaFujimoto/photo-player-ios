@@ -88,6 +88,7 @@ final class SeekInteractionUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(identifier: "temporaryRate").firstMatch.exists)
         XCTAssertFalse(app.staticTexts.matching(identifier: "seekPreview").firstMatch.exists)
         XCTAssertEqual(app.playerButton("rateMenu").value as? String, "0.25×")
+        capture("normal-track-midpoint-\(orientation.rawValue)")
         // Scope both taps to the control. App-root coordinates lazily resolve
         // the entire hierarchy again while synthesizing input, which can spend
         // the three-second fullscreen deadline after a successful seek.
