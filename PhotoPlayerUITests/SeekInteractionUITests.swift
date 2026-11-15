@@ -97,7 +97,11 @@ final class SeekInteractionUITests: XCTestCase {
         // Prepare this typed input target while paused, before the hide timer;
         // searching every AX type after Play spent the timer in input lookup.
         let playingSeek = bar(app).coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
-        pauseButton.tap(); state(app, "Playing")
+        // XCTest's inferred hit point after restoring the circular button was
+        // 32pt off-centre on both axes (outside its 40pt radius). Use the actual
+        // centre of this control, not that AX fallback corner or an app-root tap.
+        let playCenter = pauseButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        playCenter.tap(); state(app, "Playing")
         // In CI the input's own idle/snapshot preparation spent 3.11 seconds
         // after Play and resolved a control that had already auto-hidden.
         // Begin from an observed fresh visibility cycle, as during opening.
@@ -107,7 +111,7 @@ final class SeekInteractionUITests: XCTestCase {
         let seekReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Playing")
         app.revealPlayerControls()
-        pauseButton.tap()
+        playCenter.tap()
         let pauseReturned = ProcessInfo.processInfo.systemUptime
         state(app, "Paused")
         // AX queries may take seconds while playback correctly advances.
