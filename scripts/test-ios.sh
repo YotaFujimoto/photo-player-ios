@@ -248,7 +248,8 @@ geometry_controls='PhotoPlayerUITests/ContactGeometryUITests/testCopyAndToggleHa
 input_on='PhotoPlayerUITests/InputLifecycleTests/testFourToFiveAfterTabReturnWithMonitor'
 input_off='PhotoPlayerUITests/InputLifecycleTests/testSameSingleTapsWithMonitorDisabled'
 input_background='PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn'
-gesture_skip='PhotoPlayerUITests/PlaybackGestureTests/testDoubleTapBoundsSingleTapAndControlsInBothOrientations'
+gesture_skip='PhotoPlayerUITests/PlaybackGestureTests/testDoubleTapBoundsSingleTapAndControlsPortrait'
+gesture_skip_landscape='PhotoPlayerUITests/PlaybackGestureTests/testDoubleTapBoundsSingleTapAndControlsLandscape'
 gesture_hold='PhotoPlayerUITests/PlaybackGestureTests/testHeldDoubleSpeedRestoresRateAndNeverStartsPausedPlayback'
 playback_seek='PhotoPlayerUITests/VideoPlaybackTests/testPhotoKitVideoPlaybackRateAndSeek'
 mkdir -p build/copy-results
@@ -304,7 +305,8 @@ if [[ "$test_group" == skip-feedback ]]; then
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRealPlayerQueuedSkipsPreservePausedAndPlayingRate" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testBarAndSwipeAtEndPreservePlaybackIntentAndFeedbackUsesClampedDelta" || test_status=$?
-  run_tests build/copy-results/SkipGesture.xcresult "-only-testing:$gesture_skip" || test_status=$?
+  run_tests build/copy-results/SkipGesturePortrait.xcresult "-only-testing:$gesture_skip" || test_status=$?
+  run_tests build/copy-results/SkipGestureLandscape.xcresult "-only-testing:$gesture_skip_landscape" || test_status=$?
   run_tests build/copy-results/SeekFeedback.xcresult \
     "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
   exit "$test_status"
@@ -425,7 +427,8 @@ run_tests build/copy-results/SeekHorizontalPortrait.xcresult "-only-testing:Phot
 run_tests build/copy-results/SeekHorizontalLandscape.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testHorizontalSwipePriorityAndHoldExclusionLandscape" || test_status=$?
 run_tests build/copy-results/SeekLayout.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testLoadingErrorAndSeekOverlaysNeverMoveNormalControls" || test_status=$?
 run_tests build/copy-results/SeekFeedback.xcresult "-only-testing:PhotoPlayerUITests/SeekInteractionUITests/testSkipFeedbackIsBoundedReplacedAndDoesNotBlockInput" || test_status=$?
-run_tests build/copy-results/GestureSkip.xcresult "-only-testing:$gesture_skip" || test_status=$?
+run_tests build/copy-results/GestureSkipPortrait.xcresult "-only-testing:$gesture_skip" || test_status=$?
+run_tests build/copy-results/GestureSkipLandscape.xcresult "-only-testing:$gesture_skip_landscape" || test_status=$?
 run_tests build/copy-results/GestureHold.xcresult "-only-testing:$gesture_hold" || test_status=$?
 fi
 

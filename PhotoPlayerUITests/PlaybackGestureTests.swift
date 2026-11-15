@@ -22,13 +22,25 @@ final class PlaybackGestureTests: XCTestCase {
     }
 
     @MainActor
-    func testDoubleTapBoundsSingleTapAndControlsInBothOrientations() {
+    func testDoubleTapBoundsSingleTapAndControlsPortrait() {
+        verifyDoubleTap(in: .portrait)
+    }
+
+    @MainActor
+    func testDoubleTapBoundsSingleTapAndControlsLandscape() {
+        verifyDoubleTap(in: .landscapeLeft)
+    }
+
+    @MainActor
+    private func verifyDoubleTap(in orientation: UIDeviceOrientation) {
         let app = open()
         defer { XCUIDevice.shared.orientation = .portrait }
         app.pauseAfterInitialControlsHide()
         state(app, "Paused")
         setRate(app, "0.25×")
-        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+        // Separate orientation cases keep the original per-case deadline and
+        // every assertion, without one long sequence consuming both budgets.
+        do {
             XCUIDevice.shared.orientation = orientation
             let surface = app.otherElements["videoSurface"]
             XCTAssertTrue(surface.isHittable)

@@ -10,6 +10,9 @@ final class SkipAnimationTests: XCTestCase {
         let window = UIWindow(windowScene: scene)
         let state = SkipAnimationState()
         let host = UIHostingController(rootView: SkipAnimationHarness(state: state))
+        // This is a small capture canvas, not a full-screen phone controller.
+        // Device safe-area insets otherwise displace the rendered ring center.
+        host.safeAreaRegions = []
         window.frame = CGRect(x: 0, y: 0, width: 120, height: 120)
         window.rootViewController = host; window.makeKeyAndVisible()
         host.view.frame = window.bounds; host.view.layoutIfNeeded()
@@ -59,7 +62,10 @@ final class SkipAnimationTests: XCTestCase {
         let format = UIGraphicsImageRendererFormat(); format.scale = 1
         format.preferredRange = .standard; format.opaque = true
         return UIGraphicsImageRenderer(size: view.bounds.size, format: format).image { _ in
-            XCTAssertTrue(view.drawHierarchy(in: view.bounds, afterScreenUpdates: true))
+            // Capture the latest committed screen without blocking for another
+            // screen update. The previous synchronous capture took 150–190ms,
+            // undersampling a 420ms turn; the task yields between real frames.
+            XCTAssertTrue(view.drawHierarchy(in: view.bounds, afterScreenUpdates: false))
         }
     }
     private func pixels(_ image: UIImage) -> [UInt8] {
@@ -127,6 +133,6 @@ private struct SkipAnimationHarness: View {
             if let feedback = state.feedback {
                 AnimatedSkipSymbol(feedback: feedback, reduceMotion: state.reduced).frame(width: 96, height: 96)
             }
-        }.foregroundStyle(.white).ignoresSafeArea()
+        }.frame(width: 120, height: 120).foregroundStyle(.white).ignoresSafeArea()
     }
 }
