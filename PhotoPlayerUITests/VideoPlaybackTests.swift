@@ -29,13 +29,13 @@ final class VideoPlaybackTests: XCTestCase {
         let state = app.staticTexts["playerState"]
         XCTAssertTrue(state.waitForExistence(timeout: 20))
         waitForLabel(state, "Playing", timeout: 30)
-        app.buttons["playPause"].tap()
+        app.buttons["playPause"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         waitForLabel(state, "Paused")
 
         app.buttons["rateMenu"].tap()
         app.buttons["0.25×"].tap()
         XCTAssertTrue((app.buttons["rateMenu"].value as? String ?? "").contains("0.25"))
-        app.buttons["playPause"].tap()
+        app.buttons["playPause"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         waitForLabel(state, "Playing")
         let initialPosition = app.staticTexts["playbackPosition"].label
         let moved = liveUIExpectation(predicate: NSPredicate(format: "label != %@", initialPosition), object: app.staticTexts["playbackPosition"])
@@ -46,14 +46,16 @@ final class VideoPlaybackTests: XCTestCase {
         let slowRate = liveUIExpectation(predicate: NSPredicate(format: "label CONTAINS '0.25'"), object: actualRate)
         XCTAssertEqual(XCTWaiter.wait(for: [slowRate], timeout: 10), .completed)
         screenshot("video-slow-playback")
-        app.buttons["playPause"].tap()
+        app.buttons["playPause"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         waitForLabel(state, "Paused")
 
+        // The restored circular control can receive a corner-biased AX hit point.
+        // Use its visible center for physical input; keep every state/rate deadline.
         dragSlider(app, to: 0.5)
         let middle = liveUIExpectation(predicate: NSPredicate(format: "label IN %@", ["0:14", "0:15", "0:16"]), object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [middle], timeout: 15), .completed)
         waitForLabel(state, "Paused")
-        app.buttons["playPause"].tap()
+        app.buttons["playPause"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         waitForLabel(state, "Playing")
         let seekStarted = ProcessInfo.processInfo.systemUptime
         app.descendants(matching: .any)["seekSlider"].coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)).tap()
@@ -71,7 +73,7 @@ final class VideoPlaybackTests: XCTestCase {
         }
         let later = liveUIExpectation(predicate: movingPosition, object: app.staticTexts["playbackPosition"])
         XCTAssertEqual(XCTWaiter.wait(for: [later], timeout: 15), .completed)
-        app.buttons["playPause"].tap()
+        app.buttons["playPause"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         waitForLabel(state, "Paused")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(app.buttons["playPause"].isHittable)
