@@ -44,6 +44,12 @@ final class SkipAnimationTests: XCTestCase {
             XCTAssertTrue(shifts.contains { forward ? $0 > 5 : $0 < -5 },
                           "Actual rendered frames must move in the requested direction: \(shifts)")
             XCTAssertFalse(shifts.contains { forward ? $0 < -5 : $0 > 5 }, "No reversed/queued turn: \(shifts)")
+            let settled = frames.filter { $0.0 > AnimatedSkipSymbol.turnDuration + 1.0 / 30 }
+            if let last = settled.last {
+                for frame in settled.dropLast() {
+                    XCTAssertLessThan(meanDifference(frame.2, last.2), 1, "No queued rotation after the current turn finishes")
+                }
+            }
             print("CI_SKIP_MOTION forward=\(forward) times=\(frames.map { $0.0 }) shifts=\(shifts)")
             try attachMovie(frames, name: forward ? "arrow-clockwise" : "arrow-counterclockwise")
         }
