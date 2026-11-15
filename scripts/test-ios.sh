@@ -349,6 +349,9 @@ if [[ "$test_group" == feedback || "$test_group" == chrome ]]; then
   exit "$test_status"
 fi
 if [[ "$test_group" == seek ]]; then
+  run_tests build/copy-results/LiveScrubbing.xcresult \
+    "-only-testing:PhotoPlayerTests/LiveScrubbingTests" \
+    "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests" || test_status=$?
   run_tests build/copy-results/LongDurationLayout.xcresult \
     "-only-testing:PhotoPlayerTests/LongDurationLayoutTests" "-only-testing:PhotoPlayerTests/SeekBarTests" \
     "-only-testing:PhotoPlayerTests/SeekInteractionTests" "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests"

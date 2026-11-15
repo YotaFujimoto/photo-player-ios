@@ -71,6 +71,8 @@ final class PlaybackLifecycleTests: XCTestCase {
                 model.cancelInteractionForRotation()
                 XCTAssertGreaterThan(model.gestureCancellationID, old)
                 model.endScrubbing(); model.endHorizontalSeek(); model.endTemporaryDoubleRate()
+                try await wait { !model.isSeeking }
+                if playing { try await wait { model.player.timeControlStatus == .playing } }
                 XCTAssertNil(model.seekPreview); XCTAssertFalse(model.isSeeking)
                 XCTAssertNil(model.horizontalFeedback)
                 XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.15)
@@ -170,14 +172,17 @@ final class PlaybackLifecycleTests: XCTestCase {
             if playing { model.togglePlayback() } else { model.pause() }
             if playing { try await wait { model.player.timeControlStatus == .playing } }
             XCTAssertTrue(model.beginScrubbing())
-            let origin = model.player.currentTime().seconds
             model.scrub(to: 8)
             XCTAssertEqual(model.displayedPosition, 8)
-            XCTAssertFalse(model.isSeeking, "Finger movement must not issue AVPlayer seeks")
-            XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.1)
+            try await wait { abs(model.player.currentTime().seconds - 8) <= 0.15 && !model.isSeeking }
+            XCTAssertTrue(model.isBarSeeking, "Tracking remains active between decoded previews")
+            XCTAssertEqual(model.player.rate, 0, "No fragmentary audio during scrubbing")
+            for index in 0..<200 { model.scrub(to: index.isMultiple(of: 2) ? 2 : 28) }
             model.scrub(to: 15)
             model.endScrubbing()
+            XCTAssertTrue(model.isBarSeeking, "The final seek still owns button visibility")
             try await wait { !model.isSeeking }
+            XCTAssertFalse(model.isBarSeeking)
             if playing { try await wait { model.player.timeControlStatus == .playing } }
             XCTAssertEqual(model.player.currentTime().seconds, 15, accuracy: 0.25)
             XCTAssertEqual(model.player.rate, playing ? 0.25 : 0)
@@ -258,6 +263,7 @@ final class PlaybackLifecycleTests: XCTestCase {
             else { model.scrub(to: 25) }
             model.suspend()
             model.endHorizontalSeek(); model.endScrubbing()
+            try await wait { !model.isSeeking }
             XCTAssertNil(model.seekPreview)
             XCTAssertFalse(model.isSeeking)
             XCTAssertEqual(model.player.currentTime().seconds, origin, accuracy: 0.1)

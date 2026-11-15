@@ -23,6 +23,10 @@ final class LongDurationPlaybackTests: XCTestCase {
         for target in [0.0, 1, 72, 1368, 3599, 3600, 3601, 5832, 7128, 7199.9, 72] {
             XCTAssertTrue(model.beginScrubbing()); model.scrub(to: target)
             XCTAssertEqual(model.displayedPosition, target, accuracy: 0.001)
+            // Real two-hour decoding BEFORE release, distinct from clock-only
+            // layout coverage. Preview tolerance does not relax the final seek.
+            try await ready { abs(model.player.currentTime().seconds - target) <= 0.151 && !model.isSeeking }
+            XCTAssertTrue(model.isBarSeeking); XCTAssertEqual(model.player.rate, 0)
             model.endScrubbing()
             try await ready { !model.isSeeking }
             try await ready { surface.playerLayer.isReadyForDisplay }

@@ -38,6 +38,9 @@ final class PlaybackModel: ObservableObject {
     @Published private(set) var wantsPlayback = false
     @Published private(set) var canPlaySlow = false
     @Published private(set) var isSeeking = false
+    // Covers finger tracking AND the final seek, independently of transient
+    // gaps between preview requests. Horizontal gestures do not own this flag.
+    @Published private(set) var isBarSeeking = false
     @Published private(set) var stateText = "Loading…"
     @Published private(set) var pictureSize = CGSize.zero
     @Published private(set) var hdrDescription = "Checking…"
@@ -55,6 +58,7 @@ final class PlaybackModel: ObservableObject {
     private var keepsPlaybackAtSkippedEnd = false
     private var isAtSkippedEnd: Bool { keepsPlaybackAtSkippedEnd && duration > 0 && position >= duration }
     private var feedbackTask: Task<Void, Never>?
+    private var scrubTask: Task<Void, Never>?
     private var audioActive = false
     private var audioActivating = false
     private var audioRequest = UUID()
@@ -191,7 +195,7 @@ final class PlaybackModel: ObservableObject {
             [weak self] _ in Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
                 // A queued seek can make an earlier end notification obsolete.
-                guard !self.seekQueue.isBusy,
+                guard self.seekPreview == nil, !self.seekQueue.isBusy,
                       self.player.currentTime().seconds >= self.duration - 0.05 else { return }
                 if self.keepsPlaybackAtSkippedEnd && self.wantsPlayback { return }
                 self.pause()
@@ -277,6 +281,9 @@ final class PlaybackModel: ObservableObject {
     }
 
     func pause() {
+        assign(\.wantsPlayback, false)
+        cancelScrubbing()
+        isBarSeeking = false
         seekPreview = nil
         gestureCancellationID += 1
         keepsPlaybackAtSkippedEnd = false
@@ -353,7 +360,7 @@ final class PlaybackModel: ObservableObject {
     }
 
     func skip(forward: Bool) {
-        guard isReady, duration > 0, seekPreview == nil else { return }
+        guard isReady, duration > 0, seekPreview == nil, !isBarSeeking else { return }
         speed.endHold()
         // While a seek is in flight, accumulate from its latest requested target.
         // Reading AVPlayer's old currentTime here would discard rapid double taps.
@@ -371,12 +378,13 @@ final class PlaybackModel: ObservableObject {
     @discardableResult func beginScrubbing() -> Bool { beginPreview(.bar) }
 
     private func beginPreview(_ source: SeekPreview.Source) -> Bool {
-        guard isReady, duration > 0, seekPreview == nil else { return false }
+        guard isReady, duration > 0, seekPreview == nil, !isBarSeeking else { return false }
         if source == .horizontal && speed.isBoosting { return false }
         let origin = PlaybackPolicy.position(seekQueue.isBusy ? position : player.currentTime().seconds, duration: duration)
         clearFeedback()
         speed.endHold()
         seekPreview = SeekPreview(source: source, origin: origin, target: origin)
+        if source == .bar { isBarSeeking = true }
         pauseTransportIfNeeded()
         trace("preview begin \(source)")
         return true
@@ -386,6 +394,16 @@ final class PlaybackModel: ObservableObject {
         guard var preview = seekPreview, preview.source == .bar else { return }
         preview.target = PlaybackPolicy.position(seconds, duration: duration)
         seekPreview = preview
+        // Coalesce input at most 15 times/second, then let the existing single
+        // in-flight queue chase only the latest destination. This is a load
+        // budget for interactive decoding, not a retry or gesture delay.
+        guard scrubTask == nil else { return }
+        scrubTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(67)) } catch { return }
+            guard let self, let latest = self.seekPreview, latest.source == .bar else { return }
+            self.scrubTask = nil
+            self.enqueueSeek(latest.target, exact: false)
+        }
     }
 
     func endScrubbing() { commitPreview(.bar) }
@@ -402,6 +420,7 @@ final class PlaybackModel: ObservableObject {
 
     private func commitPreview(_ source: SeekPreview.Source) {
         guard let preview = seekPreview, preview.source == source else { return }
+        scrubTask?.cancel(); scrubTask = nil
         seekPreview = nil
         trace("preview commit \(source) target=\(preview.target)")
         if source == .horizontal { showHorizontalFeedback(preview) }
@@ -409,7 +428,15 @@ final class PlaybackModel: ObservableObject {
     }
     private func cancelPreview(_ source: SeekPreview.Source) {
         guard let preview = seekPreview, preview.source == source else { return }
+        scrubTask?.cancel(); scrubTask = nil
         seekPreview = nil
+        if source == .bar {
+            isBarSeeking = false
+            // Preview decoding has already moved the real player. Replace any
+            // pending preview with the origin, even if its callback is late.
+            commitSeek(preview.origin)
+            return
+        }
         position = seekQueue.isBusy ? preview.origin : PlaybackPolicy.position(player.currentTime().seconds, duration: duration)
         resumeIfNeeded()
     }
@@ -484,6 +511,7 @@ final class PlaybackModel: ObservableObject {
                 if let next = self.seekQueue.finish() { self.performSeek(next) }
                 else {
                     self.isSeeking = false
+                    if self.seekPreview?.source != .bar { self.isBarSeeking = false }
                     if self.seekPreview == nil { self.position = PlaybackPolicy.position(self.player.currentTime().seconds, duration: self.duration) }
                     if finished { self.resumeIfNeeded() }
                     else {
@@ -558,6 +586,8 @@ final class PlaybackModel: ObservableObject {
         requestGate.cancel()
         if let requestID { manager.cancelImageRequest(requestID) }
         requestID = nil
+        scrubTask?.cancel(); scrubTask = nil
+        isBarSeeking = false
         seekPreview = nil
         seekQueue.cancel()
         player.currentItem?.cancelPendingSeeks()

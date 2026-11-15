@@ -54,6 +54,9 @@ struct PlayerScreen: View {
                         .anchorPreference(key: PlayerButtonBoundsKey.self, value: .bounds) { $0 }
                         .offset(x: (geometry.safeAreaInsets.trailing - geometry.safeAreaInsets.leading) / 2,
                                 y: (geometry.safeAreaInsets.bottom - geometry.safeAreaInsets.top) / 2)
+                        .opacity(model.isBarSeeking ? 0 : 1)
+                        .allowsHitTesting(!model.isBarSeeking)
+                        .accessibilityHidden(model.isBarSeeking)
                     VStack(spacing: 0) {
                         header
                         if diagnostics, let selectionTrace {
@@ -112,6 +115,7 @@ struct PlayerScreen: View {
         }
         .onChange(of: model.showsPauseControl) { _, playing in chrome.playback(playing: playing) }
         .onChange(of: model.isSeeking) { _, seeking in chrome.block(.seeking, active: seeking) }
+        .onChange(of: model.isBarSeeking) { _, seeking in chrome.block(.bar, active: seeking) }
         .onChange(of: model.isReady) { _, _ in refreshAvailability() }
         .onChange(of: model.errorMessage) { _, _ in refreshAvailability() }
         .onChange(of: diagnostics) { _, value in chrome.block(.diagnostics, active: value) }
@@ -133,6 +137,7 @@ struct PlayerScreen: View {
         chrome.playback(playing: model.showsPauseControl)
         chrome.block(.diagnostics, active: diagnostics)
         chrome.block(.seeking, active: model.isSeeking)
+        chrome.block(.bar, active: model.isBarSeeking)
         refreshAvailability()
     }
     private func refreshAvailability() {
@@ -254,7 +259,7 @@ struct PlayerScreen: View {
                     if accepted { chrome.block(.bar, active: true) }
                     return accepted
                 }, change: model.scrub, commit: {
-                    model.endScrubbing(); chrome.block(.bar, active: false)
+                    model.endScrubbing()
                 }, cancel: {
                     model.cancelScrubbing(); chrome.block(.bar, active: false)
                 }, togglePlayback: {
