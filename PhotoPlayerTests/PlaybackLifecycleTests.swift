@@ -268,6 +268,7 @@ final class PlaybackLifecycleTests: XCTestCase {
             else { model.scrub(to: 25) }
             model.suspend()
             model.endHorizontalSeek(); model.endScrubbing()
+            NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
             try await wait { !model.isSeeking }
             XCTAssertNil(model.seekPreview)
             XCTAssertFalse(model.isSeeking)
@@ -278,6 +279,7 @@ final class PlaybackLifecycleTests: XCTestCase {
         XCTAssertTrue(model.beginHorizontalSeek())
         model.updateHorizontalSeek(translation: 100, width: 300)
         model.close(); model.endHorizontalSeek()
+        NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
         XCTAssertNil(model.seekPreview)
         XCTAssertNil(model.player.currentItem)
         assertStopped(model)

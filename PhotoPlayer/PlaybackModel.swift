@@ -199,6 +199,15 @@ final class PlaybackModel: ObservableObject {
                 self.prepareSeekOutput()
             }
         })
+        notifications.append(NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) {
+            [weak self] _ in Task { @MainActor in
+                guard let self, self.session == currentSession else { return }
+                // A destination jump can arrive while backgrounded, when
+                // presentation priming is intentionally disabled. Resume only
+                // that pending preparation; never change playback intent.
+                self.prepareSeekOutput()
+            }
+        })
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) {
             [weak self] _ in Task { @MainActor in
                 guard let self, self.session == currentSession else { return }
@@ -586,6 +595,7 @@ final class PlaybackModel: ObservableObject {
         clearFeedback()
         pause()
         player.cancelPendingPrerolls()
+        prerollGeneration = nil
         if isLoading { cancelLoading() }
         deactivateAudio()
     }
