@@ -1,6 +1,7 @@
 import XCTest
 import Photos
 import AVFoundation
+import UIKit
 @testable import PhotoPlayer
 
 /// Runs against the same generated, pre-authorized PhotoKit fixtures as the UI suite.
