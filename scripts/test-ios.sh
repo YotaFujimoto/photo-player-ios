@@ -4,7 +4,7 @@ set -euo pipefail
 # Each CI group starts on a fresh standard runner, with one simulator per runner.
 # Never retry a case; the workflow requires every group before archiving.
 test_group="${TEST_GROUP:-full}"
-case "$test_group" in full|seek-display|skip-feedback|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
+case "$test_group" in full|skip-native|seek-display|skip-feedback|core|playback|library|frames|original|selection|native|seek|feedback|chrome|cleanup|presentation|photo-cleanup|feedback-timing|selection-hosts) ;; *) exit 2 ;; esac
 
 # Use the pinned stable runtime instead of selecting an installed beta/RC.
 # Do not reuse the runner image's pre-created, Watch-paired phone. In run
@@ -301,7 +301,6 @@ if [[ "$test_group" == full || "$test_group" == core || "$test_group" == seek-di
   python3 scripts/check-seek-recording.py build/recordings/seek-screen.mp4 build/test.log | tee build/recording-analysis.log || test_status=$?
 fi
 if [[ "$test_group" == seek-display ]]; then
-  run_tests build/copy-results/SymbolProbe.xcresult "-only-testing:PhotoPlayerTests/SkipAnimationTests/testStandardSymbolProbe" || test_status=$?
   run_tests build/copy-results/LiveScrubbing.xcresult "-only-testing:PhotoPlayerTests/LiveScrubbingTests" || test_status=$?
   xcrun simctl addmedia "$simulator_id" build/fixture-source/long-gop-regression.mov
   fixture_dirty=true; expected_videos=$((expected_videos + 1))
@@ -319,7 +318,7 @@ if [[ "$test_group" == selection-hosts ]]; then
   done
   exit "$test_status"
 fi
-if [[ "$test_group" == skip-feedback ]]; then
+if [[ "$test_group" == skip-feedback || "$test_group" == skip-native ]]; then
   run_tests build/copy-results/SkipNative.xcresult \
     "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests" \
     "-only-testing:PhotoPlayerTests/SkipAnimationTests" \
@@ -327,6 +326,7 @@ if [[ "$test_group" == skip-feedback ]]; then
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRealPlayerQueuedSkipsPreservePausedAndPlayingRate" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testBarAndSwipeAtEndPreservePlaybackIntentAndFeedbackUsesClampedDelta" || test_status=$?
+  if [[ "$test_group" == skip-native ]]; then exit "$test_status"; fi
   run_tests build/copy-results/SkipGesturePortrait.xcresult "-only-testing:$gesture_skip" || test_status=$?
   run_tests build/copy-results/SkipGestureLandscape.xcresult "-only-testing:$gesture_skip_landscape" || test_status=$?
   run_tests build/copy-results/SeekFeedback.xcresult \

@@ -4,31 +4,6 @@ import ImageIO
 @testable import PhotoPlayer
 
 final class SkipAnimationTests: XCTestCase {
-    @MainActor func testStandardSymbolProbe() async throws {
-        guard #available(iOS 18, *) else { throw XCTSkip("Rotate requires iOS 18") }
-        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let previous = scene.windows.first(where: \.isKeyWindow)
-        let window = UIWindow(windowScene: scene)
-        let state = StandardSymbolProbeState()
-        let host = UIHostingController(rootView: StandardSymbolProbe(state: state))
-        host.safeAreaRegions = []; window.frame = CGRect(x: 0, y: 0, width: 120, height: 120)
-        window.rootViewController = host; window.makeKeyAndVisible(); host.view.layoutIfNeeded()
-        defer { window.isHidden = true; previous?.makeKey() }
-        _ = capture(host.view, afterScreenUpdates: true)
-        let before = pixels(capture(host.view)); state.pulse += 1
-        var frames: [(Double, UIImage, [UInt8])] = []
-        let start = Date()
-        for _ in 0..<8 {
-            try await Task.sleep(for: .milliseconds(45))
-            let shot = capture(host.view); let bytes = pixels(shot)
-            print("CI_SF_PARTIAL centralDifference=\(meanDifference(core(before), core(bytes)))")
-            frames.append((Date().timeIntervalSince(start), shot, bytes))
-        }
-        try attachMovie(frames, name: "official-goforward10-byLayer-probe")
-        for name in ["arrow.clockwise", "arrow.counterclockwise"] {
-            XCTAssertNotNil(UIImage(systemName: name)); print("CI_SF_AVAILABLE \(name)")
-        }
-    }
     @MainActor func testLiveArrowMovesInBothDirectionsWhileNumeralStaysFixed() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first(where: \.isKeyWindow)
@@ -145,18 +120,6 @@ final class SkipAnimationTests: XCTestCase {
             still.name = "\(name)-t\(String(format: "%.3f", frames[index].0))"
             still.lifetime = .keepAlways; add(still)
         }
-    }
-}
-
-@MainActor private final class StandardSymbolProbeState: ObservableObject { @Published var pulse = 0 }
-@available(iOS 18, *) private struct StandardSymbolProbe: View {
-    @ObservedObject var state: StandardSymbolProbeState
-    var body: some View {
-        ZStack {
-            Color.black
-            Image(systemName: "goforward.10").font(.system(size: 80))
-                .symbolEffect(.rotate.byLayer, options: .speed(3), value: state.pulse)
-        }.foregroundStyle(.white).frame(width: 120, height: 120)
     }
 }
 

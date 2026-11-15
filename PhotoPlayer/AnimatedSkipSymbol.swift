@@ -25,7 +25,7 @@ struct SkipSymbolGlyph: View {
                 let artwork = forward ? SkipArrowArtwork.forward : SkipArrowArtwork.backward
                 let side = min(geometry.size.width, geometry.size.height)
                 let scale = side / (2 * artwork.radius)
-                Image(systemName: artwork.name).resizable()
+                Image(uiImage: artwork.image).resizable()
                     .frame(width: artwork.size.width * scale, height: artwork.size.height * scale)
                     .offset(x: (artwork.size.width / 2 - artwork.center.x) * scale,
                             y: (artwork.size.height / 2 - artwork.center.y) * scale)
@@ -43,15 +43,15 @@ struct SkipSymbolGlyph: View {
 /// semicircle defines the rotation center independently of the arrowhead. This
 /// preserves Apple's artwork while avoiding a pivot at its asymmetric bounds.
 private struct SkipArrowArtwork {
-    let name: String
+    let image: UIImage
     let size: CGSize
     let center: CGPoint
     let radius: CGFloat
-    static let forward = Self(name: "arrow.clockwise")
-    static let backward = Self(name: "arrow.counterclockwise")
+    static let forward = Self(name: "goforward")
+    static let backward = Self(name: "gobackward")
     init(name: String) {
-        self.name = name
         let symbol = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 128, weight: .regular))!
+        self.image = symbol.withRenderingMode(.alwaysTemplate)
         let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = false
         let image = UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in
             symbol.withTintColor(.white, renderingMode: .alwaysOriginal).draw(at: .zero)
