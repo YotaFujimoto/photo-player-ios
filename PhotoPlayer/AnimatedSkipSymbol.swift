@@ -5,7 +5,7 @@ import SwiftUI
 struct AnimatedSkipSymbol: View {
     let feedback: SkipFeedback
     let reduceMotion: Bool
-    static let turnDuration = 0.42
+    static let turnDuration = 0.28
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion)) { timeline in
@@ -22,7 +22,15 @@ struct SkipSymbolGlyph: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                SkipArrowShape(forward: forward, turns: turns).fill(.foreground)
+                let artwork = forward ? SkipArrowArtwork.forward : SkipArrowArtwork.backward
+                let side = min(geometry.size.width, geometry.size.height)
+                let scale = side / (2 * artwork.radius)
+                Image(systemName: artwork.name).resizable()
+                    .frame(width: artwork.size.width * scale, height: artwork.size.height * scale)
+                    .offset(x: (artwork.size.width / 2 - artwork.center.x) * scale,
+                            y: (artwork.size.height / 2 - artwork.center.y) * scale)
+                    .frame(width: side, height: side)
+                    .rotationEffect(.degrees((forward ? 1 : -1) * turns * 360))
                 Text("10")
                     .font(.system(size: min(geometry.size.width, geometry.size.height) * 0.43,
                                   weight: .medium, design: .rounded).monospacedDigit())
@@ -31,30 +39,41 @@ struct SkipSymbolGlyph: View {
     }
 }
 
-struct SkipArrowShape: Shape {
-    let forward: Bool
-    var turns: Double
-    func path(in rect: CGRect) -> Path {
-        // Unit circle: the arrowhead stays inside its envelope during rotation.
-        // Transform into the SF-glyph-sized frame last, preserving that frame's
-        // width, height and center throughout the turn.
-        var arc = Path()
-        arc.addArc(center: .zero, radius: 0.925, startAngle: .degrees(-30),
-                   endAngle: .degrees(270), clockwise: false)
-        var arrow = arc.strokedPath(StrokeStyle(lineWidth: 0.15, lineCap: .round))
-        func point(_ degrees: Double, _ radius: Double) -> CGPoint {
-            let radians = degrees * .pi / 180
-            return CGPoint(x: cos(radians) * radius, y: sin(radians) * radius)
+/// Measure only the two official SF glyphs once, never video pixels. The lower
+/// semicircle defines the rotation center independently of the arrowhead. This
+/// preserves Apple's artwork while avoiding a pivot at its asymmetric bounds.
+private struct SkipArrowArtwork {
+    let name: String
+    let size: CGSize
+    let center: CGPoint
+    let radius: CGFloat
+    static let forward = Self(name: "arrow.clockwise")
+    static let backward = Self(name: "arrow.counterclockwise")
+    init(name: String) {
+        self.name = name
+        let symbol = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 128, weight: .regular))!
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = false
+        let image = UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in
+            symbol.withTintColor(.white, renderingMode: .alwaysOriginal).draw(at: .zero)
+        }.cgImage!
+        let w = image.width, h = image.height
+        var bytes = [UInt8](repeating: 0, count: w * h * 4)
+        bytes.withUnsafeMutableBytes { raw in
+            let context = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
         }
-        var head = Path()
-        head.move(to: point(-65, 0.96))
-        head.addLine(to: point(-102, 0.99))
-        head.addLine(to: point(-96, 0.57)); head.closeSubpath()
-        arrow.addPath(head)
-        if !forward { arrow = arrow.applying(CGAffineTransform(scaleX: -1, y: 1)) }
-        let angle = (forward ? 1.0 : -1.0) * turns * 2 * .pi
-        return arrow.applying(CGAffineTransform(rotationAngle: angle)
-            .concatenating(CGAffineTransform(scaleX: rect.width / 2, y: rect.height / 2))
-            .concatenating(CGAffineTransform(translationX: rect.midX, y: rect.midY)))
+        var ink: [CGPoint] = []
+        for y in 0..<h { for x in 0..<w where bytes[(y*w+x)*4+3] > 127 {
+            ink.append(CGPoint(x: CGFloat(x)+0.5, y: CGFloat(y)+0.5))
+        } }
+        let lower = ink.filter { $0.y >= CGFloat(h) * 0.45 }
+        let left = lower.map(\.x).min()!, right = lower.map(\.x).max()!
+        let bottom = lower.map(\.y).max()!
+        let pivot = CGPoint(x: (left + right) / 2, y: bottom - (right - left) / 2)
+        center = pivot
+        radius = ink.map { hypot($0.x - pivot.x, $0.y - pivot.y) }.max()! + 0.5
+        size = symbol.size
     }
 }

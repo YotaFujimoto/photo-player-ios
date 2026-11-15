@@ -62,7 +62,9 @@ final class SkipAnimationTests: XCTestCase {
                 XCTAssertLessThan(meanDifference(core(first.2), core(frame.2)), 1,
                                   "The numeral must not rotate or translate with the arrow")
             }
-            let pairs = zip(frames, frames.dropFirst()).filter { $0.1.0 < 0.40 && $0.1.0 - $0.0.0 < 0.17 }
+            let pairs = zip(frames, frames.dropFirst()).filter {
+                $0.1.0 < AnimatedSkipSymbol.turnDuration && $0.1.0 - $0.0.0 < AnimatedSkipSymbol.turnDuration / 2
+            }
             let shifts = pairs.map { angularShift(profile($0.0.2), profile($0.1.2)) }
             XCTAssertTrue(shifts.contains { forward ? $0 > 5 : $0 < -5 },
                           "Actual rendered frames must move in the requested direction: \(shifts)")

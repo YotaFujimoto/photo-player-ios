@@ -21,17 +21,7 @@ final class SeekFeedbackStyleTests: XCTestCase {
                     XCTAssertTrue(video.contains(symbol)); XCTAssertLessThan(symbol.height, play.height)
                     XCTAssertEqual(symbol.midY, video.midY)
                     if !symbol.isEmpty { XCTAssertFalse(symbol.intersects(play)) }
-                    if ratio <= 1 {
-                        let previous = SeekFeedbackStyle.build17SkipFrame(in: video, forward: forward, playButton: play)
-                        XCTAssertEqual(symbol.midX, previous.midX, accuracy: 0.001, "Resizing must not move the portrait center")
-                    } else {
-                        let reference = VideoGeometry.fitted(CGSize(width: 1000, height: 1000 * ratio), in: canvas)
-                        let previous = SeekFeedbackStyle.build17SkipFrame(in: reference, forward: forward, playButton: play)
-                        if !previous.isEmpty {
-                            XCTAssertEqual((symbol.midX - video.midX) / (video.width / 2),
-                                           (previous.midX - reference.midX) / (reference.width / 2), accuracy: 0.00001)
-                        }
-                    }
+                    XCTAssertEqual(symbol.midX, video.minX + video.width * (forward ? 0.75 : 0.25), accuracy: 0.001)
                     if abs(ratio - 1.7778) < 0.001 {
                         print("CI_SKIP_LAYOUT canvas=\(size) direction=\(forward) video=\(video) glyph=\(symbol) ratio=\(abs(symbol.midX-video.midX)/(video.width/2))")
                     }

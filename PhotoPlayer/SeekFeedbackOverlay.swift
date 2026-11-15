@@ -38,20 +38,9 @@ enum SeekFeedbackStyle {
     }
     static func skipFrame(in video: CGRect, canvas: CGRect, forward: Bool, playButton: CGRect? = nil) -> CGRect {
         let baseline = build17SkipFrame(in: video, forward: forward, playButton: playButton)
-        var center = baseline.midX
-        if video.width > video.height {
-            // Transpose this material's aspect ratio, then fit its portrait
-            // counterpart in this canvas. No previous video or orientation cache.
-            let reference = VideoGeometry.fitted(CGSize(width: video.height, height: video.width), in: canvas)
-            var referenceGlyph = build17SkipFrame(in: reference, forward: forward, playButton: playButton)
-            // Extremely narrow references may have no space beside the button.
-            // Derive the ratio without that obstruction, then fit the real glyph.
-            if referenceGlyph.isEmpty { referenceGlyph = build17SkipFrame(in: reference, forward: forward) }
-            let ratio = (referenceGlyph.midX - reference.midX) / max(1, reference.width / 2)
-            center = video.midX + ratio * video.width / 2
-        }
+        let center = video.minX + video.width * (forward ? 0.75 : 0.25)
         var size = CGSize(width: baseline.width * 0.9, height: baseline.height * 0.9)
-        // Keep the requested center/ratio even on unusual aspect ratios. Reduce
+        // Keep the requested quarter center even on unusual aspect ratios. Reduce
         // only if required for containment, rather than sliding toward the button.
         var available = min(center - video.minX, video.maxX - center)
         if let playButton, playButton.minY < video.midY + size.height / 2,
