@@ -259,6 +259,7 @@ if [[ "$test_group" == full || "$test_group" == core ]]; then
   run_tests build/copy-results/UnitTests.xcresult "-only-testing:PhotoPlayerTests" \
     "-skip-testing:PhotoPlayerTests/LongGOPFixtureTests" \
     "-skip-testing:PhotoPlayerTests/LongDurationPlaybackTests" \
+    "-skip-testing:PhotoPlayerTests/SkipAnimationTests" \
     "-skip-testing:PhotoPlayerTests/SeekDisplayTests"
 fi
 if [[ "${PLAYBACK_CHECK_ONLY:-false}" == true ]]; then
@@ -291,6 +292,15 @@ fi
 # Collect independent UI failures in one run; keep every case, deadline and
 # nonzero result. No retries or acceptance changes. Unit/build gates stay fatal.
 test_status=0
+if [[ "$test_group" == full || "$test_group" == core || "$test_group" == skip-native || "$test_group" == skip-feedback ]]; then
+  mkdir -p build/recordings
+  xcrun simctl io "$simulator_id" recordVideo --codec=h264 build/recordings/skip-screen.mp4 >build/skip-recording.log 2>&1 &
+  recording_pid=$!
+  run_tests build/copy-results/SkipAnimation.xcresult "-only-testing:PhotoPlayerTests/SkipAnimationTests" || test_status=$?
+  kill -INT "$recording_pid"
+  wait "$recording_pid" || true
+  python3 scripts/check-skip-recording.py build/recordings/skip-screen.mp4 build/test.log | tee build/skip-recording-analysis.log || test_status=$?
+fi
 if [[ "$test_group" == persistence ]]; then
   run_tests build/copy-results/CounterPersistence.xcresult "-only-testing:PhotoPlayerUITests/CounterPersistenceTests" || test_status=$?
   run_tests build/copy-results/InputBackground.xcresult "-only-testing:PhotoPlayerUITests/InputLifecycleTests/testBackgroundStopsPlaybackAndInputContinuesAfterReturn" || test_status=$?
@@ -328,7 +338,6 @@ fi
 if [[ "$test_group" == skip-feedback || "$test_group" == skip-native ]]; then
   run_tests build/copy-results/SkipNative.xcresult \
     "-only-testing:PhotoPlayerTests/SeekFeedbackStyleTests" \
-    "-only-testing:PhotoPlayerTests/SkipAnimationTests" \
     "-only-testing:PhotoPlayerTests/FrameCropTests/testAspectFitAndFeedbackStayInsideTallWideSquareImagesAcrossRotation" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRealPlayerQueuedSkipsPreservePausedAndPlayingRate" \
     "-only-testing:PhotoPlayerTests/PlaybackLifecycleTests/testRotationDiscardsInteractionsButKeepsIntentRateAndCommittedSeek" \
