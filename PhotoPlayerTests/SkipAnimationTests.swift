@@ -18,7 +18,7 @@ final class SkipAnimationTests: XCTestCase {
         host.view.frame = window.bounds; host.view.layoutIfNeeded()
         defer { state.feedback = nil; window.isHidden = true; previous?.makeKey() }
         // Warm the real timeline/rendering view before starting the measured pulse.
-        _ = capture(host.view)
+        _ = capture(host.view, afterScreenUpdates: true)
         try await Task.sleep(for: .milliseconds(80))
         for (pulse, forward) in [true, false, true].enumerated() {
             // Replace an existing pulse, including a reversal, without removing
@@ -58,14 +58,14 @@ final class SkipAnimationTests: XCTestCase {
         XCTAssertLessThan(pixels(capture(host.view)).map(Int.init).reduce(0, +), 100, "Removal leaves no timeline drawing")
     }
 
-    @MainActor private func capture(_ view: UIView) -> UIImage {
+    @MainActor private func capture(_ view: UIView, afterScreenUpdates: Bool = false) -> UIImage {
         let format = UIGraphicsImageRendererFormat(); format.scale = 1
         format.preferredRange = .standard; format.opaque = true
         return UIGraphicsImageRenderer(size: view.bounds.size, format: format).image { _ in
             // Capture the latest committed screen without blocking for another
             // screen update. The previous synchronous capture took 150–190ms,
             // undersampling a 420ms turn; the task yields between real frames.
-            XCTAssertTrue(view.drawHierarchy(in: view.bounds, afterScreenUpdates: false))
+            XCTAssertTrue(view.drawHierarchy(in: view.bounds, afterScreenUpdates: afterScreenUpdates))
         }
     }
     private func pixels(_ image: UIImage) -> [UInt8] {
