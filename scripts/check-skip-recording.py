@@ -35,32 +35,39 @@ def profile(p):
                 for r in [40,43,46]) for d in range(360)]
 def shift(a,b):
     return min(range(-160,161), key=lambda s: sum(abs(a[d]-b[(d+s)%360]) for d in range(360)))
+def presentation_end(frame):
+    # simctl emits variable-rate video: a static screen is one frame held until
+    # the next PTS, not repeated stills. Use the actual presentation interval.
+    return float(times[frame[2]+1]["best_effort_timestamp_time"]) if frame[2]+1<len(times) else frame[0]
 report = {"screenFrames": count, "pulses": []}
 failures = []
 for index, frames in enumerate(groups):
-    if len(frames)<3:
+    if len(frames)<(3 if index<3 else 1):
         failures.append(f"Marker {index+1}: insufficient actual screen frames ({len(frames)})")
         continue
     start = frames[0][0]
     if index < 4:
         if sum(core(frames[0][1])) < 1000: failures.append(f"Marker {index+1}: numeral not visible")
         drift = max(difference(core(frames[0][1]), core(f[1])) for f in frames)
-        # H.264 recording can perturb even unchanged edges. Three luma levels
-        # allow codec noise, not the large change from moving/rotating the 10.
-        if drift > 3: failures.append(f"Marker {index+1}: numeral changed ({drift})")
+        # Keep the original one-level numeral/stillness limit. The recorded
+        # fixed numeral varied by less than 0.02 luma levels in this fixture.
+        if drift > 1: failures.append(f"Marker {index+1}: numeral changed ({drift})")
     if index < 3:
         pairs = [(a,b) for a,b in zip(frames,frames[1:]) if b[0]-start<0.28 and b[0]-a[0]<0.14]
         shifts = [shift(profile(a[1]),profile(b[1])) for a,b in pairs]
         forward = index != 1
         if not any(s>5 if forward else s < -5 for s in shifts): failures.append(f"Pulse {index+1}: no observed turn {shifts}")
         if any(s < -5 if forward else s>5 for s in shifts): failures.append(f"Pulse {index+1}: reversed turn {shifts}")
-        settled = [f for f in frames if f[0]-start > 0.32]
-        if index != 1 and len(settled)<2: failures.append(f"Pulse {index+1}: no settled frames")
-        if settled and any(difference(f[1],settled[-1][1])>3 for f in settled): failures.append(f"Pulse {index+1}: queued/late turn")
-        report["pulses"].append({"pulse":index+1,"frames":len(frames),"duration":frames[-1][0]-start,"shifts":shifts,"numeralDrift":drift})
+        settled = [f for f in frames if presentation_end(f)-start > 0.32]
+        if index != 1 and not settled: failures.append(f"Pulse {index+1}: no settled presentation interval")
+        if settled and any(difference(f[1],settled[-1][1])>1 for f in settled): failures.append(f"Pulse {index+1}: queued/late turn")
+        report["pulses"].append({"pulse":index+1,"frames":len(frames),"duration":presentation_end(frames[-1])-start,"shifts":shifts,"numeralDrift":drift})
     elif index == 3:
-        if any(difference(f[1],frames[0][1])>3 for f in frames): failures.append("Reduce Motion changed the arrow")
-    elif any(sum(f[1])/len(f[1])>1 for f in frames): failures.append("Removal left a visible arrow")
+        if presentation_end(frames[-1])-start < 0.3: failures.append("Reduce Motion observation too short")
+        if any(difference(f[1],frames[0][1])>1 for f in frames): failures.append("Reduce Motion changed the arrow")
+    else:
+        if presentation_end(frames[-1])-start < 0.1: failures.append("Removal observation too short")
+        if any(sum(f[1])/len(f[1])>1 for f in frames): failures.append("Removal left a visible arrow")
 report["failures"] = failures
 print("CI_SKIP_SCREEN", json.dumps(report))
 with open(video+".json","w") as stream: json.dump(report,stream,indent=2)
